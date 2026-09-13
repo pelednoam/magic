@@ -14,7 +14,6 @@ from mtgcoach.carddata import manifest as manifest_mod
 from mtgcoach.carddata.commands import FAILED, OK, safe
 from mtgcoach.carddata.paths import effects_path, manifest_path, set_dir
 from mtgcoach.carddata.sealed import CardAbilities, dump, load
-from mtgcoach.core.abilities import UnmodeledAbility
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -71,22 +70,47 @@ def review(data_root: Path, set_code: SetCode, out: TextIO) -> int:
 
     cards = load(path)
     unmodelled = [c for c in cards if not c.is_modelled]
+    doubtful = [c for c in cards if c.confidence in {"low", "medium"} and c.is_modelled]
+
     for card in unmodelled:
         print(f"  unmodelled  {safe(card.name)}", file=out)
-        for ability in card.abilities:
-            if isinstance(ability, UnmodeledAbility):
-                print(f"                {safe(ability.reason)[:90]}", file=out)
+        for reason in card.unmodelled_reasons:
+            print(f"                {safe(reason)[:90]}", file=out)
+    for card in doubtful:
+        print(f"  {card.confidence:<10}  {safe(card.name)}", file=out)
+        if card.notes:
+            print(f"                {safe(card.notes)[:90]}", file=out)
     modelled = len(cards) - len(unmodelled)
     share = 100 * modelled / len(cards) if cards else 0
     print(f"{modelled}/{len(cards)} cards fully modelled ({share:.0f}%)", file=out)
     return OK
 
 
-def seal(data_root: Path, set_code: SetCode, out: TextIO) -> int:
-    """Promote reviewed proposals to the fixture the engine reads."""
+def seal(
+    data_root: Path,
+    set_code: SetCode,
+    out: TextIO,
+    model: str = "",
+    *,
+    accepted: bool = False,
+) -> int:
+    """Promote reviewed proposals to the fixture the engine reads.
+
+    ``accepted`` is the human step made explicit. Without it, sealing would take
+    a model's output straight to the engine with nothing recording that anyone
+    had looked -- and since the fixture is marked generated, the diff would not
+    show it either.
+    """
     source = set_dir(data_root, set_code) / PROPOSALS
     if not source.exists():
         print(f"nothing to seal; run `mtgcoach effects extract {set_code}`", file=out)
+        return FAILED
+    if not accepted:
+        print(
+            f"review {set_code} first (`mtgcoach effects review {set_code}`), "
+            "then seal with --accept",
+            file=out,
+        )
         return FAILED
 
     cards = load(source)
@@ -99,6 +123,7 @@ def seal(data_root: Path, set_code: SetCode, out: TextIO) -> int:
         card_count=len(cards),
         modelled_count=sum(1 for c in cards if c.is_modelled),
         sha256=manifest_mod.sha256_of(destination),
+        model=model,
     )
     manifest_mod.write(manifest_path(data_root, set_code), record)
     print(

@@ -8,6 +8,7 @@ a coach confidently doing the wrong thing.
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 from mtgcoach.carddata.effectparts import (
@@ -43,6 +44,13 @@ from mtgcoach.core.targets import Controller, TargetSpec
 from mtgcoach.core.vocabulary import CounterKind, Duration
 from mtgcoach.core.zones import ZoneName
 
+#: One or more brace-delimited symbols: {G}, {2}{W}, {W/U}, {X}. Empty is legal
+#: -- a land's cost is empty -- but a sentence is not.
+MANA_SYMBOLS = re.compile(r"(?:\{[^{}]{1,5}\})*")
+
+#: Bare symbols with no braces, as the extractor often writes them.
+BARE_SYMBOLS = re.compile(r"[WUBRGCSXwubrgcsx0-9]+")
+
 if TYPE_CHECKING:
     from mtgcoach.carddata.jsondata import JsonObject
     from mtgcoach.core.effects import Effect
@@ -54,6 +62,26 @@ def _enum[T](factory: type[T], name: str, label: str, context: str) -> T:
     except ValueError as exc:
         msg = f"{context}: unknown {label} {name!r}"
         raise MalformedJsonError(msg) from exc
+
+
+def _mana(text: str, context: str) -> str:
+    """Normalise a mana string to brace form, rejecting anything that is not one.
+
+    Every neighbouring field is a closed enum the decoder rejects on; an
+    arbitrary string here would hand the solver something it cannot parse,
+    discovered at the table rather than at import.
+
+    Bare symbols are accepted and braced: the extractor wrote ``G`` for seven of
+    the eight mana abilities in the box and ``{U}`` for the eighth, and ``G``
+    means exactly one thing. Normalising here means the stored form is canonical
+    whichever way it arrived.
+    """
+    if MANA_SYMBOLS.fullmatch(text):
+        return text
+    if BARE_SYMBOLS.fullmatch(text):
+        return "".join(f"{{{symbol}}}" for symbol in text.upper())
+    msg = f"{context}: {text!r} is not a mana cost"
+    raise MalformedJsonError(msg)
 
 
 def _int(obj: JsonObject, key: str, context: str) -> int:
@@ -140,7 +168,7 @@ def decode(value: object, context: str) -> Effect:
             return CreateTokens(_int(obj, "count", where), decode_token(obj["token"], where))
         case "produce_mana":
             return ProduceMana(
-                require_str(obj, "mana", where),
+                _mana(require_str(obj, "mana", where), where),
                 decode_amount(obj.get("amount", 1), where),
             )
         case "unmodeled":

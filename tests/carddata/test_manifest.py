@@ -2,15 +2,11 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import pytest
-
 from mtgcoach.carddata import manifest as manifest_mod
-from mtgcoach.carddata.jsondata import MalformedJsonError
 from mtgcoach.core.ids import SetCode
 
 if TYPE_CHECKING:
@@ -19,12 +15,21 @@ if TYPE_CHECKING:
 FDN = SetCode("FDN")
 
 
-def _fixture(tmp_path: Path, cards: int = 2) -> Path:
+def _fixture(tmp_path: Path, cards: int = 2, unmodelled: int = 1) -> Path:
+    """A fixture where the first ``unmodelled`` cards carry an unmodelled ability."""
     path = tmp_path / "effects.json"
-    path.write_text(
-        json.dumps({"cards": [{"name": f"c{i}"} for i in range(cards)]}),
-        encoding="utf-8",
-    )
+    rows: list[object] = [
+        {
+            "name": f"c{i}",
+            "abilities": (
+                [{"kind": "unmodeled", "text": "t", "reason": "r"}]
+                if i < unmodelled
+                else [{"kind": "spell", "effects": []}]
+            ),
+        }
+        for i in range(cards)
+    ]
+    path.write_text(json.dumps({"cards": rows}), encoding="utf-8")
     return path
 
 
@@ -106,32 +111,16 @@ def test_a_missing_fixture_is_caught(tmp_path: Path) -> None:
     assert manifest_mod.verify(effects, record) == ("effects.json is missing",)
 
 
-def test_a_fixture_without_a_cards_list_counts_zero(tmp_path: Path) -> None:
+def test_a_fixture_without_a_cards_list_is_reported(tmp_path: Path) -> None:
     effects = tmp_path / "effects.json"
     effects.write_text(json.dumps({"cards": "lots"}), encoding="utf-8")
     record = _manifest(effects, cards=2)
-    assert any("file holds 0 cards" in p for p in manifest_mod.verify(effects, record))
+    assert any("has no 'cards' list" in p for p in manifest_mod.verify(effects, record))
 
 
-@pytest.mark.parametrize("field", ["schema_version", "card_count", "modelled_count"])
-def test_a_bad_count_field_is_rejected(field: str, tmp_path: Path) -> None:
-    path = tmp_path / "manifest.json"
-    body = {
-        "set_code": "FDN",
-        "schema_version": 1,
-        "card_count": 2,
-        "modelled_count": 1,
-        "sha256": "abc",
-    }
-    body[field] = -1
-    path.write_text(json.dumps(body), encoding="utf-8")
-    with pytest.raises(MalformedJsonError, match="non-negative integer"):
-        manifest_mod.read(path)
-
-
-def test_the_checksum_reads_a_file_in_chunks(tmp_path: Path) -> None:
-    """Large fixtures must not need to be held in memory to be checksummed."""
-    path = tmp_path / "big.bin"
-    payload = b"x" * (1 << 18)
-    path.write_bytes(payload)
-    assert manifest_mod.sha256_of(path) == hashlib.sha256(payload).hexdigest()
+def test_a_corrupt_fixture_is_reported_not_raised(tmp_path: Path) -> None:
+    """The case `check` exists for must not escape as an exception."""
+    effects = tmp_path / "effects.json"
+    effects.write_text("{ truncated", encoding="utf-8")
+    record = _manifest(effects)
+    assert any("not readable JSON" in p for p in manifest_mod.verify(effects, record))

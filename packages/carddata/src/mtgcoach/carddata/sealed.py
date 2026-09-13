@@ -19,6 +19,7 @@ from mtgcoach.carddata.jsondata import (
     require_object,
     require_str,
 )
+from mtgcoach.core.abilities import unmodelled_reasons
 from mtgcoach.core.ids import OracleId
 
 if TYPE_CHECKING:
@@ -35,15 +36,23 @@ class CardAbilities:
     name: str
     abilities: tuple[Ability, ...]
     notes: str = ""
+    #: The extractor's own confidence, carried on a *proposal*. Empty on sealed
+    #: data, where it no longer means anything: sealing is a person saying yes.
+    confidence: str = ""
 
     @property
     def is_modelled(self) -> bool:
-        """Whether every ability on this card is expressible.
+        """Whether every ability on this card is expressible, all the way down.
 
         A card with no abilities at all counts: a vanilla creature is fully
         understood, it simply does nothing.
         """
-        return not any(type(a).__name__ == "UnmodeledAbility" for a in self.abilities)
+        return not self.unmodelled_reasons
+
+    @property
+    def unmodelled_reasons(self) -> tuple[str, ...]:
+        """Every reason this card is not fully expressible, at any depth."""
+        return tuple(reason for a in self.abilities for reason in unmodelled_reasons(a))
 
 
 def dump(path: Path, cards: list[CardAbilities]) -> None:
@@ -59,6 +68,7 @@ def dump(path: Path, cards: list[CardAbilities]) -> None:
                 "oracle_id": card.oracle_id,
                 "name": card.name,
                 "notes": card.notes,
+                "confidence": card.confidence,
                 "abilities": [encode(a) for a in card.abilities],
             }
             for card in sorted(cards, key=lambda c: c.name)
@@ -91,4 +101,5 @@ def _card(value: object, context: str) -> CardAbilities:
         name=name,
         abilities=tuple(decode(a, name) for a in as_array(obj.get("abilities")) or []),
         notes=optional_str(obj, "notes"),
+        confidence=optional_str(obj, "confidence"),
     )

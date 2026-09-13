@@ -72,6 +72,12 @@ def build_parser() -> argparse.ArgumentParser:
     ):
         sub = effects.add_parser(name, help=helptext)
         sub.add_argument("set_code", type=_set_code)
+        if name == "seal":
+            sub.add_argument(
+                "--accept",
+                action="store_true",
+                help="Confirm the proposals have been reviewed.",
+            )
 
     pool = top.add_parser("pool", help="Choose what you own.").add_subparsers(
         dest="action", required=True
@@ -100,7 +106,13 @@ def _dispatch(args: argparse.Namespace, store: CardStore, data_root: Path, out: 
             store, ClaudeCliExtractor(), data_root, args.set_code, out
         ),
         ("effects", "review"): lambda: effectcommands.review(data_root, args.set_code, out),
-        ("effects", "seal"): lambda: effectcommands.seal(data_root, args.set_code, out),
+        ("effects", "seal"): lambda: effectcommands.seal(
+            data_root,
+            args.set_code,
+            out,
+            ClaudeCliExtractor().model,
+            accepted=args.accept,
+        ),
         ("effects", "check"): lambda: effectcommands.check(data_root, args.set_code, out),
         ("pool", "show"): lambda: commands.pool_show(store, out),
         ("pool", "enable"): lambda: commands.pool_enable(store, args.set_code, out),

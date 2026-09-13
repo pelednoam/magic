@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, Protocol
 
+from mtgcoach.core.abilities import unmodelled_reasons
 from mtgcoach.core.amounts import Quantity
 from mtgcoach.core.targets import Condition, Controller, TargetKind
 from mtgcoach.core.vocabulary import (
@@ -87,7 +88,7 @@ class Proposal:
     def needs_attention(self) -> bool:
         """Whether a reviewer should look at this one before the easy ones."""
         return self.confidence is not Confidence.HIGH or any(
-            type(a).__name__ == "UnmodeledAbility" for a in self.abilities
+            unmodelled_reasons(a) for a in self.abilities
         )
 
 
@@ -113,11 +114,14 @@ class EffectExtractor(Protocol):
 
 
 def vocabulary() -> str:
-    """The schema, described for a prompt, generated from the code itself.
+    """The schema, described for a prompt.
 
-    Written out by hand this would drift from the codec the first time an enum
-    gained a member, and the prompt would then ask for values the decoder
-    rejects.
+    The enum lines really are generated from the code, so a new target kind or
+    trigger event reaches the prompt automatically. The two *kind* lists are
+    hand-written -- the tag strings live in the codec's match arms, not on the
+    classes -- so ``test_extraction`` checks every one of them against the
+    decoder and against the unions. An earlier version of this docstring claimed
+    the whole thing was generated and could not drift, which was not true.
     """
     lines = [
         "ability kinds: " + ", ".join(ABILITY_KINDS),

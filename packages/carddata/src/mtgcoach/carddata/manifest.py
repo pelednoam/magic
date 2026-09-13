@@ -19,6 +19,8 @@ from typing import TYPE_CHECKING
 
 from mtgcoach.carddata.jsondata import (
     MalformedJsonError,
+    as_object,
+    optional_str,
     require_object,
     require_str,
 )
@@ -27,7 +29,7 @@ from mtgcoach.core.ids import SetCode
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from mtgcoach.carddata.jsondata import JsonObject
+    from mtgcoach.carddata.jsondata import JsonObject, JsonValue
 
 #: Bumped when the effect or ability schema changes shape. A fixture sealed
 #: under an older version cannot be trusted to decode into the same meaning.
@@ -43,6 +45,7 @@ class Manifest:
     card_count: int
     modelled_count: int
     sha256: str
+    model: str = ""
 
     @property
     def coverage(self) -> float:
@@ -70,6 +73,7 @@ def write(path: Path, manifest: Manifest) -> None:
                 "schema_version": manifest.schema_version,
                 "card_count": manifest.card_count,
                 "modelled_count": manifest.modelled_count,
+                "model": manifest.model,
                 "sha256": manifest.sha256,
             },
             indent=2,
@@ -91,6 +95,7 @@ def read(path: Path) -> Manifest:
         schema_version=_count(obj, "schema_version", path.name),
         card_count=_count(obj, "card_count", path.name),
         modelled_count=_count(obj, "modelled_count", path.name),
+        model=optional_str(obj, "model"),
         sha256=require_str(obj, "sha256", path.name),
     )
 
@@ -118,9 +123,56 @@ def verify(effects_path: Path, manifest: Manifest) -> tuple[str, ...]:
             f"sealed under schema version {manifest.schema_version}, "
             f"this build expects {SCHEMA_VERSION}"
         )
-    obj = require_object(json.loads(effects_path.read_text(encoding="utf-8")), effects_path.name)
+    try:
+        parsed = json.loads(effects_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        # A corrupt fixture is exactly what `check` exists to find, so it is a
+        # problem to report, not an exception to escape through it.
+        problems.append(f"{effects_path.name} is not readable JSON: {exc}")
+        return tuple(problems)
+
+    obj = require_object(parsed, effects_path.name)
     cards = obj.get("cards")
-    count = len(cards) if isinstance(cards, list) else 0
-    if count != manifest.card_count:
-        problems.append(f"file holds {count} cards, manifest says {manifest.card_count}")
+    if not isinstance(cards, list):
+        problems.append(f"{effects_path.name} has no 'cards' list")
+        return tuple(problems)
+    if len(cards) != manifest.card_count:
+        problems.append(f"file holds {len(cards)} cards, manifest says {manifest.card_count}")
+    problems.extend(_modelled_problems(cards, manifest))
     return tuple(problems)
+
+
+def _modelled_problems(cards: list[JsonValue], manifest: Manifest) -> list[str]:
+    """Audit the coverage claim, not just the card count.
+
+    ``modelled_count`` is signed like every other field, and an unaudited signed
+    field is decoration: a manifest claiming 91 of 124 passed `check` while the
+    fixture actually held 65.
+    """
+    modelled = sum(
+        1
+        for card in cards
+        if (obj := as_object(card)) is not None
+        and not any(_is_unmodelled(row) for row in _rows(obj, "abilities"))
+    )
+    if modelled != manifest.modelled_count:
+        return [f"file holds {modelled} modelled cards, manifest says {manifest.modelled_count}"]
+    return []
+
+
+def _rows(obj: JsonObject, key: str) -> list[JsonValue]:
+    value = obj.get(key)
+    return value if isinstance(value, list) else []
+
+
+def _is_unmodelled(row: JsonValue) -> bool:
+    """Whether an ability is unmodelled, at its own level or inside its effects."""
+    obj = as_object(row)
+    if obj is None:
+        return False
+    if obj.get("kind") == "unmodeled":
+        return True
+    return any(
+        (inner := as_object(e)) is not None and inner.get("kind") == "unmodeled"
+        for e in _rows(obj, "effects")
+    )

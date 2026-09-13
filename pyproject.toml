@@ -76,11 +76,12 @@ ignore = [
 # reduce the count is a lookup table, which silently loses the exhaustiveness
 # check that makes adding an effect kind safe. Confined to the codec, where the
 # shape is forced.
-"packages/carddata/src/mtgcoach/carddata/effect*.py" = [
-    "C901",
-    "PLR0911",
-    "PLR0912",
-]
+# Listed rather than globbed: `effect*.py` also covered effectcommands.py, which
+# is not a codec and has no exhaustive match, while missing abilitycodec.py,
+# which is one and does -- the opposite of what the reason above says.
+"packages/carddata/src/mtgcoach/carddata/abilitycodec.py" = ["C901", "PLR0911", "PLR0912"]
+"packages/carddata/src/mtgcoach/carddata/effectencode.py" = ["C901", "PLR0911", "PLR0912"]
+"packages/carddata/src/mtgcoach/carddata/effectdecode.py" = ["C901", "PLR0911", "PLR0912"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 8

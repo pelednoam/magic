@@ -18,7 +18,9 @@ Four shapes cover the box:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, assert_never
+
+from mtgcoach.core.effects import ProduceMana, Unmodeled
 
 if TYPE_CHECKING:
     from mtgcoach.core.effects import Effect
@@ -64,7 +66,7 @@ class ActivatedAbility:
     @property
     def is_mana_ability(self) -> bool:
         """Whether this only makes mana, and so never uses the stack (CR 605.1a)."""
-        return bool(self.effects) and all(type(e).__name__ == "ProduceMana" for e in self.effects)
+        return bool(self.effects) and all(isinstance(e, ProduceMana) for e in self.effects)
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,3 +106,31 @@ type Ability = (
     | StaticRestriction
     | UnmodeledAbility
 )
+
+
+def effects_of(ability: Ability) -> tuple[Effect, ...]:
+    """The effects an ability carries, empty for the ones that carry none."""
+    match ability:
+        case SpellAbility(effects=effects):
+            return effects
+        case TriggeredAbility(effects=effects):
+            return effects
+        case ActivatedAbility(effects=effects):
+            return effects
+        case StaticModifier() | StaticRestriction() | UnmodeledAbility():
+            return ()
+    assert_never(ability)
+
+
+def unmodelled_reasons(ability: Ability) -> tuple[str, ...]:
+    """Why this ability is not fully expressible, empty when it is.
+
+    Looks *inside* the ability as well as at it. An earlier version checked only
+    whether the ability itself was an ``UnmodeledAbility``, so a spell whose
+    effects included an ``Unmodeled`` one counted as fully modelled -- which
+    overstated the sealed Foundations fixture by 26 cards, 73% against a true
+    52%. A coverage number that flatters itself is worse than none.
+    """
+    if isinstance(ability, UnmodeledAbility):
+        return (ability.reason,)
+    return tuple(e.reason for e in effects_of(ability) if isinstance(e, Unmodeled))
