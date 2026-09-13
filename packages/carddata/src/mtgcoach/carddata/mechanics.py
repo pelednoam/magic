@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 #: - Deathtouch makes any nonzero damage lethal (CR 702.2b).
 #: - Trample spills the excess through to the defender.
 #: - Lifelink turns damage dealt into life gained.
-#: - Menace requires two blockers or none (CR 702.111a).
+#: - Menace requires two blockers or none (CR 702.111b).
 #: - Indestructible survives lethal damage.
 #: - Defender cannot attack; Haste attacks the turn it arrives.
 #:

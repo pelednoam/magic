@@ -43,15 +43,14 @@ BOARD = [
 
 def _reference_can_pay(cost: ManaCost, sources: Sequence[ManaSource]) -> bool:
     """Try every subset, and every way of assigning it. Obviously correct."""
-    if cost.colorless:
+    if not cost.is_payable:
         return False
-    need = cost.total
-    for chosen in itertools.combinations(range(len(sources)), need):
+    # The {C} pip is a symbol like any other, met only by a colourless source.
+    symbols = (*cost.symbols, *(frozenset[str]() for _ in range(cost.colorless)))
+    for chosen in itertools.combinations(range(len(sources)), cost.total):
         for order in itertools.permutations(chosen):
-            coloured = order[: len(cost.symbols)]
-            if all(
-                sources[i].can_pay(symbol) for i, symbol in zip(coloured, cost.symbols, strict=True)
-            ):
+            coloured = order[: len(symbols)]
+            if all(sources[i].can_pay(symbol) for i, symbol in zip(coloured, symbols, strict=True)):
                 return True
     return False
 
@@ -61,8 +60,9 @@ def _reference_can_pay(cost: ManaCost, sources: Sequence[ManaSource]) -> bool:
 
 #: Costs this board can and cannot pay. Two Forests, an Island, a Mountain and
 #: Llanowar Elves -- so plenty of green, one blue, one red.
-CASTABLE = ["{G}", "{1}{G}", "{2}{G}{G}", "{1}{U}", ""]
-UNCASTABLE = ["{U}{U}", "{4}{G}{G}", "{R}{R}"]
+CASTABLE = ["{G}", "{1}{G}", "{2}{G}{G}", "{1}{U}", "{0}"]
+#: The empty string is a card with *no* mana cost, which is not a free one.
+UNCASTABLE = ["{U}{U}", "{4}{G}{G}", "{R}{R}", "", "{C}"]
 
 
 @pytest.mark.parametrize("cost", CASTABLE)

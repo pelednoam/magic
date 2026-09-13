@@ -52,8 +52,11 @@ class TooManyCombinationsError(ValueError):
     """
 
 
-def _arrangements(attackers: int, blockers: int) -> int:
+def arrangements(attackers: int, blockers: int) -> int:
     """Every block, times every division of damage the attacker could choose.
+
+    Public because it is what ``check_defence_size`` bounds, and a test that
+    asserts the two counts are different has to be able to name both.
 
     Each blocker either sits out or blocks one attacker, and then within each
     attacker's group the attacker picks which of them to kill -- a subset. So
@@ -73,7 +76,7 @@ def resolutions_for(attackers: int, blockers: int) -> int:
     block assignment per damage order.
     """
     return sum(
-        math.comb(attackers, size) * _arrangements(size, blockers) for size in range(attackers + 1)
+        math.comb(attackers, size) * arrangements(size, blockers) for size in range(attackers + 1)
     )
 
 
@@ -84,7 +87,7 @@ def check_defence_size(attackers: Sequence[Creature], blockers: Sequence[Creatur
         TooManyCombinationsError: If the board is past what will be enumerated.
     """
     _check_dimensions(attackers, blockers)
-    _check(_arrangements(len(attackers), len(blockers)), attackers, blockers)
+    _check(arrangements(len(attackers), len(blockers)), attackers, blockers)
 
 
 def check_plan_size(attackers: Sequence[Creature], blockers: Sequence[Creature]) -> None:

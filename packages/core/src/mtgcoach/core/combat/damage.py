@@ -29,6 +29,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from mtgcoach.core.combat.board import Board, Hit, Outcome, Side
+from mtgcoach.core.combat.model import check_stats
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -68,11 +69,19 @@ def _attacker_hits(
         if assigned > 0:
             hits.append(Hit(blocker.instance_id, assigned, deathtouch=deathtouch))
             remaining -= assigned
-    if remaining > 0 and not attacker.has("Trample") and hits:
-        # Nowhere else for it to go, and piling it on is what a player does --
-        # it costs nothing and a lifelinker gains the life for it.
-        last = hits[-1]
-        hits[-1] = Hit(last.target, last.amount + remaining, deathtouch=last.deathtouch)
+    if remaining > 0 and not attacker.has("Trample") and blockers:
+        # Nowhere else for it to go, and it has to go somewhere: an attacker
+        # without trample assigns all its damage among its blockers, whether or
+        # not any of it matters. Piling it on is free, and a lifelinker gains
+        # the life for it -- which it did not when every blocker already had
+        # lethal marked and so took no assignment at all, leaving the damage to
+        # vanish along with the life.
+        target = hits[-1] if hits else Hit(blockers[0].instance_id, 0, deathtouch=deathtouch)
+        merged = Hit(target.target, target.amount + remaining, deathtouch=target.deathtouch)
+        if hits:
+            hits[-1] = merged
+        else:
+            hits.append(merged)
         remaining = 0
     # CR 702.19b: only trample lets the excess through to the player.
     return hits, remaining if attacker.has("Trample") else 0
@@ -161,7 +170,13 @@ def resolve(attackers: Sequence[Creature], blocks: Blocks, defender_life: int) -
     defender to zero the game is over before the regular step (CR 704.3), and
     without knowing the life total this went on to resolve a step that could
     hand the life back.
+
+    Raises:
+        ValueError: If a creature has no fixed power or toughness, or two of
+            them share an identity. This is public, so it asks: ``check_stats``
+            said every entry point had to, and this one was not doing it.
     """
+    check_stats(attackers, blocks.blockers)
     board = Board()
     for first in (True, False):
         _step_damage(attackers, blocks, board, first=first)

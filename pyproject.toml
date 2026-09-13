@@ -68,7 +68,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# A test builder mirrors the shape of the thing it builds; CardFacts has eight
+# A test builder mirrors the shape of the thing it builds; CardFacts has nine
 # fields and a helper that hides half of them behind a dict would be worse.
 # Only what `tests/**` does not already grant -- ruff unions the two lists.
 "tests/helpers.py" = ["PLR0913"]

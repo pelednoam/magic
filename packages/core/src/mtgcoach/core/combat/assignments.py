@@ -39,7 +39,7 @@ def block_assignments(
 def menace_respected(
     attackers: Sequence[Creature], by_attacker: dict[InstanceId, list[Creature]]
 ) -> bool:
-    """CR 702.111a: a creature with menace needs two blockers or none."""
+    """CR 702.111b: a creature with menace needs two blockers or none."""
     return all(
         len(by_attacker.get(attacker.instance_id, [])) not in _ILLEGAL_MENACE_BLOCKS
         for attacker in attackers

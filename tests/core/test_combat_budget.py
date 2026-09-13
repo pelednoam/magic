@@ -18,6 +18,7 @@ from mtgcoach.core.combat.budget import (
     MAX_BLOCKERS,
     MAX_RESOLUTIONS,
     TooManyCombinationsError,
+    arrangements,
     check_defence_size,
     check_plan_size,
     resolutions_for,
@@ -84,10 +85,12 @@ def test_plans_refuses_the_same_board() -> None:
 def test_a_single_defence_is_cheaper_than_the_whole_enumeration() -> None:
     """`best_defence` searches one attack, so it takes boards `plans` will not.
 
-    Eight attackers against four blockers is 11,265 arrangements for a single
-    defence and 501,248 across every attack subset.
+    The two counts are asserted rather than quoted: the numbers in this
+    docstring went stale the moment the enumeration changed shape, and a stale
+    number in a test is worse than none.
     """
     attackers, blockers = _some(8, "a"), _some(4, "b")
+    assert arrangements(8, 4) < MAX_RESOLUTIONS < resolutions_for(8, 4)
     check_defence_size(attackers, blockers)
     with pytest.raises(TooManyCombinationsError, match="combats to resolve"):
         check_plan_size(attackers, blockers)

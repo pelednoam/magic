@@ -1,4 +1,4 @@
-"""Colour from mana cost (CR 105.2), including costs the solver refuses."""
+"""Colour from mana cost (CR 202.2), including costs the solver refuses."""
 
 from __future__ import annotations
 

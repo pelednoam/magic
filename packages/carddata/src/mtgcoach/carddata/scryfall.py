@@ -49,7 +49,7 @@ def _face_from(obj: JsonObject, fallback_name: str) -> CardFace:
     Adventure faces carry no ``colors`` field at all, and the card's top-level
     one is empty, so reading it directly made both halves of every adventure
     card colourless -- including the black half of a ``{1}{B}`` adventure. An
-    absent field means undeclared, and CR 105.2 says the mana cost decides.
+    absent field means undeclared, and CR 202.2 says the mana cost decides.
     """
     mana_cost = optional_str(obj, "mana_cost")
     declared = string_set(obj, "colors")

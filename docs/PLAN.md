@@ -4,9 +4,9 @@ An assistant for learning Magic: The Gathering at the kitchen table. Point a pho
 or at the board, and get a clear answer to *"what can I do this turn, and what should I do?"*
 
 **Status:** M0–M3 merged to `main`. M4 (the four solvers — mana, legality, combat, triggers)
-on `m4-engine`, two rounds of ensemble review with the findings fixed by hand: 744 tests, 100%
-line and branch, with **52% of the Beginner Box fully modelled** and eleven keywords
-implemented. M5 next; see §10.
+on `m4-engine`, four rounds of ensemble review with the findings fixed by hand: 780 tests,
+100% line and branch, with **52% of the Beginner Box fully modelled** and eleven keywords
+implemented. The fourth round found nothing blocking in the engine. M5 next; see §10.
 
 ---
 
@@ -540,8 +540,8 @@ coaching and a boolean is not.
 
 The search enumerates *sets* of sources and tests each for a perfect matching (Kuhn's
 algorithm), rather than enumerating assignments of sources to pips. The first version did the
-latter and was factorial: five coloured pips across twenty sources is 1.8M ordered assignments
-against 15,504 sets, and the answers are identical because a payment is a set of lands to tap —
+latter and was factorial: five coloured pips across sixteen sources is 525K ordered assignments
+against 4,368 sets, and the answers are identical because a payment is a set of lands to tap —
 which land paid for which pip is not something a player can act on. `can_pay` stops at the
 first payment, so a *castable* spell is cheap to confirm. The expensive case is the failing one
 — nothing to stop at, and the whole space scanned — and that is exactly what `legality` asks
@@ -556,16 +556,30 @@ read as generic would do the same, and the whole point of this layer is that its
 be trusted.
 
 Neither hybrid form appears on the 124 box cards; that was checked at extraction time against
-the imported set, and **there is no standing test for it**, because no committed fixture
-carries mana costs — `effects.json` holds abilities, the decklists hold names. What is pinned
-is that every per-face cost in the Scryfall sample parses. Committing the box's costs would
-close the gap and is worth doing when the bulk data is next downloaded.
+the imported set. There is a standing test over the eight-card Scryfall sample — every
+per-face cost in it parses, and the symbols come back out — but **not over the other 116**,
+because no committed fixture carries their costs: `effects.json` holds abilities and the
+decklists hold names. Committing the box's costs would close the gap, and is worth doing when
+the bulk data is next downloaded.
 
 **2. Timing & legality** — `legality.py`. Built the other way round from the usual: the
-primitives are `why_not_cast`, `why_not_play_land`, `why_not_attack`, each returning *reasons*,
-and the booleans are the empty-reasons case. "You can't cast that" teaches nothing; "you need
+primitives are `why_not_cast`, `why_not_play_land`, `why_not_declare_attackers` and
+`why_not_attack`, each returning *reasons*, and the booleans are the empty-reasons case.
+"You can't cast that" teaches nothing; "you need
 one more Forest" and "that's a sorcery, so only in your main phase" are the two sentences a
 beginner needs most, and a rules engine usually throws them away on the way to a boolean.
+
+Attacking is two questions, not one. `why_not_declare_attackers(state, player)` is about the
+clock (CR 508.1a) and is asked once; `why_not_attack(permanent, card)` is about a creature and
+is asked once per creature. Folded together they answered a confident "yes, Grizzly Bears can
+attack" during its controller's upkeep. A card with no printed mana cost is refused too
+(CR 202.1a) — a different thing from a cost of `{0}`, though both parsed identically until
+they were split.
+
+Two refusals here are exceptions rather than reasons, deliberately: more untapped sources than
+the solver will search, and two sources sharing an identity. A reason is something the player
+can act on; these say the *question* was malformed or too large, which is the caller's problem,
+and answering "you can't cast that" would be a lie.
 
 Mana failures are diagnosed rather than reported: a `{C}` pip nothing can make, too few
 sources, no source of a colour, or — the awkward one — enough sources of the right colours
@@ -596,12 +610,32 @@ that looked obviously right:
   regular step and hit the player. CR 509.1h: blocked is blocked. This turned a double striker
   into an unblockable one.
 - without trample the attacker assigned its whole power to the first blocker, so a 4/4 blocked
-  by two 1/1s killed one of them. CR 510.1a assigns lethal to each in turn.
-- the blocker order was the caller's list order, not the attacking player's choice (CR 509.2),
-  so the same board coached differently depending on how it was passed in.
+  by two 1/1s killed one of them. Lethal is owed to each blocker it wants to kill (CR 510.1c).
+- which blocker took the damage was the caller's list order rather than the attacking player's
+  choice, so the same board coached differently depending on how it was passed in.
 - lifelink was modelled for attackers only, though `SUPPORTED_KEYWORDS` claimed it flatly. A
   blocking lifelinker gains the *defender* life, which can make a lethal attack survivable.
   `Outcome` now tracks both sides.
+- a defender reduced to zero by first strike came *back* if a lifelink blocker dealt damage in
+  the regular step. State-based actions are checked between them (CR 704.3), so `resolve` needs
+  the life total and stops when it reaches zero.
+- a blocker whose attacker died in the first step went on dealing damage to it — and, with
+  lifelink, on gaining life for hitting a creature that was no longer there.
+- a negative power dealt *negative* damage, healing the defender and draining its own
+  controller. CR 107.1b: it is zero.
+- a deathtouch attacker spent a second point on a blocker it had already assigned lethal damage
+  to, because "lethal assigned" and "died" were one set — and an indestructible blocker never
+  joins the second. A double-striking deathtouch trampler lost a point every combat.
+- without trample, damage that could not be assigned anywhere simply vanished, taking a
+  lifelinker's life gain with it. An attacker divides all of it among its blockers whether or
+  not any of it matters.
+- the damage division enumerated *orderings*, which is the pre-Foundations rule. The 2024
+  update removed damage assignment order: the attacker divides its damage as it likes, owing
+  lethal to each blocker it wants to kill. So the choice is which blockers to kill, and the
+  enumeration is over subsets — which covers assignments orderings could not express (a 4/4
+  ignoring the 1/1 to kill the 3/3) and is *cheaper*: six blockers is 64 subsets against 720.
+- `plans` searched attacks that could not legally be made. It filters by `can_attack`, so the
+  coach no longer recommends swinging with a tapped or summoning-sick creature.
 
 The defender is assumed to block *well*, and "well" is ordered: survive, then don't lose
 creatures for nothing, then take less damage, then lose the cheaper creature. That second term
@@ -611,24 +645,36 @@ creatures involved, because every other term can tie — two 0/1 chump blockers 
 the same — and when they did, the winner was whichever the caller listed first, so one board
 produced two different pieces of advice. A property test found that within a hundred examples.
 
-Two refusals rather than two guesses. A creature whose power is `*` stops the evaluation —
-Consuming Aberration would otherwise look harmless. And the board itself is bounded, which took
-three attempts because the first two counted a dimension and told a story about it: first
-`MAX_ATTACKERS` alone, though the block assignments are (A+1)^B and the **blockers** are the
-exponent; then (A+1)^B, though that is one `best_defence` and `plans` runs 2^A of them. Both
-stories admitted eight attackers against six blockers, which takes **five minutes**.
+Refusals rather than guesses, and every public entry point makes them: a creature whose power
+is `*` (Consuming Aberration would otherwise look harmless), two creatures sharing an
+`InstanceId` (one permanent cannot fight itself), and a board too large to search exactly.
+`check_stats` guards `resolve`, `best_defence` and `plans` alike — the first two were reached
+directly and were not asking, which is how a guard that exists still lets the thing through.
+
+Bounding the board took three attempts, because the first two counted a dimension and told a
+story about it: first `MAX_ATTACKERS` alone, though the block assignments are (A+1)^B and the
+**blockers** are the exponent; then (A+1)^B, though that is one `best_defence` and `plans` runs
+2^A of them. Both stories admitted eight attackers against six blockers, which takes **five
+minutes**.
 
 `budget.py` now counts what the search actually does — every block assignment times every
-damage order — and that number tracks measured wall time to within a few percent across every
-board shape tried. The cap is that count at about four seconds. It admits six attackers against
-four blockers, or eight against three; it refuses five against five. The refusal is deliberate:
-a coach that silently switches to a heuristic on a big board is worse than one that says it
+division of damage — and that number tracks measured wall time to within a few percent across
+every board shape tried. `MAX_RESOLUTIONS` is that count at about three seconds, and is the
+source of truth; what it admits is roughly eight attackers against three blockers, six against
+four, or three against six, and it refuses five against five. The refusal is deliberate: a
+coach that silently switches to a heuristic on a big board is worse than one that says it
 cannot be sure, because the player cannot tell which answer they got.
 
 `Outcome` and `Plan` carry the creatures themselves, not their printed names. Two Grizzly Bears
 reported as `("Grizzly Bears", "Grizzly Bears")` cannot be mapped back to a permanent, which is
 the identity collapse the engine uses `InstanceId` to avoid, arriving at the output boundary
 instead.
+
+**Feeding it real cards.** `carddata.enginefacts.facts_for(card, face)` builds a `CardFacts`
+from a stored card — per *face*, because a transform card has no top-level mana cost and an
+adventure card's is the joined `{3} // {1}{B}`. This was missing until the fourth review round
+pointed out that every `CardFacts` in the repository was built by `tests/helpers.py`: the
+engine was correct about cards that nothing in the system could actually hand it.
 
 **4. Trigger scanner** — `triggerscan.py`. At each step boundary, walk the battlefield for
 triggers matching the transition. Only triggers the *clock alone* decides can be found this
@@ -650,7 +696,9 @@ the opponent's turn. None is in the Beginner Box, and closing it needs a re-extr
 **Keywords.** `SUPPORTED_KEYWORDS` was empty through M3 and now holds eleven: flying, reach,
 first strike, double strike, deathtouch, trample, lifelink, menace, indestructible, defender,
 haste. Each is there because a specific rule reads it and a test pins the behaviour — a test
-greps the engine for every claimed keyword, so the registry cannot drift into decoration.
+greps `core` for every claimed keyword. A weak guarantee -- it proves the string appears,
+not that a rule reads it -- but it catches the failure that matters, which is adding a
+keyword to the registry and nothing else.
 Vigilance is deliberately absent: it governs whether attacking *taps* the creature, and nothing
 taps attackers yet. Ward is not in the box's vocabulary yet either.
 

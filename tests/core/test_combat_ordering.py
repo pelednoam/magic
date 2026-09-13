@@ -10,7 +10,8 @@ import pytest
 
 from helpers import creature, facts
 from mtgcoach.core.cards import CardInstance
-from mtgcoach.core.combat.model import Creature
+from mtgcoach.core.combat.damage import resolve
+from mtgcoach.core.combat.model import Blocks, Creature
 from mtgcoach.core.combat.search import best_defence
 from mtgcoach.core.ids import InstanceId, OracleId
 from mtgcoach.core.permanents import Permanent
@@ -91,3 +92,46 @@ def test_best_defence_refuses_an_unknown_blocker_too() -> None:
     )
     with pytest.raises(ValueError, match="no fixed power"):
         best_defence([creature("Bear", 2, 2)], [star], STARTING_LIFE)
+
+
+def test_one_permanent_cannot_be_in_a_combat_twice() -> None:
+    """Damage is marked by identity, so a repeat fights itself.
+
+    Its damage is doubled and so is what kills it -- the same caller bug the
+    mana solver refuses for two sources sharing an identifier.
+    """
+    bear = creature("Bear", 2, 2)
+    with pytest.raises(ValueError, match="cannot be in it twice"):
+        best_defence([bear, bear], [], STARTING_LIFE)
+
+
+def test_resolve_refuses_it_too() -> None:
+    """It is public, so it asks -- which it was not doing."""
+    bear = creature("Bear", 2, 2)
+    with pytest.raises(ValueError, match="cannot be in it twice"):
+        resolve([bear, bear], Blocks(), STARTING_LIFE)
+
+
+def test_resolve_refuses_an_unknown_power() -> None:
+    star = Creature(
+        Permanent(CardInstance(InstanceId("ca"), OracleId("ca"))).settle(),
+        facts("Consuming Aberration", creature=True),
+    )
+    with pytest.raises(ValueError, match="no fixed power"):
+        resolve([star], Blocks(), STARTING_LIFE)
+
+
+def test_damage_with_nowhere_to_go_still_lands_on_a_blocker() -> None:
+    """An attacker without trample assigns all of it among its blockers.
+
+    When every blocker already had lethal marked, nothing was assigned at all
+    and the damage vanished -- taking a lifelinker's life gain with it.
+    """
+    vampire = creature("Vampire", 3, 3, "Lifelink", "Double strike")
+    outcome = resolve(
+        [vampire],
+        Blocks({vampire.instance_id: (creature("Statue", 0, 2, "Indestructible"),)}),
+        STARTING_LIFE,
+    )
+    assert outcome.attacker_life_gained == 6, "three in each step"
+    assert outcome.damage_to_defender == 0, "still blocked, and no trample"

@@ -1,6 +1,6 @@
 """The colours of a printed face.
 
-CR 105.2: a card's colour is determined by its mana cost. Scryfall does not give
+CR 202.2: a card's colour is determined by its mana cost. Scryfall does not give
 every face a ``colors`` field -- an adventure card's faces carry none -- so a
 face that declares none is undeclared, not colourless, and the cost settles it.
 

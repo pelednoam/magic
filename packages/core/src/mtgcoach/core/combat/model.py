@@ -116,12 +116,13 @@ def can_block(blocker: Creature, attacker: Creature) -> bool:
     return not attacker.has("Flying") or blocker.has("Flying") or blocker.has("Reach")
 
 
-#: Menace: a creature with it cannot be blocked except by two or more (CR 702.111a).
+#: Menace: a creature with it cannot be blocked except by two or more
+#: (CR 702.111b -- subrule (a) is only the sentence naming it an evasion ability).
 MENACE_MINIMUM = 2
 
 
 def check_stats(*groups: Sequence[Creature]) -> None:
-    """Refuse a combat containing a creature whose power is not knowable.
+    """Refuse a combat the engine cannot resolve honestly.
 
     Every public entry point has to ask. ``power`` returns ``self.card.power or
     0``, so a Consuming Aberration passed to a function that skipped this check
@@ -135,4 +136,11 @@ def check_stats(*groups: Sequence[Creature]) -> None:
     unknown = sorted(c.name for group in groups for c in group if not c.has_fixed_stats)
     if unknown:
         msg = f"cannot evaluate combat: {', '.join(unknown)} {UNKNOWN_STATS}"
+        raise ValueError(msg)
+    ids = [c.instance_id for group in groups for c in group]
+    if len(set(ids)) != len(ids):
+        # Damage is marked by identity, so one permanent appearing twice fights
+        # itself: its damage is doubled and so is what kills it. The same class
+        # of caller bug the mana solver refuses for sources.
+        msg = "cannot evaluate combat: one permanent cannot be in it twice"
         raise ValueError(msg)

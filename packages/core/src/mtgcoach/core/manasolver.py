@@ -32,6 +32,8 @@ import itertools
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
+from mtgcoach.core.manamatch import covers
+
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
 
@@ -78,43 +80,6 @@ class Payment:
         return len(self.tapped)
 
 
-def _can_match(symbols: Sequence[frozenset[str]], chosen: Sequence[ManaSource]) -> bool:
-    """Whether every symbol can be given a distinct source from ``chosen``.
-
-    Kuhn's algorithm: match each symbol in turn, and when its only candidates
-    are taken, try to push an earlier symbol onto a different source.
-    """
-    partner: dict[int, int] = {}
-    return all(_augment(index, symbols, chosen, partner, set()) for index in range(len(symbols)))
-
-
-def _augment(
-    symbol: int,
-    symbols: Sequence[frozenset[str]],
-    chosen: Sequence[ManaSource],
-    partner: dict[int, int],
-    tried: set[int],
-) -> bool:
-    """Find a source for ``symbol``, displacing earlier matches if it helps."""
-    for index, source in enumerate(chosen):
-        if index in tried or not source.can_pay(symbols[symbol]):
-            continue
-        tried.add(index)
-        if index not in partner or _augment(partner[index], symbols, chosen, partner, tried):
-            partner[index] = symbol
-            return True
-    return False
-
-
-def _colour_sets(
-    symbols: Sequence[frozenset[str]], sources: Sequence[ManaSource]
-) -> Iterator[frozenset[int]]:
-    """Every set of sources that can cover the coloured symbols, one each."""
-    for chosen in itertools.combinations(range(len(sources)), len(symbols)):
-        if _can_match(symbols, [sources[i] for i in chosen]):
-            yield frozenset(chosen)
-
-
 def options(cost: ManaCost, sources: Sequence[ManaSource]) -> Iterator[Payment]:
     """Every distinct payment, lazily and in no particular order.
 
@@ -122,6 +87,11 @@ def options(cost: ManaCost, sources: Sequence[ManaSource]) -> Iterator[Payment]:
     building the whole ranked list means a legality check on a large board costs
     what a full recommendation costs, and it is asked once per card in hand.
     """
+    if not cost.is_payable:
+        # CR 202.1a: no printed mana cost, no way to pay. The parser keeps this
+        # distinct from {0}, and the solver has to honour it or a card with no
+        # cost comes back castable for nothing.
+        return
     _check_sources(sources)
     # A {C} pip needs specifically colourless mana, which a source with no
     # colours makes -- ManaSource documents exactly that. Refusing it outright
@@ -130,21 +100,23 @@ def options(cost: ManaCost, sources: Sequence[ManaSource]) -> Iterator[Payment]:
     # never looked at.
     symbols = (*cost.symbols, *(_COLOURLESS for _ in range(cost.colorless)))
 
-    seen: set[tuple[InstanceId, ...]] = set()
-    for coloured in _colour_sets(symbols, sources):
-        spare_indices = [i for i in range(len(sources)) if i not in coloured]
-        for generic in itertools.combinations(spare_indices, cost.generic):
-            used = coloured | frozenset(generic)
-            key = tuple(sorted(sources[i].instance_id for i in used))
-            if key in seen:
-                continue
-            seen.add(key)
-            yield Payment(
-                tapped=key,
-                spare=tuple(
-                    sorted(sources[i].instance_id for i in range(len(sources)) if i not in used)
-                ),
-            )
+    # One enumeration over the whole payment, not one over the coloured part
+    # and another over the generic. Choosing the colours first and the generic
+    # second reaches the same set of lands by many routes -- {6}{W}{U} from
+    # sixteen sources visited 360,360 pairs to produce 12,870 distinct payments
+    # -- and every repeat had to be recognised and discarded.
+    size = len(symbols) + cost.generic
+    for used in itertools.combinations(range(len(sources)), size):
+        chosen = [sources[i] for i in used]
+        if not covers(symbols, chosen):
+            continue
+        spent = frozenset(used)
+        yield Payment(
+            tapped=tuple(sorted(sources[i].instance_id for i in used)),
+            spare=tuple(
+                sorted(sources[i].instance_id for i in range(len(sources)) if i not in spent)
+            ),
+        )
 
 
 def payments(cost: ManaCost, sources: Sequence[ManaSource]) -> tuple[Payment, ...]:

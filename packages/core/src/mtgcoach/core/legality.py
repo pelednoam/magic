@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from mtgcoach.core.manashortfall import mana_shortfall
 from mtgcoach.core.manasolver import can_pay
 from mtgcoach.core.player import MAX_LAND_DROPS_PER_TURN
 from mtgcoach.core.steps import Step, has_priority, is_main_phase
@@ -45,7 +46,20 @@ def why_not_cast(
     card: CardFacts,
     sources: Sequence[ManaSource],
 ) -> tuple[str, ...]:
-    """Reasons this card cannot be cast now, empty when it can."""
+    """Reasons this card cannot be cast now, empty when it can.
+
+    Raises:
+        IllegalEventError: If ``player_id`` is not in this game.
+        DuplicateSourceError: If two sources share an identity -- one permanent
+            cannot be tapped twice.
+        TooManySourcesError: If there are more untapped sources than the mana
+            solver will search exactly.
+
+    The last two are deliberately exceptions rather than reasons. A reason is
+    something the player can act on ("you need one more Forest"); these say the
+    *question* was malformed or too large, which is the caller's problem and not
+    the player's, and quietly returning "you can't cast that" would be a lie.
+    """
     reasons: list[str] = []
     # Raises for an unknown player, as every other predicate here does. An
     # instant used to skip every state lookup, so a bad id came back "castable".
@@ -64,7 +78,7 @@ def why_not_cast(
     elif not card.is_instant_speed:
         reasons.extend(_sorcery_timing(state, player_id, "this"))
     if not can_pay(card.cost, sources):
-        reasons.append(_mana_shortfall(card, sources))
+        reasons.append(mana_shortfall(card, sources))
     return tuple(reasons)
 
 
@@ -88,43 +102,6 @@ def _sorcery_timing(state: GameState, player_id: PlayerId, subject: str) -> tupl
     return ()
 
 
-def _mana_shortfall(card: CardFacts, sources: Sequence[ManaSource]) -> str:
-    """Say what is missing, not merely that something is.
-
-    Distinguishing "one short" from "no green at all" is the difference between
-    a player waiting a turn and a player reading the wrong lesson.
-    """
-    if card.cost.colorless and not any(not source.produces for source in sources):
-        # Checked, not asserted: the earlier version returned this sentence
-        # whenever the cost had a {C} pip, which is a claim about the player's
-        # board that the code never looked at.
-        return "you have no source of colourless mana"
-    available = len(sources)
-    needed = card.cost.total
-    if available < needed:
-        short = needed - available
-        return f"you need {short} more untapped source{'s' if short > 1 else ''}"
-    missing = sorted(
-        colour
-        for colour in _required_colours(card)
-        if not any(colour in source.produces for source in sources)
-    )
-    if missing:
-        return f"you have no source of {'/'.join(missing)}"
-    return "your untapped sources cannot cover that combination of colours"
-
-
-def _required_colours(card: CardFacts) -> frozenset[str]:
-    """The colours the cost genuinely demands.
-
-    Not ``ManaCost.colors``, which unions a hybrid symbol's alternatives: for
-    ``{W/U}{G}`` that set is ``{W, U, G}``, and a player holding a Plains and a
-    Forest would be told they have no source of U. A hybrid symbol demands
-    nothing in particular, so only single-colour symbols count.
-    """
-    return frozenset(next(iter(symbol)) for symbol in card.cost.symbols if len(symbol) == 1)
-
-
 def can_play_land(state: GameState, player_id: PlayerId, card: CardFacts) -> bool:
     """Whether this land can be played now."""
     return not why_not_play_land(state, player_id, card)
@@ -136,7 +113,13 @@ def can_cast(
     card: CardFacts,
     sources: Sequence[ManaSource],
 ) -> bool:
-    """Whether this card can be cast now."""
+    """Whether this card can be cast now.
+
+    Raises:
+        IllegalEventError: If ``player_id`` is not in this game.
+        DuplicateSourceError: If two sources share an identity.
+        TooManySourcesError: If there are too many sources to search exactly.
+    """
     return not why_not_cast(state, player_id, card, sources)
 
 
@@ -151,7 +134,13 @@ def why_not_declare_attackers(state: GameState, player_id: PlayerId) -> tuple[st
 
     ``Permanent`` carries no controller, which is why the player is a separate
     argument rather than read off the creature.
+
+    Raises:
+        IllegalEventError: If ``player_id`` is not in this game. Comparing it
+            against the active player alone answered "not your turn" for a name
+            that was never playing.
     """
+    state.player(player_id)
     if state.active_player != player_id:
         return ("you can only attack on your own turn",)
     if state.step is not Step.DECLARE_ATTACKERS:

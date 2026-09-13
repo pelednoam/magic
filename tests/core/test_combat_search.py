@@ -110,7 +110,7 @@ def test_summoning_sickness_does_not_stop_a_block() -> None:
 
 
 def test_menace_needs_two_blockers() -> None:
-    """CR 702.111a -- one blocker is not a legal block at all."""
+    """CR 702.111b -- one blocker is not a legal block at all."""
     attacker = creature("Brute", 3, 3, "Menace")
     one = best_defence([attacker], [creature("Bear", 2, 2)], STARTING_LIFE)
     assert one.damage_to_defender == 3, "a single blocker cannot block it"
