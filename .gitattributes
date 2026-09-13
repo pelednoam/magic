@@ -2,3 +2,9 @@
 # no reviewer has anything useful to say about a resolved dependency graph.
 # `-diff` makes git report it as changed without emitting its contents.
 uv.lock -diff linguist-generated=true
+
+# Sealed effect fixtures are generated and checksummed. Their reviewable surface
+# is the manifest beside them -- card count and SHA, which the preflight audits
+# -- not 100 KB of JSON no reviewer can meaningfully read. `mtgcoach effects
+# review` is where a person looks at the contents.
+data/sets/*/effects.json -diff linguist-generated=true
