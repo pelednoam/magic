@@ -1,0 +1,4 @@
+# Generated and enormous: 1004 lines of it dominated the first review diff, and
+# no reviewer has anything useful to say about a resolved dependency graph.
+# `-diff` makes git report it as changed without emitting its contents.
+uv.lock -diff linguist-generated=true
