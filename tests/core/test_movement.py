@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-from helpers import card_id, deck
 
+from helpers import card_id, deck
 from mtgcoach.core.errors import IllegalEventError
 from mtgcoach.core.ids import InstanceId
 from mtgcoach.core.movement import add_card, move_card, remove_card
@@ -77,3 +77,25 @@ def test_removing_from_the_battlefield_drops_permanent_state() -> None:
     back = add_card(player, CARDS[2], ZoneName.BATTLEFIELD)
     assert back.battlefield[0].summoning_sick
     assert not back.battlefield[0].tapped
+
+
+def test_moving_a_card_to_the_zone_it_is_already_in_is_refused() -> None:
+    """Remove-then-add would rebuild the permanent and silently untap it."""
+    tapped = replace(_populated(), battlefield=(Permanent(CARDS[2]).tap().settle(),))
+    with pytest.raises(IllegalEventError, match="already in"):
+        move_card(tapped, card_id("p", 2), ZoneName.BATTLEFIELD)
+
+
+@pytest.mark.parametrize(
+    ("zone", "index"),
+    [
+        (ZoneName.LIBRARY, 0),
+        (ZoneName.HAND, 1),
+        (ZoneName.BATTLEFIELD, 2),
+        (ZoneName.GRAVEYARD, 3),
+        (ZoneName.EXILE, 4),
+    ],
+)
+def test_a_no_op_move_is_refused_in_every_zone(zone: ZoneName, index: int) -> None:
+    with pytest.raises(IllegalEventError, match="already in"):
+        move_card(_populated(), card_id("p", index), zone)

@@ -3,8 +3,9 @@
 An assistant for learning Magic: The Gathering at the kitchen table. Point a phone at a card
 or at the board, and get a clear answer to *"what can I do this turn, and what should I do?"*
 
-**Status:** M0 complete — scaffolding, toolchain and gates, on branch `m0-scaffolding`.
-M1 next; see §10.
+**Status:** M0 (scaffolding, toolchain and gates) merged to `main`. M1 (state model,
+events, reducer, step walker) on `m1-core-state`: 182 tests, 100% line and branch.
+M2 next; see §10.
 
 ---
 
@@ -251,7 +252,10 @@ packages/core/src/mtgcoach/core/
 ├─ ids.py           NewType: OracleId, InstanceId, PlayerId, SetCode  (~20 lines)
 ├─ mana.py          ManaSymbol, ManaCost, cost parsing
 ├─ mana_solver.py   payment search
-├─ cards.py         Card / CardFace — static data, set-agnostic
+├─ cards.py         CardInstance — one physical card in one game
+├─ errors.py        IllegalEventError
+├─ movement.py      remove / add / move a card between zones
+├─ turn.py          step advancement and turn-based actions
 ├─ effects.py       the Effect discriminated union
 ├─ keywords.py      Keyword registry + which are engine-supported
 ├─ permanents.py    Permanent
@@ -483,18 +487,32 @@ class GameState:
     active_player: PlayerId
     step: Step
     players: Mapping[PlayerId, PlayerState]
-    stack: tuple[StackObject, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class PlayerState:
-    life: int
-    hand: tuple[CardInstance, ...]  # opponent: count + what's known from their decklist
+    library: tuple[CardInstance, ...]
+    hand: tuple[CardInstance, ...]
     battlefield: tuple[Permanent, ...]
     graveyard: tuple[CardInstance, ...]
-    library: Library  # count + known remaining
-    lands_played_this_turn: int
+    exile: tuple[CardInstance, ...]
+    life: int = STARTING_LIFE
+    lands_played_this_turn: int = 0
 ```
+
+Two decisions in that shape are worth stating, because an earlier draft of this plan assumed
+otherwise:
+
+- **The engine holds the true state, hidden zones included** — not "a count plus what is known
+  of the opponent's decklist". Redacting a library or a hand is a *view* concern: a thin layer
+  redacts the state on its way to a given player's screen. Keeping the engine fully informed is
+  what makes card conservation checkable and avoids a "we do not know" special case in every
+  legality question. The opponent-knowledge reasoning the coach needs (§3's "two burn spells
+  left in their deck") is computed from their registered decklist, not from a deliberately
+  impoverished state.
+- **There is no `stack` field yet.** Nothing before M4 can put an object on it, and a field no
+  event can change is a field no test can cover. It arrives with spell casting, alongside
+  `counters` and attachments on `Permanent`.
 
 **Event-sourced.** Store the event log, derive state via `reduce.apply`. Free undo, free replay,
 free end-of-game review, and the strongest property test in the suite. Costs nothing now,
@@ -663,8 +681,8 @@ ensemble review (§6) before the next begins.
 
 | # | Milestone | Why |
 |---|---|---|
-| **M0** | `git init`; `uv` workspace; the full §5 toolchain failing-on-violation from commit one; review agent installed and configured. | Standards and the review loop are free on day one, expensive to retrofit. |
-| **M1** | `core`: state model, events, `reduce`, step walker. 100% + property tests. | The spine. No UI needed to test it. |
+| **M0** ✅ | `git init`; `uv` workspace; the full §5 toolchain failing-on-violation from commit one; review agent installed and configured. | Standards and the review loop are free on day one, expensive to retrofit. |
+| **M1** ✅ | `core`: state model, events, `reduce`, step walker. 100% + property tests. | The spine. No UI needed to test it. |
 | **M2** | `carddata`: Scryfall ingestion, `Collection`, the `sets add / audit` commands, FDN decklists as data. | Establishes the set-agnostic data layer before any set-specific work exists to bias it. |
 | **M3** | Effect extraction pipeline + review CLI + FDN golden fixture and signed manifest. Card explainer CLI. | Useful immediately; proves the build-time Claude pattern *and* the multi-set pipeline in one go. |
 | **M4** | Mana solver, legality, trigger scanner, combat simulator. Hypothesis suites. Convergence-loop review. | The engine. This is what makes it a coach rather than a notepad. |

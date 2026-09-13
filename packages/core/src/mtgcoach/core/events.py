@@ -33,7 +33,13 @@ class DrawCard:
 
 @dataclass(frozen=True, slots=True)
 class PlayLand:
-    """Put a land from hand onto the battlefield, using the land drop."""
+    """Spend the turn's land drop to put a card from hand onto the battlefield.
+
+    The reducer checks that the card is in hand and that the land drop is
+    unspent. It cannot check that the card is a *land*: ``core`` holds no card
+    data by design, so that check arrives with the card database. Until then a
+    caller can play any card in hand as its land for the turn.
+    """
 
     player: PlayerId
     instance_id: InstanceId
@@ -50,7 +56,13 @@ class SetTapped:
 
 @dataclass(frozen=True, slots=True)
 class MoveCard:
-    """Move one card between two of a player's zones."""
+    """Move one card between two of a player's zones, unconditionally.
+
+    The unchecked primitive that effects are built from, not a player action.
+    It bypasses the land drop deliberately: plenty of effects put a permanent
+    onto the battlefield without spending one. Player actions that carry a cost
+    or a limit get their own event, as ``PlayLand`` does.
+    """
 
     player: PlayerId
     instance_id: InstanceId

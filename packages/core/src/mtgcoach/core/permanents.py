@@ -37,5 +37,13 @@ class Permanent:
         return replace(self, tapped=False)
 
     def settle(self) -> Permanent:
-        """Return a copy that has been under its controller's control since upkeep."""
+        """Return a copy no longer treated as summoning sick.
+
+        CR 302.6 phrases this as a condition -- the permanent has been under its
+        controller's control *since their most recent turn began* -- rather than
+        as an event. This flag is a cached answer to that question, set false at
+        the moment the condition becomes true. It is stored on every permanent
+        although it only matters for creatures; which permanents care is a
+        legality question, not a state one.
+        """
         return replace(self, summoning_sick=False)

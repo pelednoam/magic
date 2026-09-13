@@ -93,6 +93,16 @@ def add_card(player: PlayerState, card: CardInstance, zone: ZoneName) -> PlayerS
 
 
 def move_card(player: PlayerState, instance_id: InstanceId, to: ZoneName) -> PlayerState:
-    """Move one card to ``to``, wherever it currently is."""
+    """Move one card to ``to``, wherever it currently is.
+
+    Raises:
+        IllegalEventError: If the card is already in ``to``. Remove-then-add
+            would rebuild it -- silently untapping a permanent and making it
+            summoning sick again -- and a caller asking for a move that is not
+            a move is confused rather than expressing something meaningful.
+    """
+    if player.find(to, instance_id) is not None:
+        msg = f"card {instance_id!r} is already in {to}"
+        raise IllegalEventError(msg)
     without, card = remove_card(player, instance_id)
     return add_card(without, card, to)

@@ -53,6 +53,7 @@ src = [
     "packages/vision/src",
     "services/api/src",
     "tools",
+    "tests",
 ]
 
 [tool.ruff.lint]

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-import pytest
-from helpers import card_id, deck
+from dataclasses import replace
 
+import pytest
+
+from helpers import card_id, deck
 from mtgcoach.core.cards import CardInstance
 from mtgcoach.core.ids import InstanceId, OracleId
 from mtgcoach.core.permanents import Permanent
@@ -61,7 +63,7 @@ def test_find_does_not_search_other_zones() -> None:
     assert _populated().find(ZoneName.HAND, card_id("p", 0)) is None
 
 
-def test_untap_all_untaps_and_settles() -> None:
+def test_begin_turn_untaps_and_settles() -> None:
     cards = deck("p", 2)
     player = PlayerState(
         library=(),
@@ -70,6 +72,11 @@ def test_untap_all_untaps_and_settles() -> None:
         graveyard=(),
         exile=(),
     )
-    untapped = player.untap_all()
+    untapped = player.begin_turn()
     assert [p.tapped for p in untapped.battlefield] == [False, False]
     assert [p.summoning_sick for p in untapped.battlefield] == [False, False]
+
+
+def test_begin_turn_resets_the_land_drop() -> None:
+    player = replace(_populated(), lands_played_this_turn=1)
+    assert player.begin_turn().lands_played_this_turn == 0

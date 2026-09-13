@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from helpers import ME, YOU, deck
 
+from helpers import ME, YOU, deck
 from mtgcoach.core.errors import IllegalEventError
 from mtgcoach.core.ids import PlayerId
 from mtgcoach.core.player import OPENING_HAND_SIZE, PlayerState

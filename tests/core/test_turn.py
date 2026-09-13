@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-from helpers import ME, YOU, deck
 
+from helpers import ME, YOU, deck
 from mtgcoach.core.errors import IllegalEventError
 from mtgcoach.core.movement import add_card
 from mtgcoach.core.state import GameState, start_game

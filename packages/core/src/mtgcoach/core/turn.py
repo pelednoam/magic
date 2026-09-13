@@ -49,10 +49,7 @@ def _on_enter(state: GameState, step: Step) -> GameState:
 
 def _untap_step(state: GameState) -> GameState:
     active = state.player(state.active_player)
-    return state.with_player(
-        state.active_player,
-        replace(active.untap_all(), lands_played_this_turn=0),
-    )
+    return state.with_player(state.active_player, active.begin_turn())
 
 
 def draw_card(state: GameState, player_id: PlayerId) -> GameState:

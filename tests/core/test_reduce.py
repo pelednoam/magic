@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
-from helpers import ME, YOU, card_id, deck
 
+from helpers import ME, YOU, card_id, deck
 from mtgcoach.core.errors import IllegalEventError
 from mtgcoach.core.events import (
     AdvanceStep,

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from helpers import ME, YOU, deck
 
+from helpers import ME, YOU, deck
 from mtgcoach.core.state import GameState, start_game
 
 

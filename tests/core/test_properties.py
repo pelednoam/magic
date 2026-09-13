@@ -12,10 +12,10 @@ from __future__ import annotations
 import copy
 from typing import TYPE_CHECKING
 
-from helpers import ME, YOU, deck
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
+from helpers import ME, YOU, deck
 from mtgcoach.core.errors import IllegalEventError
 from mtgcoach.core.events import (
     AdvanceStep,

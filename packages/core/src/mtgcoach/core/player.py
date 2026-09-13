@@ -78,6 +78,21 @@ class PlayerState:
                 return card
         return None
 
-    def untap_all(self) -> PlayerState:
-        """Untap every permanent, as the untap step does (CR 502.2)."""
-        return replace(self, battlefield=tuple(p.untap().settle() for p in self.battlefield))
+    def begin_turn(self) -> PlayerState:
+        """Apply the turn-based actions that happen as this player's turn begins.
+
+        Three separate rules that happen to coincide at the untap step, and that
+        an earlier docstring conflated under a single citation:
+
+        - Every permanent untaps (CR 502.2).
+        - Summoning sickness lifts. CR 302.6 is a continuous condition, not an
+          action the untap step performs; clearing a flag here is a modelling
+          shortcut, correct because this is the moment the condition becomes
+          true. See ``Permanent.settle``.
+        - The land drop is one per turn (CR 305.2), so it resets.
+        """
+        return replace(
+            self,
+            battlefield=tuple(p.untap().settle() for p in self.battlefield),
+            lands_played_this_turn=0,
+        )
