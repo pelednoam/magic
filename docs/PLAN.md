@@ -4,9 +4,9 @@ An assistant for learning Magic: The Gathering at the kitchen table. Point a pho
 or at the board, and get a clear answer to *"what can I do this turn, and what should I do?"*
 
 **Status:** M0–M3 merged to `main`. M4 (the four solvers — mana, legality, combat, triggers)
-on `m4-engine`, ensemble-reviewed and the findings fixed: 726 tests, 100% line and branch,
-with **52% of the Beginner Box fully modelled** and eleven keywords implemented. M5 next;
-see §10.
+on `m4-engine`, two rounds of ensemble review with the findings fixed by hand: 744 tests, 100%
+line and branch, with **52% of the Beginner Box fully modelled** and eleven keywords
+implemented. M5 next; see §10.
 
 ---
 
@@ -548,9 +548,16 @@ costs; `payments` refuses past `MAX_PAYMENTS` rather than returning a truncated 
 complete.
 
 `parse` refuses what it cannot model rather than approximating: `{2/W}` and `{W/P}` raise
-`UnsupportedCostError`. Neither appears on the 124 box cards — all of them parse — but a
-hybrid cost silently read as generic would misprice a spell, and the whole point of this layer
-is that its answers can be trusted.
+`UnsupportedCostError`, and so does a split card's joined `{3} // {1}{B}` — that card has two
+costs, and silently picking one would misprice whichever half you didn't cast. A hybrid cost
+read as generic would do the same, and the whole point of this layer is that its answers can
+be trusted.
+
+Neither hybrid form appears on the 124 box cards; that was checked at extraction time against
+the imported set, and **there is no standing test for it**, because no committed fixture
+carries mana costs — `effects.json` holds abilities, the decklists hold names. What is pinned
+is that every per-face cost in the Scryfall sample parses. Committing the box's costs would
+close the gap and is worth doing when the bulk data is next downloaded.
 
 **2. Timing & legality** — `legality.py`. Built the other way round from the usual: the
 primitives are `why_not_cast`, `why_not_play_land`, `why_not_attack`, each returning *reasons*,
@@ -595,17 +602,31 @@ that looked obviously right:
   `Outcome` now tracks both sides.
 
 The defender is assumed to block *well*, and "well" is ordered: survive, then don't lose
-creatures for nothing, then take less damage. That middle term has to outrank damage or the
-model chump-blocks everything at twenty life and every attack looks bad. The attacker's
-ordering is the mirror image, with "kill the bigger creature" as the tiebreak.
+creatures for nothing, then take less damage, then lose the cheaper creature. That second term
+has to outrank damage or the model chump-blocks everything at twenty life and every attack
+looks bad. The attacker's ordering is the mirror image. Both end in a total order over the
+creatures involved, because every other term can tie — two 0/1 chump blockers are worth exactly
+the same — and when they did, the winner was whichever the caller listed first, so one board
+produced two different pieces of advice. A property test found that within a hundred examples.
 
 Two refusals rather than two guesses. A creature whose power is `*` stops the evaluation —
-Consuming Aberration would otherwise look harmless. And the board itself is bounded: the attack
-subsets are 2^A but the block assignments are (A+1)^B, so the **blockers** are the exponent,
-and capping only attackers guarded nothing — eight against eight is ~11e9 resolutions, a hang
-rather than an answer. `budget.py` bounds both dimensions and their product, and raises rather
-than falling back to a heuristic, because a coach that silently changes method is one whose
-answers cannot be told apart.
+Consuming Aberration would otherwise look harmless. And the board itself is bounded, which took
+three attempts because the first two counted a dimension and told a story about it: first
+`MAX_ATTACKERS` alone, though the block assignments are (A+1)^B and the **blockers** are the
+exponent; then (A+1)^B, though that is one `best_defence` and `plans` runs 2^A of them. Both
+stories admitted eight attackers against six blockers, which takes **five minutes**.
+
+`budget.py` now counts what the search actually does — every block assignment times every
+damage order — and that number tracks measured wall time to within a few percent across every
+board shape tried. The cap is that count at about four seconds. It admits six attackers against
+four blockers, or eight against three; it refuses five against five. The refusal is deliberate:
+a coach that silently switches to a heuristic on a big board is worse than one that says it
+cannot be sure, because the player cannot tell which answer they got.
+
+`Outcome` and `Plan` carry the creatures themselves, not their printed names. Two Grizzly Bears
+reported as `("Grizzly Bears", "Grizzly Bears")` cannot be mapped back to a permanent, which is
+the identity collapse the engine uses `InstanceId` to avoid, arriving at the output boundary
+instead.
 
 **4. Trigger scanner** — `triggerscan.py`. At each step boundary, walk the battlefield for
 triggers matching the transition. Only triggers the *clock alone* decides can be found this
@@ -617,6 +638,12 @@ stayed home, which is noise dressed as help. Attacking, blocking and dealing com
 therefore event-driven, reported by the module that observes the event.
 `every_event_is_classified()` is checked by a test so a new `TriggerEvent` has to be filed as
 one or the other rather than silently never firing.
+
+`triggers_at` also takes whose turn it is, and requires it. The step is only half the condition
+for "at the beginning of **your** upkeep"; without the other half these reminders fired twice a
+round. One gap stays open and is written down in the module: the schema's `TriggerEvent` does
+not distinguish "your upkeep" from "each upkeep", so a card with the latter is not reported on
+the opponent's turn. None is in the Beginner Box, and closing it needs a re-extraction.
 
 **Keywords.** `SUPPORTED_KEYWORDS` was empty through M3 and now holds eleven: flying, reach,
 first strike, double strike, deathtouch, trample, lifelink, menace, indestructible, defender,

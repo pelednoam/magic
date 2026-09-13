@@ -23,17 +23,32 @@ class Outcome:
     Life gained is tracked per side because lifelink is not the attacker's
     privilege: a blocker with it gains the defender life, which changes whether
     an attack is lethal at all.
+
+    The creatures lost are the creatures, not their printed names. A board with
+    two Grizzly Bears reported ``("Grizzly Bears", "Grizzly Bears")``, which no
+    caller could map back to a permanent -- reintroducing at the output the
+    identity collapse the engine uses ``InstanceId`` to avoid.
     """
 
     damage_to_defender: int = 0
-    attackers_lost: tuple[str, ...] = ()
-    blockers_lost: tuple[str, ...] = ()
+    attackers_lost: tuple[Creature, ...] = ()
+    blockers_lost: tuple[Creature, ...] = ()
     attacker_life_gained: int = 0
     defender_life_gained: int = 0
 
-    def life_swing_against(self, defender_life: int) -> int:
-        """The defender's life total after this attack."""
+    def defender_life_after(self, defender_life: int) -> int:
+        """The defender's life total once this attack has resolved."""
         return defender_life - self.damage_to_defender + self.defender_life_gained
+
+    @property
+    def attacker_names(self) -> tuple[str, ...]:
+        """The names of the attackers lost, for showing a player."""
+        return tuple(c.name for c in self.attackers_lost)
+
+    @property
+    def blocker_names(self) -> tuple[str, ...]:
+        """The names of the blockers lost, for showing a player."""
+        return tuple(c.name for c in self.blockers_lost)
 
 
 @dataclass

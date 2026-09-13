@@ -52,8 +52,11 @@ def _battlefield(*names: str) -> list[Permanent]:
     return [Permanent(CardInstance(InstanceId(f"{n}-1"), OracleId(n))).settle() for n in names]
 
 
-def _scan(step: Step, *names: str) -> tuple[str, ...]:
-    return tuple(r.name for r in triggers_at(step, _battlefield(*names), _abilities, _names))
+def _scan(step: Step, *names: str, your_turn: bool = True) -> tuple[str, ...]:
+    return tuple(
+        r.name
+        for r in triggers_at(step, _battlefield(*names), _abilities, _names, your_turn=your_turn)
+    )
 
 
 def test_an_upkeep_trigger_is_reported_at_upkeep() -> None:
@@ -101,13 +104,17 @@ def test_every_permanent_with_the_trigger_is_reported() -> None:
         Permanent(CardInstance(InstanceId(f"c{i}"), OracleId("Bloodthirsty Conqueror"))).settle()
         for i in range(3)
     ]
-    found = triggers_at(Step.UPKEEP, battlefield, _abilities, _names)
+    found = triggers_at(Step.UPKEEP, battlefield, _abilities, _names, your_turn=True)
     assert [r.instance_id for r in found] == [InstanceId(f"c{i}") for i in range(3)]
 
 
 def test_a_reminder_carries_the_event_it_is_about() -> None:
     (reminder,) = triggers_at(
-        Step.UPKEEP, _battlefield("Bloodthirsty Conqueror"), _abilities, _names
+        Step.UPKEEP,
+        _battlefield("Bloodthirsty Conqueror"),
+        _abilities,
+        _names,
+        your_turn=True,
     )
     assert reminder.event is TriggerEvent.BEGINNING_OF_UPKEEP
 
@@ -123,3 +130,15 @@ def test_the_two_classifications_do_not_overlap() -> None:
 
 def test_each_step_maps_to_a_distinct_event() -> None:
     assert len(set(AT_STEP.values())) == len(AT_STEP)
+
+
+def test_your_upkeep_trigger_is_not_reported_on_their_turn() -> None:
+    """The step is only half the condition; whose turn it is, is the other half.
+
+    Without this it reminded you of your upkeep triggers twice a round.
+    """
+    assert _scan(Step.UPKEEP, "Bloodthirsty Conqueror", your_turn=False) == ()
+
+
+def test_your_end_step_trigger_is_not_reported_on_their_turn_either() -> None:
+    assert _scan(Step.END_STEP, "Nightshade Dryad", your_turn=False) == ()

@@ -76,14 +76,26 @@ def triggers_at(
     battlefield: Sequence[Permanent],
     abilities: Callable[[OracleId], Sequence[Ability]],
     names: Callable[[OracleId], str],
+    *,
+    your_turn: bool,
 ) -> tuple[Reminder, ...]:
     """Every clock-driven trigger that fires on entering ``step``.
 
     ``abilities`` and ``names`` are lookups rather than data because ``core``
     holds no card data; the caller supplies them from the sealed fixture.
+
+    ``your_turn`` is required rather than defaulted because the step is only
+    half the condition: "at the beginning of **your** upkeep" needs to be your
+    upkeep, and without it these reminders fired twice a round -- on your turn
+    and on the opponent's.
+
+    A known gap, stated because it is a gap and not a decision: the schema's
+    ``TriggerEvent`` does not distinguish "your upkeep" from "each upkeep", so a
+    card with the latter is not reported on the opponent's turn. None is in the
+    Beginner Box. Splitting the event is the fix, and it needs a re-extraction.
     """
     event = AT_STEP.get(step)
-    if event is None:
+    if event is None or not your_turn:
         return ()
     return tuple(
         Reminder(permanent.instance_id, names(permanent.card.oracle_id), event)

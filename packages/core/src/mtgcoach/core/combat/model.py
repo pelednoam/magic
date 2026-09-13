@@ -32,10 +32,13 @@ class Creature:
     permanent: Permanent
     card: CardFacts
 
-    @property
-    def instance_id(self) -> InstanceId:
-        """The identifier of the underlying card."""
-        return self.permanent.instance_id
+    #: Reached through two properties on every damage assignment, of which one
+    #: search makes millions. Resolved once instead.
+    instance_id: InstanceId = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        """Resolve the identifier once."""
+        object.__setattr__(self, "instance_id", self.permanent.instance_id)
 
     @property
     def name(self) -> str:

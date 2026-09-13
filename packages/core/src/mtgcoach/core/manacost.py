@@ -74,9 +74,16 @@ class ManaCost:
 def parse(text: str) -> ManaCost:
     """Parse a mana cost string.
 
+    One cost, one face. Scryfall gives a split or modal card a joined top-level
+    ``mana_cost`` -- ``"{3} // {1}{B}"`` -- and that is refused rather than
+    resolved to either half: the card has two costs, and picking one silently
+    would misprice whichever half the player did not cast. Callers read the
+    faces.
+
     Raises:
-        UnsupportedCostError: If a symbol cannot be modelled, or if the string
-            contains anything outside brace-delimited symbols.
+        UnsupportedCostError: If a symbol cannot be modelled, if the string
+            contains anything outside brace-delimited symbols, or if it is a
+            two-faced card's joined cost.
     """
     stripped = text.strip()
     if not stripped:
@@ -124,6 +131,14 @@ class ManaSource:
     ``produces`` is the set of colours this source could make. A Forest is
     ``{"G"}``; a dual land is two colours; a source making colourless mana has
     an empty set, which pays generic costs and nothing else.
+
+    One source makes **one** mana. Every consumer assumes it: the solver draws
+    ``cost.generic`` sources from a combination, and ``legality`` compares the
+    number of sources against the cost's total. A Sol Ring or a bounce land
+    would be under-counted, and the advice would be wrong in the direction that
+    matters -- "you can't cast that" when you can. Nothing in the Beginner Box
+    makes more than one, and the fix is a quantity here rather than a different
+    solver, but until it exists this is a limit and not a simplification.
     """
 
     instance_id: InstanceId

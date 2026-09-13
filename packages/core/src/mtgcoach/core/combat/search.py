@@ -19,28 +19,38 @@ import itertools
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from mtgcoach.core.combat.budget import check_size
+from mtgcoach.core.combat.assignments import (
+    block_assignments,
+    damage_orders,
+    identity,
+)
+from mtgcoach.core.combat.budget import check_defence_size, check_plan_size
 from mtgcoach.core.combat.damage import resolve
-from mtgcoach.core.combat.model import MENACE_MINIMUM, UNKNOWN_STATS, Blocks, can_block
+from mtgcoach.core.combat.model import UNKNOWN_STATS, Blocks
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Sequence
+    from collections.abc import Sequence
 
     from mtgcoach.core.combat.board import Outcome
     from mtgcoach.core.combat.model import Creature
-    from mtgcoach.core.ids import InstanceId
 
-#: Every blocker count a creature with menace forbids: one, and only one.
-_ILLEGAL_MENACE_BLOCKS = frozenset(range(1, MENACE_MINIMUM))
+#: How a candidate outcome is ranked. The last term is a total order over the
+#: creatures involved, so that a tie is never broken by list position.
+type _Key = tuple[int, int, int, int, tuple[tuple[str, ...], tuple[str, ...]]]
 
 
 @dataclass(frozen=True, slots=True)
 class Plan:
     """One attack, and what the defender's best answer does to it."""
 
-    attackers: tuple[str, ...]
+    attackers: tuple[Creature, ...]
     outcome: Outcome
     defender_life_after: int
+
+    @property
+    def names(self) -> tuple[str, ...]:
+        """The attackers' names, for showing a player."""
+        return tuple(c.name for c in self.attackers)
 
     @property
     def is_lethal(self) -> bool:
@@ -62,52 +72,6 @@ class Plan:
         )
 
 
-def _block_assignments(
-    attackers: Sequence[Creature], blockers: Sequence[Creature]
-) -> Iterator[Blocks]:
-    """Every legal way the defender could block, including not blocking."""
-    choices = [[None, *[a for a in attackers if can_block(blocker, a)]] for blocker in blockers]
-    for combination in itertools.product(*choices) if choices else [()]:
-        by_attacker: dict[InstanceId, list[Creature]] = {}
-        for blocker, target in zip(blockers, combination, strict=True):
-            if target is not None:
-                by_attacker.setdefault(target.instance_id, []).append(blocker)
-        if _menace_respected(attackers, by_attacker):
-            yield Blocks({k: tuple(v) for k, v in by_attacker.items()})
-
-
-def _menace_respected(
-    attackers: Sequence[Creature], by_attacker: dict[InstanceId, list[Creature]]
-) -> bool:
-    """CR 702.111a: a creature with menace needs two blockers or none."""
-    return all(
-        len(by_attacker.get(attacker.instance_id, [])) not in _ILLEGAL_MENACE_BLOCKS
-        for attacker in attackers
-        if attacker.has("Menace")
-    )
-
-
-def _damage_orders(attackers: Sequence[Creature], blocks: Blocks) -> Iterator[Blocks]:
-    """Every order the attacking player could assign damage in (CR 509.2).
-
-    The order is the attacking player's choice. It used to be the caller's list
-    order, so a 4/4 blocked by a 3/3 and a 1/1 killed whichever happened to be
-    passed first, and the same board in a different order gave different advice.
-    """
-    groups = [blocks.on(attacker) for attacker in attackers]
-    per_attacker = [
-        list(itertools.permutations(group)) if len(group) > 1 else [group] for group in groups
-    ]
-    for combination in itertools.product(*per_attacker) if per_attacker else [()]:
-        yield Blocks(
-            {
-                attacker.instance_id: order
-                for attacker, order in zip(attackers, combination, strict=True)
-                if order
-            }
-        )
-
-
 def _best_for_attacker(
     attackers: Sequence[Creature], blocks: Blocks, defender_life: int
 ) -> Outcome:
@@ -118,16 +82,16 @@ def _best_for_attacker(
     creature. That last term is what makes the answer independent of the order
     the caller happened to pass the blockers in.
     """
-    worth = {b.name: b.power + b.toughness for b in blocks.blockers}
     best: Outcome | None = None
-    best_key: tuple[int, int, int, int] | None = None
-    for order in _damage_orders(attackers, blocks):
+    best_key: _Key | None = None
+    for order in damage_orders(attackers, blocks):
         outcome = resolve(attackers, order)
         key = (
-            0 if outcome.life_swing_against(defender_life) <= 0 else 1,
+            0 if outcome.defender_life_after(defender_life) <= 0 else 1,
             len(outcome.attackers_lost) - len(outcome.blockers_lost),
             -outcome.damage_to_defender,
-            -sum(worth[name] for name in outcome.blockers_lost),
+            -sum(c.power + c.toughness for c in outcome.blockers_lost),
+            identity(outcome),
         )
         if best_key is None or key < best_key:
             best, best_key = outcome, key
@@ -152,15 +116,17 @@ def best_defence(
     Raises:
         TooManyCombinationsError: If this board is too large to search exactly.
     """
-    check_size(attackers, blockers)
+    check_defence_size(attackers, blockers)
     best: Outcome | None = None
-    best_key: tuple[int, int, int] | None = None
-    for blocks in _block_assignments(attackers, blockers):
+    best_key: _Key | None = None
+    for blocks in block_assignments(attackers, blockers):
         outcome = _best_for_attacker(attackers, blocks, defender_life)
         key = (
-            1 if outcome.life_swing_against(defender_life) <= 0 else 0,
+            1 if outcome.defender_life_after(defender_life) <= 0 else 0,
             len(outcome.blockers_lost) - len(outcome.attackers_lost),
             outcome.damage_to_defender,
+            sum(c.power + c.toughness for c in outcome.blockers_lost),
+            identity(outcome),
         )
         if best_key is None or key < best_key:
             best, best_key = outcome, key
@@ -181,7 +147,7 @@ def plans(
     if unknown:
         msg = f"cannot evaluate combat: {', '.join(sorted(unknown))} {UNKNOWN_STATS}"
         raise ValueError(msg)
-    check_size(attackers, blockers)
+    check_plan_size(attackers, blockers)
 
     found: list[Plan] = []
     for size in range(len(attackers) + 1):
@@ -189,9 +155,9 @@ def plans(
             outcome = best_defence(chosen, blockers, defender_life)
             found.append(
                 Plan(
-                    attackers=tuple(sorted(c.name for c in chosen)),
+                    attackers=chosen,
                     outcome=outcome,
-                    defender_life_after=outcome.life_swing_against(defender_life),
+                    defender_life_after=outcome.defender_life_after(defender_life),
                 )
             )
     found.sort(key=lambda p: (not p.is_lethal, -p.value, len(p.attackers)))

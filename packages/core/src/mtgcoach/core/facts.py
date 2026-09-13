@@ -36,7 +36,16 @@ class CardFacts:
     toughness: int | None = None
     keywords: frozenset[str] = field(default_factory=frozenset[str])
 
+    #: The same keywords, case-folded once. Derived, so it is neither an
+    #: argument nor part of equality -- but combat asks ``has`` millions of
+    #: times in one search, and folding every keyword on every question was a
+    #: third of the time the whole engine spent.
+    _folded: frozenset[str] = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        """Fold the keywords once, since ``has`` is asked far more than once."""
+        object.__setattr__(self, "_folded", frozenset(k.casefold() for k in self.keywords))
+
     def has(self, keyword: str) -> bool:
         """Whether the card has a keyword, compared without regard to case."""
-        wanted = keyword.casefold()
-        return any(k.casefold() == wanted for k in self.keywords)
+        return keyword.casefold() in self._folded

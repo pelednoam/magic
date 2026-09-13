@@ -14,9 +14,10 @@ if TYPE_CHECKING:
 class Permanent:
     """A card on the battlefield, with the state that only exists there.
 
-    Counters and attachments are deliberately absent: nothing in M1 can create
-    one, and a field no event can set is a field no test can cover. They arrive
-    with the effect model in M4.
+    Counters and attachments are deliberately absent: nothing yet can create
+    one, and a field no event can set is a field no test can cover. M4 shipped
+    the effect *schema* without the casting that would put one on the table, so
+    they arrive with spell casting -- the milestone that first creates one.
     """
 
     card: CardInstance

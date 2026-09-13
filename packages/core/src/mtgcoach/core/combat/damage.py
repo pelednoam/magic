@@ -135,8 +135,13 @@ def resolve(attackers: Sequence[Creature], blocks: Blocks) -> Outcome:
         _step_damage(attackers, blocks, board, first=first)
     return Outcome(
         damage_to_defender=board.to_defender,
-        attackers_lost=tuple(sorted(a.name for a in attackers if board.is_dead(a))),
-        blockers_lost=tuple(sorted(b.name for b in blocks.blockers if board.is_dead(b))),
+        attackers_lost=_dead(attackers, board),
+        blockers_lost=_dead(blocks.blockers, board),
         attacker_life_gained=board.attacker_lifelink,
         defender_life_gained=board.defender_lifelink,
     )
+
+
+def _dead(creatures: Sequence[Creature], board: Board) -> tuple[Creature, ...]:
+    """Those of ``creatures`` that took lethal damage, in a stable order."""
+    return tuple(sorted((c for c in creatures if board.is_dead(c)), key=lambda c: c.instance_id))

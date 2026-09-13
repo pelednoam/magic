@@ -27,9 +27,9 @@ def test_attacking_with_a_flyer_they_cannot_block() -> None:
     flyer = creature("Skyhunter", 2, 2, "Flying")
     ground = creature("Bear", 2, 2)
     best = plans([flyer, ground], [creature("Ogre", 3, 3)], STARTING_LIFE)[0]
-    assert best.attackers == ("Skyhunter",)
+    assert best.names == ("Skyhunter",)
     assert best.outcome.damage_to_defender == 2
-    assert not best.outcome.attackers_lost
+    assert not best.outcome.attacker_names
 
 
 def test_lethal_is_ranked_first() -> None:
@@ -43,8 +43,8 @@ def test_not_attacking_is_always_an_option() -> None:
     """A coach that cannot say 'hold back' is not giving advice."""
     suicidal = creature("Squire", 1, 1)
     all_plans = plans([suicidal], [creature("Giant", 5, 5)], STARTING_LIFE)
-    assert any(p.attackers == () for p in all_plans)
-    assert all_plans[0].attackers == (), "attacking into a bigger creature is not best"
+    assert any(p.names == () for p in all_plans)
+    assert all_plans[0].names == (), "attacking into a bigger creature is not best"
 
 
 def test_a_good_defender_chump_blocks_to_survive() -> None:
@@ -52,7 +52,7 @@ def test_a_good_defender_chump_blocks_to_survive() -> None:
     attacker = creature("Bear", 2, 2)
     outcome = best_defence([attacker], [creature("Squire", 1, 1)], 1)
     assert outcome.damage_to_defender == 0
-    assert outcome.blockers_lost == ("Squire",)
+    assert outcome.blocker_names == ("Squire",)
 
 
 def test_a_defender_at_high_life_takes_the_hit_rather_than_chump_block() -> None:
@@ -60,21 +60,21 @@ def test_a_defender_at_high_life_takes_the_hit_rather_than_chump_block() -> None
     attacker = creature("Bear", 2, 2)
     outcome = best_defence([attacker], [creature("Squire", 1, 1)], STARTING_LIFE)
     assert outcome.damage_to_defender == 2
-    assert not outcome.blockers_lost
+    assert not outcome.blocker_names
 
 
 def test_a_defender_takes_a_free_trade() -> None:
     attacker = creature("Bear", 2, 2)
     outcome = best_defence([attacker], [creature("Wall", 0, 4)], STARTING_LIFE)
     assert outcome.damage_to_defender == 0
-    assert not outcome.blockers_lost
+    assert not outcome.blocker_names
 
 
 def test_a_defender_blocks_to_kill_when_it_costs_nothing() -> None:
     attacker = creature("Squire", 1, 1)
     outcome = best_defence([attacker], [creature("Giant", 5, 5)], STARTING_LIFE)
-    assert outcome.attackers_lost == ("Squire",)
-    assert not outcome.blockers_lost
+    assert outcome.attacker_names == ("Squire",)
+    assert not outcome.blocker_names
 
 
 def test_flying_cannot_be_blocked_by_a_ground_creature() -> None:
@@ -174,7 +174,7 @@ def test_every_subset_is_considered() -> None:
 
 
 def test_an_empty_board_has_one_plan() -> None:
-    assert plans([], [], STARTING_LIFE)[0].attackers == ()
+    assert plans([], [], STARTING_LIFE)[0].names == ()
 
 
 def test_blocking_nothing_is_a_legal_assignment() -> None:

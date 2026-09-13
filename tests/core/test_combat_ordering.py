@@ -18,7 +18,7 @@ def test_the_attacker_chooses_which_blocker_to_kill() -> None:
     big, small = creature("Ogre", 3, 3), creature("Squire", 1, 1)
     for order in ([big, small], [small, big]):
         outcome = best_defence([attacker], order, 1)
-        assert outcome.blockers_lost == ("Ogre",)
+        assert outcome.blocker_names == ("Ogre",)
 
 
 def test_the_advice_does_not_depend_on_the_order_of_the_blocker_list() -> None:
@@ -30,7 +30,7 @@ def test_the_advice_does_not_depend_on_the_order_of_the_blocker_list() -> None:
 
 def test_a_single_blocker_has_only_one_order() -> None:
     outcome = best_defence([creature("Brute", 4, 4)], [creature("Squire", 1, 1)], 1)
-    assert outcome.blockers_lost == ("Squire",)
+    assert outcome.blocker_names == ("Squire",)
 
 
 # --- two copies of a card are two creatures ---------------------------------

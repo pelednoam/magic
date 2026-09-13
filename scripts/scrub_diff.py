@@ -38,16 +38,35 @@ import sys
 # `TokenSpec`, `str` and `os.environ` do not.
 _SECRET_VALUE = r"""(?:['"][^'"]{4,}['"]|(?=[\w.\-]*\d)[\w.\-]{8,})"""
 
+# A private key is a *block*, not a line. A banner matches one line and one
+# line only; every base64 body line after it matches nothing (it has no
+# `key:`-style prefix, and it is not an `sk-`/`AKIA`/`ghp_` shape), so a
+# line-at-a-time scrubber redacts the banner and writes the usable key straight
+# through. These two bound the block so the body can be redacted as well.
+#
+# `_PEM_BEGIN` is also the banner pattern in CREDENTIAL_PATTERNS below, and has
+# to be: an earlier version paired a narrow `BEGIN (RSA )?PRIVATE KEY` there
+# with this broad one here, and opened the block only when the banner had been
+# redacted. `-----BEGIN OPENSSH PRIVATE KEY-----` matched the broad pattern but
+# not the narrow one, so nothing was redacted, the block never opened, and the
+# scrubber exited 0 calling the key clean. One regex, used for both jobs.
+_PEM_BEGIN = re.compile(r"(?i)BEGIN\s+[A-Z0-9 ]*PRIVATE\s+KEY")
+_PEM_END = re.compile(r"(?i)END\s+[A-Z0-9 ]*PRIVATE\s+KEY")
+
 CREDENTIAL_PATTERNS = [
     re.compile(
         r"(?i)(api[_-]?key|secret[_-]?key|access[_-]?key)\s*[:=]\s*" + _SECRET_VALUE
     ),
     re.compile(r"(?i)(password|passwd|pwd)\s*[:=]\s*" + _SECRET_VALUE),
     re.compile(r"(?i)\b(token|bearer)\s*[:=]\s*" + _SECRET_VALUE),
-    re.compile(r"(?i)BEGIN\s+(RSA\s+)?PRIVATE\s+KEY"),
+    _PEM_BEGIN,
     re.compile(r"(?i)(^|[\s'\"/])\.env(\.[a-z]+)?([\s'\"/]|$)"),
     re.compile(r"AKIA[0-9A-Z]{16}"),
-    re.compile(r"sk-[a-zA-Z0-9]{20,128}"),
+    # Hyphens included: a current key is `sk-ant-api03-...` or `sk-proj-...`,
+    # and a run of plain alphanumerics stops at the first hyphen -- so the
+    # pattern matched only legacy keys, and missed every key this tool is most
+    # likely to meet.
+    re.compile(r"sk-[a-zA-Z0-9_-]{20,192}"),
     re.compile(r"ghp_[a-zA-Z0-9]{36,}"),
     re.compile(r"gho_[a-zA-Z0-9]{36,}"),
     re.compile(r"glpat-[a-zA-Z0-9\-]{20,}"),
@@ -55,15 +74,6 @@ CREDENTIAL_PATTERNS = [
     re.compile(r"(?i)DefaultEndpointsProtocol=https;AccountName="),
     re.compile(r'"type"\s*:\s*"service_account"'),
 ]
-
-# A private key is a *block*, not a line. The `BEGIN ... PRIVATE KEY` pattern
-# above matches one line and one line only; every base64 body line after it
-# matches nothing (it has no `key:`-style prefix, and it is not an `sk-`/`AKIA`
-# /`ghp_` shape), so a line-at-a-time scrubber redacts the banner and writes
-# the usable key straight through. These two bound the block so the body can be
-# redacted as well.
-_PEM_BEGIN = re.compile(r"(?i)BEGIN\s+[A-Z0-9 ]*PRIVATE\s+KEY")
-_PEM_END = re.compile(r"(?i)END\s+[A-Z0-9 ]*PRIVATE\s+KEY")
 
 REDACTED = "# [REDACTED: credential pattern detected]"
 _REDACTED_LINE = REDACTED + "\n"
@@ -107,8 +117,11 @@ def _is_intentional_fixture_line(line: str) -> bool:
     scrubbed normally, so accidentally committed real secrets are
     still caught.
     """
+    body = _body(line).lstrip()
     return (
-        "re.compile(" in line
+        body.startswith(
+            ("re.compile(", "_SECRET_VALUE", "_PEM_", "CREDENTIAL_PATTERNS")
+        )
         or "+API_KEY" in line
         or "+password" in line
         or "+secret" in line
@@ -139,9 +152,24 @@ def _redact_preserving_prefix(line: str) -> str:
     return _REDACTED_LINE
 
 
+#: Metadata lines that begin with a body-line character. `--- a/.env.example`
+#: and `+++ b/.env.example` start with `-` and `+`, so treating them as content
+#: redacted the file headers themselves: the patch lost its file attribution,
+#: became structurally invalid, and the review aborted claiming a leaked secret
+#: because someone committed a `.env.example`.
+_HEADER_PREFIXES = ("--- ", "+++ ", "---\n", "+++\n")
+
+
 def _is_body_line(line: str) -> bool:
     """Whether this is a hunk body line rather than diff metadata."""
+    if line.startswith(_HEADER_PREFIXES):
+        return False
     return line[:1] in ("+", "-", " ")
+
+
+def _is_metadata(line: str) -> bool:
+    """Whether this line is diff structure rather than file content."""
+    return not _is_body_line(line)
 
 
 def _body(line: str) -> str:
@@ -165,6 +193,10 @@ def scrub_line(line: str, in_safe_file: bool) -> str:
         diff prefix (``+``, ``-``, or `` ``) so the patch remains
         syntactically valid.
     """
+    if _is_metadata(line):
+        # Headers are structure, not content. A file *named* `.env.example`
+        # is not a secret, and redacting its header breaks the patch.
+        return line
     if in_safe_file and _is_intentional_fixture_line(line):
         return line
     # Match the body, not the `+`/`-`/` ` the diff format puts in front of it.
@@ -241,8 +273,11 @@ def main() -> None:
 if __name__ == "__main__":
     try:
         main()
-    except OSError as exc:
+    except Exception as exc:  # noqa: BLE001 - any failure truncates the output
         # Anything already on stdout is a partial, unscrubbed patch. Exit 2 so
-        # the caller can say so rather than reporting a clean block.
+        # the caller can say so rather than reporting a clean block. Catching
+        # only OSError left MemoryError, RecursionError and re.error exiting 1,
+        # which the caller reads as "rotate your credentials" -- sending an
+        # operator to hunt a secret that was never there.
         print(f"# scrub_diff.py: aborted, output is truncated: {exc}", file=sys.stderr)
         sys.exit(2)

@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+from typing import cast
+
 import pytest
 
 from mtgcoach.core.ids import InstanceId
 from mtgcoach.core.manacost import ManaCost, ManaSource, UnsupportedCostError, parse
+
+FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "scryfall_fdn_sample.json"
 
 
 def test_an_empty_cost() -> None:
@@ -85,3 +91,51 @@ def test_a_source_pays_a_symbol_it_shares_a_colour_with() -> None:
 
 def test_a_colourless_source_pays_no_coloured_symbol() -> None:
     assert not ManaSource(InstanceId("wastes")).can_pay(frozenset({"G"}))
+
+
+def test_every_cost_in_the_scryfall_fixture_parses() -> None:
+    """Real Scryfall strings, not ones written to suit the parser.
+
+    The whole Beginner Box was checked at extraction time, but no committed
+    fixture carries mana costs -- ``effects.json`` holds abilities and the
+    decklists hold names -- so this pins the parser against the only real
+    costs the repository actually stores.
+    """
+    costs = _face_costs(json.loads(FIXTURE.read_text(encoding="utf-8")))
+    assert costs, "the fixture should carry some costs"
+    for text in costs:
+        assert parse(text).total >= 0
+
+
+def test_a_two_faced_cards_joined_cost_is_refused() -> None:
+    """Scryfall joins them at the top level; resolving to one half would lie."""
+    joined = [
+        c["mana_cost"]
+        for c in json.loads(FIXTURE.read_text(encoding="utf-8"))
+        if isinstance(c.get("mana_cost"), str) and "//" in c["mana_cost"]
+    ]
+    assert joined, "the fixture should carry a split card"
+    for text in joined:
+        with pytest.raises(UnsupportedCostError, match="not a mana cost"):
+            parse(text)
+
+
+def _face_costs(cards: list[dict[str, object]]) -> list[str]:
+    """Every per-face mana cost in a Scryfall payload.
+
+    A card with faces carries the real costs there; its top-level ``mana_cost``
+    is the two joined with ``//``.
+    """
+    found: list[str] = []
+    for card in cards:
+        faces: object = card.get("card_faces")
+        if isinstance(faces, list):
+            nested: list[dict[str, object]] = [
+                f for f in cast("list[object]", faces) if isinstance(f, dict)
+            ]
+            found.extend(_face_costs(nested))
+            continue
+        cost = card.get("mana_cost")
+        if isinstance(cost, str) and cost:
+            found.append(cost)
+    return found
