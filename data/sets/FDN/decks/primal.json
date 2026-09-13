@@ -1,0 +1,64 @@
+{
+  "key": "primal",
+  "name": "Primal",
+  "color": "G",
+  "tutorial": false,
+  "sources": [
+    "https://mtg.wtf/deck/fdn/primal",
+    "https://magic.wizards.com/en/news/feature/foundations-beginner-box-contents"
+  ],
+  "cards": [
+    {
+      "name": "Aggressive Mammoth",
+      "quantity": 1
+    },
+    {
+      "name": "Bear Cub",
+      "quantity": 1
+    },
+    {
+      "name": "Biogenic Upgrade",
+      "quantity": 1
+    },
+    {
+      "name": "Bite Down",
+      "quantity": 1
+    },
+    {
+      "name": "Druid of the Cowl",
+      "quantity": 1
+    },
+    {
+      "name": "Forest",
+      "quantity": 8
+    },
+    {
+      "name": "Giant Growth",
+      "quantity": 1
+    },
+    {
+      "name": "Magnigoth Sentry",
+      "quantity": 1
+    },
+    {
+      "name": "Mild-Mannered Librarian",
+      "quantity": 1
+    },
+    {
+      "name": "New Horizons",
+      "quantity": 1
+    },
+    {
+      "name": "Thrashing Brontodon",
+      "quantity": 1
+    },
+    {
+      "name": "Uncharted Haven",
+      "quantity": 1
+    },
+    {
+      "name": "Wildwood Scourge",
+      "quantity": 1
+    }
+  ]
+}

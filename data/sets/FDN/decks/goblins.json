@@ -1,0 +1,68 @@
+{
+  "key": "goblins",
+  "name": "Goblins",
+  "color": "R",
+  "tutorial": false,
+  "sources": [
+    "https://mtg.wtf/deck/fdn/goblins",
+    "https://magic.wizards.com/en/news/feature/foundations-beginner-box-contents"
+  ],
+  "cards": [
+    {
+      "name": "Battle-Rattle Shaman",
+      "quantity": 1
+    },
+    {
+      "name": "Dragon Fodder",
+      "quantity": 1
+    },
+    {
+      "name": "Dropkick Bomber",
+      "quantity": 1
+    },
+    {
+      "name": "Frenzied Goblin",
+      "quantity": 1
+    },
+    {
+      "name": "Goblin Firebomb",
+      "quantity": 1
+    },
+    {
+      "name": "Goblin Oriflamme",
+      "quantity": 1
+    },
+    {
+      "name": "Goblin Smuggler",
+      "quantity": 1
+    },
+    {
+      "name": "Incinerating Blast",
+      "quantity": 1
+    },
+    {
+      "name": "Kindled Fury",
+      "quantity": 1
+    },
+    {
+      "name": "Mountain",
+      "quantity": 7
+    },
+    {
+      "name": "Raging Redcap",
+      "quantity": 1
+    },
+    {
+      "name": "Swab Goblin",
+      "quantity": 1
+    },
+    {
+      "name": "Uncharted Haven",
+      "quantity": 1
+    },
+    {
+      "name": "Volley Veteran",
+      "quantity": 1
+    }
+  ]
+}

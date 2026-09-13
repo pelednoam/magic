@@ -1,0 +1,64 @@
+{
+  "key": "inferno",
+  "name": "Inferno",
+  "color": "R",
+  "tutorial": false,
+  "sources": [
+    "https://mtg.wtf/deck/fdn/inferno",
+    "https://magic.wizards.com/en/news/feature/foundations-beginner-box-contents"
+  ],
+  "cards": [
+    {
+      "name": "Carnelian Orb of Dragonkind",
+      "quantity": 1
+    },
+    {
+      "name": "Dragonlord's Servant",
+      "quantity": 1
+    },
+    {
+      "name": "Fiery Annihilation",
+      "quantity": 1
+    },
+    {
+      "name": "Fire Elemental",
+      "quantity": 1
+    },
+    {
+      "name": "Firespitter Whelp",
+      "quantity": 1
+    },
+    {
+      "name": "Kargan Dragonrider",
+      "quantity": 1
+    },
+    {
+      "name": "Mountain",
+      "quantity": 8
+    },
+    {
+      "name": "Rapacious Dragon",
+      "quantity": 1
+    },
+    {
+      "name": "Scorching Dragonfire",
+      "quantity": 1
+    },
+    {
+      "name": "Seize the Spoils",
+      "quantity": 1
+    },
+    {
+      "name": "Skyraker Giant",
+      "quantity": 1
+    },
+    {
+      "name": "Terror of Mount Velus",
+      "quantity": 1
+    },
+    {
+      "name": "Uncharted Haven",
+      "quantity": 1
+    }
+  ]
+}

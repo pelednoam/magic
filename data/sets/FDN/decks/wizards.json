@@ -1,0 +1,68 @@
+{
+  "key": "wizards",
+  "name": "Wizards",
+  "color": "U",
+  "tutorial": false,
+  "sources": [
+    "https://mtg.wtf/deck/fdn/wizards",
+    "https://magic.wizards.com/en/news/feature/foundations-beginner-box-contents"
+  ],
+  "cards": [
+    {
+      "name": "Arcane Epiphany",
+      "quantity": 1
+    },
+    {
+      "name": "Burrog Befuddler",
+      "quantity": 1
+    },
+    {
+      "name": "Clinquant Skymage",
+      "quantity": 1
+    },
+    {
+      "name": "Erudite Wizard",
+      "quantity": 1
+    },
+    {
+      "name": "Exclusion Mage",
+      "quantity": 1
+    },
+    {
+      "name": "Fleeting Distraction",
+      "quantity": 1
+    },
+    {
+      "name": "Icewind Elemental",
+      "quantity": 1
+    },
+    {
+      "name": "Into the Roil",
+      "quantity": 1
+    },
+    {
+      "name": "Island",
+      "quantity": 7
+    },
+    {
+      "name": "Mischievous Mystic",
+      "quantity": 1
+    },
+    {
+      "name": "Mystic Archaeologist",
+      "quantity": 1
+    },
+    {
+      "name": "Quick Study",
+      "quantity": 1
+    },
+    {
+      "name": "Starlight Snare",
+      "quantity": 1
+    },
+    {
+      "name": "Uncharted Haven",
+      "quantity": 1
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "key": "elves",
+  "name": "Elves",
+  "color": "G",
+  "tutorial": false,
+  "sources": [
+    "https://mtg.wtf/deck/fdn/elves",
+    "https://magic.wizards.com/en/news/feature/foundations-beginner-box-contents"
+  ],
+  "cards": [
+    {
+      "name": "Beast-Kin Ranger",
+      "quantity": 1
+    },
+    {
+      "name": "Broken Wings",
+      "quantity": 1
+    },
+    {
+      "name": "Dwynen's Elite",
+      "quantity": 1
+    },
+    {
+      "name": "Elvish Archdruid",
+      "quantity": 1
+    },
+    {
+      "name": "Elvish Regrower",
+      "quantity": 1
+    },
+    {
+      "name": "Felling Blow",
+      "quantity": 1
+    },
+    {
+      "name": "Forest",
+      "quantity": 7
+    },
+    {
+      "name": "Joraga Invocation",
+      "quantity": 1
+    },
+    {
+      "name": "Llanowar Elves",
+      "quantity": 1
+    },
+    {
+      "name": "Snakeskin Veil",
+      "quantity": 1
+    },
+    {
+      "name": "Tajuru Pathwarden",
+      "quantity": 1
+    },
+    {
+      "name": "Thornweald Archer",
+      "quantity": 1
+    },
+    {
+      "name": "Uncharted Haven",
+      "quantity": 1
+    },
+    {
+      "name": "Wildheart Invoker",
+      "quantity": 1
+    }
+  ]
+}

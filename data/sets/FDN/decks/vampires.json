@@ -1,0 +1,68 @@
+{
+  "key": "vampires",
+  "name": "Vampires",
+  "color": "B",
+  "tutorial": true,
+  "sources": [
+    "https://mtg.wtf/deck/fdn/vampires",
+    "https://magic.wizards.com/en/news/feature/foundations-beginner-box-contents"
+  ],
+  "cards": [
+    {
+      "name": "Bloodtithe Collector",
+      "quantity": 1
+    },
+    {
+      "name": "Crossway Troublemakers",
+      "quantity": 1
+    },
+    {
+      "name": "Hero's Downfall",
+      "quantity": 1
+    },
+    {
+      "name": "Highborn Vampire",
+      "quantity": 1
+    },
+    {
+      "name": "Moment of Craving",
+      "quantity": 1
+    },
+    {
+      "name": "Offer Immortality",
+      "quantity": 1
+    },
+    {
+      "name": "Stromkirk Bloodthief",
+      "quantity": 1
+    },
+    {
+      "name": "Swamp",
+      "quantity": 7
+    },
+    {
+      "name": "Uncharted Haven",
+      "quantity": 1
+    },
+    {
+      "name": "Untamed Hunger",
+      "quantity": 1
+    },
+    {
+      "name": "Vampire Interloper",
+      "quantity": 1
+    },
+    {
+      "name": "Vampire Neonate",
+      "quantity": 1
+    },
+    {
+      "name": "Vampire Spawn",
+      "quantity": 1
+    },
+    {
+      "name": "Vengeful Bloodwitch",
+      "quantity": 1
+    }
+  ]
+}

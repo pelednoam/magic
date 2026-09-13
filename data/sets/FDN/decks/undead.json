@@ -1,0 +1,68 @@
+{
+  "key": "undead",
+  "name": "Undead",
+  "color": "B",
+  "tutorial": false,
+  "sources": [
+    "https://mtg.wtf/deck/fdn/undead",
+    "https://magic.wizards.com/en/news/feature/foundations-beginner-box-contents"
+  ],
+  "cards": [
+    {
+      "name": "Cemetery Recruitment",
+      "quantity": 1
+    },
+    {
+      "name": "Crow of Dark Tidings",
+      "quantity": 1
+    },
+    {
+      "name": "Deadly Plot",
+      "quantity": 1
+    },
+    {
+      "name": "Death Baron",
+      "quantity": 1
+    },
+    {
+      "name": "Diregraf Ghoul",
+      "quantity": 1
+    },
+    {
+      "name": "Eaten Alive",
+      "quantity": 1
+    },
+    {
+      "name": "Hungry Ghoul",
+      "quantity": 1
+    },
+    {
+      "name": "Maalfeld Twins",
+      "quantity": 1
+    },
+    {
+      "name": "Reassembling Skeleton",
+      "quantity": 1
+    },
+    {
+      "name": "Skeleton Archer",
+      "quantity": 1
+    },
+    {
+      "name": "Suspicious Shambler",
+      "quantity": 1
+    },
+    {
+      "name": "Swamp",
+      "quantity": 7
+    },
+    {
+      "name": "Uncharted Haven",
+      "quantity": 1
+    },
+    {
+      "name": "Undying Malice",
+      "quantity": 1
+    }
+  ]
+}

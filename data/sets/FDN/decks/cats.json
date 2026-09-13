@@ -1,0 +1,68 @@
+{
+  "key": "cats",
+  "name": "Cats",
+  "color": "W",
+  "tutorial": true,
+  "sources": [
+    "https://mtg.wtf/deck/fdn/cats",
+    "https://magic.wizards.com/en/news/feature/foundations-beginner-box-contents"
+  ],
+  "cards": [
+    {
+      "name": "Angelic Edict",
+      "quantity": 1
+    },
+    {
+      "name": "Elspeth's Smite",
+      "quantity": 1
+    },
+    {
+      "name": "Felidar Savior",
+      "quantity": 1
+    },
+    {
+      "name": "Helpful Hunter",
+      "quantity": 1
+    },
+    {
+      "name": "Ingenious Leonin",
+      "quantity": 1
+    },
+    {
+      "name": "Jazal Goldmane",
+      "quantity": 1
+    },
+    {
+      "name": "Leonin Skyhunter",
+      "quantity": 1
+    },
+    {
+      "name": "Leonin Vanguard",
+      "quantity": 1
+    },
+    {
+      "name": "Moment of Triumph",
+      "quantity": 1
+    },
+    {
+      "name": "Pacifism",
+      "quantity": 1
+    },
+    {
+      "name": "Plains",
+      "quantity": 7
+    },
+    {
+      "name": "Prideful Parent",
+      "quantity": 1
+    },
+    {
+      "name": "Savannah Lions",
+      "quantity": 1
+    },
+    {
+      "name": "Uncharted Haven",
+      "quantity": 1
+    }
+  ]
+}

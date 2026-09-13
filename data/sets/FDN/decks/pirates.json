@@ -1,0 +1,68 @@
+{
+  "key": "pirates",
+  "name": "Pirates",
+  "color": "U",
+  "tutorial": false,
+  "sources": [
+    "https://mtg.wtf/deck/fdn/pirates",
+    "https://magic.wizards.com/en/news/feature/foundations-beginner-box-contents"
+  ],
+  "cards": [
+    {
+      "name": "Bigfin Bouncer",
+      "quantity": 1
+    },
+    {
+      "name": "Brineborn Cutthroat",
+      "quantity": 1
+    },
+    {
+      "name": "Cancel",
+      "quantity": 1
+    },
+    {
+      "name": "Corsair Captain",
+      "quantity": 1
+    },
+    {
+      "name": "Eaten by Piranhas",
+      "quantity": 1
+    },
+    {
+      "name": "Island",
+      "quantity": 7
+    },
+    {
+      "name": "Kitesail Corsair",
+      "quantity": 1
+    },
+    {
+      "name": "Opt",
+      "quantity": 1
+    },
+    {
+      "name": "Pirate's Cutlass",
+      "quantity": 1
+    },
+    {
+      "name": "Skyship Buccaneer",
+      "quantity": 1
+    },
+    {
+      "name": "Spectral Sailor",
+      "quantity": 1
+    },
+    {
+      "name": "Storm Fleet Spy",
+      "quantity": 1
+    },
+    {
+      "name": "Tolarian Terror",
+      "quantity": 1
+    },
+    {
+      "name": "Uncharted Haven",
+      "quantity": 1
+    }
+  ]
+}

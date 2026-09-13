@@ -1,0 +1,68 @@
+{
+  "key": "healing",
+  "name": "Healing",
+  "color": "W",
+  "tutorial": false,
+  "sources": [
+    "https://mtg.wtf/deck/fdn/healing",
+    "https://magic.wizards.com/en/news/feature/foundations-beginner-box-contents"
+  ],
+  "cards": [
+    {
+      "name": "Adamant Will",
+      "quantity": 1
+    },
+    {
+      "name": "Ajani's Pridemate",
+      "quantity": 1
+    },
+    {
+      "name": "Ancestor Dragon",
+      "quantity": 1
+    },
+    {
+      "name": "Bishop's Soldier",
+      "quantity": 1
+    },
+    {
+      "name": "Dazzling Angel",
+      "quantity": 1
+    },
+    {
+      "name": "Deadly Riposte",
+      "quantity": 1
+    },
+    {
+      "name": "Herald of Faith",
+      "quantity": 1
+    },
+    {
+      "name": "Hinterland Sanctifier",
+      "quantity": 1
+    },
+    {
+      "name": "Inspiring Overseer",
+      "quantity": 1
+    },
+    {
+      "name": "Plains",
+      "quantity": 7
+    },
+    {
+      "name": "Prayer of Binding",
+      "quantity": 1
+    },
+    {
+      "name": "Quick-Draw Katana",
+      "quantity": 1
+    },
+    {
+      "name": "Twinblade Paladin",
+      "quantity": 1
+    },
+    {
+      "name": "Uncharted Haven",
+      "quantity": 1
+    }
+  ]
+}
