@@ -13,7 +13,6 @@ unplayable until the solver grows. Hence the fallback.
 from __future__ import annotations
 
 import re
-from typing import Final
 
 from mtgcoach.core.manacost import COLORS, UnsupportedCostError, parse
 
@@ -37,7 +36,3 @@ def _scan(mana_cost: str) -> frozenset[str]:
         for letter in symbol.upper()
         if letter in COLORS
     )
-
-
-#: Re-exported so callers need not reach into core for the obvious constant.
-ALL_COLORS: Final[frozenset[str]] = COLORS

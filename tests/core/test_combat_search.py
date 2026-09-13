@@ -8,9 +8,14 @@ import pytest
 
 from helpers import creature, facts
 from mtgcoach.core.cards import CardInstance
+from mtgcoach.core.combat.budget import (
+    MAX_ATTACKERS,
+    MAX_BLOCKERS,
+    TooManyCombinationsError,
+)
 from mtgcoach.core.combat.damage import resolve
 from mtgcoach.core.combat.model import Blocks, Creature, can_block
-from mtgcoach.core.combat.search import MAX_ATTACKERS, best_defence, plans
+from mtgcoach.core.combat.search import best_defence, plans
 from mtgcoach.core.ids import InstanceId, OracleId
 from mtgcoach.core.permanents import Permanent
 
@@ -135,13 +140,32 @@ def test_an_unknown_blocker_stops_the_evaluation_too() -> None:
 
 def test_too_many_attackers_is_refused_rather_than_approximated() -> None:
     army = [creature(f"C{i}", 1, 1) for i in range(MAX_ATTACKERS + 1)]
-    with pytest.raises(ValueError, match="cannot evaluate 9 attackers"):
+    with pytest.raises(TooManyCombinationsError, match="cannot evaluate 9 attackers"):
         plans(army, [], STARTING_LIFE)
 
 
-def test_the_limit_itself_is_allowed() -> None:
+def test_too_many_blockers_is_refused_too() -> None:
+    """The blockers are the exponent; capping only attackers guarded nothing."""
+    wall = [creature(f"B{i}", 1, 1) for i in range(MAX_BLOCKERS + 1)]
+    with pytest.raises(TooManyCombinationsError, match="blockers"):
+        plans([creature("Bear", 2, 2)], wall, STARTING_LIFE)
+
+
+def test_best_defence_refuses_an_oversized_board_as_well() -> None:
+    """It is reachable directly, so the guard cannot live only in `plans`."""
+    wall = [creature(f"B{i}", 1, 1) for i in range(MAX_BLOCKERS + 1)]
+    with pytest.raises(TooManyCombinationsError):
+        best_defence([creature("Bear", 2, 2)], wall, STARTING_LIFE)
+
+
+def test_the_attacker_limit_itself_is_allowed() -> None:
     army = [creature(f"C{i}", 1, 1) for i in range(MAX_ATTACKERS)]
     assert len(plans(army, [], STARTING_LIFE)) == 2**MAX_ATTACKERS
+
+
+def test_the_blocker_limit_itself_is_allowed() -> None:
+    wall = [creature(f"B{i}", 1, 1) for i in range(MAX_BLOCKERS)]
+    assert plans([creature("Bear", 2, 2)], wall, STARTING_LIFE)
 
 
 def test_every_subset_is_considered() -> None:

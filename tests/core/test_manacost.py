@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from mtgcoach.core.ids import InstanceId
 from mtgcoach.core.manacost import ManaCost, ManaSource, UnsupportedCostError, parse
 
 
@@ -76,11 +77,11 @@ def test_an_empty_cost_has_no_colours() -> None:
 
 
 def test_a_source_pays_a_symbol_it_shares_a_colour_with() -> None:
-    forest = ManaSource("forest", frozenset({"G"}))
+    forest = ManaSource(InstanceId("forest"), frozenset({"G"}))
     assert forest.can_pay(frozenset({"G"}))
     assert not forest.can_pay(frozenset({"U"}))
     assert forest.can_pay(frozenset({"G", "U"})), "a hybrid symbol"
 
 
 def test_a_colourless_source_pays_no_coloured_symbol() -> None:
-    assert not ManaSource("wastes").can_pay(frozenset({"G"}))
+    assert not ManaSource(InstanceId("wastes")).can_pay(frozenset({"G"}))

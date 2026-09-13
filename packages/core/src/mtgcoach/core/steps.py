@@ -77,3 +77,15 @@ def is_main_phase(step: Step) -> bool:
 def is_combat(step: Step) -> bool:
     """Whether ``step`` is part of the combat phase."""
     return step in _COMBAT_STEPS
+
+
+#: The two steps in which no player receives priority, so nothing can be cast
+#: and no ability activated: untap (CR 502.4) and cleanup (CR 514.3, which does
+#: hand out priority if a trigger or a discard intervenes -- not something the
+#: state can express yet, and the safe side of the approximation).
+_NO_PRIORITY: Final[frozenset[Step]] = frozenset({Step.UNTAP, Step.CLEANUP})
+
+
+def has_priority(step: Step) -> bool:
+    """Whether players receive priority during ``step``."""
+    return step not in _NO_PRIORITY

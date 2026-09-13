@@ -5,9 +5,17 @@ can fix most cheaply: the information is already on the battlefield, it just has
 to be noticed at the right moment. So at every step boundary the battlefield is
 walked for abilities whose condition the transition satisfies.
 
-Only step-driven triggers can be found this way. "When this creature dies" and
-"whenever you gain life" are driven by events, not by the clock, and they are
-reported when the event happens rather than when a step begins.
+Only triggers the *clock alone* decides can be found this way, and that is a
+shorter list than it first looks. "At the beginning of your upkeep" fires for
+every permanent you control, so entering the upkeep is the whole condition. But
+"whenever this creature attacks" fires only for a creature that actually
+attacked, and this function is handed the battlefield, not the attackers -- it
+would remind you about every creature you own, including the ones that stayed
+home, which is noise dressed up as help.
+
+So attacking, blocking, dealing combat damage, dying and gaining life are all
+classified as event-driven: they are reported by whatever observes the event
+(``combat`` knows who attacked; ``reduce`` knows what died), not by the clock.
 """
 
 from __future__ import annotations
@@ -26,18 +34,20 @@ if TYPE_CHECKING:
     from mtgcoach.core.ids import InstanceId, OracleId
     from mtgcoach.core.permanents import Permanent
 
-#: Which step each clock-driven trigger fires in.
+#: Which step each clock-driven trigger fires in. Only the two whose condition
+#: is the step itself, for every permanent on the battlefield.
 AT_STEP: Final[dict[Step, TriggerEvent]] = {
     Step.UPKEEP: TriggerEvent.BEGINNING_OF_UPKEEP,
-    Step.DECLARE_ATTACKERS: TriggerEvent.ATTACKS,
-    Step.DECLARE_BLOCKERS: TriggerEvent.BLOCKS,
-    Step.COMBAT_DAMAGE: TriggerEvent.DEALS_COMBAT_DAMAGE,
     Step.END_STEP: TriggerEvent.END_STEP,
 }
 
 #: Triggers driven by something happening rather than by the clock. Listed so
 #: that a new TriggerEvent has to be classified as one or the other rather than
 #: silently never firing.
+#:
+#: ATTACKS, BLOCKS and DEALS_COMBAT_DAMAGE are here rather than under a step
+#: because the step is only half their condition: the other half is having
+#: attacked, blocked or connected, which this scanner cannot see.
 EVENT_DRIVEN: Final[frozenset[TriggerEvent]] = frozenset(
     {
         TriggerEvent.ENTERS,
@@ -45,6 +55,9 @@ EVENT_DRIVEN: Final[frozenset[TriggerEvent]] = frozenset(
         TriggerEvent.ANOTHER_CREATURE_ENTERS,
         TriggerEvent.YOU_GAIN_LIFE,
         TriggerEvent.YOU_CAST_SPELL,
+        TriggerEvent.ATTACKS,
+        TriggerEvent.BLOCKS,
+        TriggerEvent.DEALS_COMBAT_DAMAGE,
     }
 )
 

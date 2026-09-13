@@ -34,6 +34,7 @@ BOOK: dict[str, tuple[Ability, ...]] = {
         TriggeredAbility(Trigger(TriggerEvent.BEGINNING_OF_UPKEEP), (GAIN,)),
     ),
     "Goblin Raider": (TriggeredAbility(Trigger(TriggerEvent.ATTACKS), (GAIN,)),),
+    "Nightshade Dryad": (TriggeredAbility(Trigger(TriggerEvent.END_STEP), (GAIN,)),),
     "Forest": (MANA_ABILITY,),
     "Puzzle": (UNKNOWN_ABILITY,),
 }
@@ -59,12 +60,22 @@ def test_an_upkeep_trigger_is_reported_at_upkeep() -> None:
     assert _scan(Step.UPKEEP, "Bloodthirsty Conqueror") == ("Bloodthirsty Conqueror",)
 
 
-def test_an_attack_trigger_is_reported_when_attackers_are_declared() -> None:
-    assert _scan(Step.DECLARE_ATTACKERS, "Goblin Raider") == ("Goblin Raider",)
+def test_an_end_step_trigger_is_reported_at_the_end_step() -> None:
+    assert _scan(Step.END_STEP, "Nightshade Dryad") == ("Nightshade Dryad",)
 
 
 def test_a_trigger_is_not_reported_in_the_wrong_step() -> None:
-    assert _scan(Step.UPKEEP, "Goblin Raider") == ()
+    assert _scan(Step.UPKEEP, "Nightshade Dryad") == ()
+
+
+def test_an_attack_trigger_is_not_reported_by_the_clock() -> None:
+    """The scanner sees the battlefield, not the attackers.
+
+    Reporting it at declare-attackers would remind you about every creature you
+    own, including the ones that stayed home.
+    """
+    for step in Step:
+        assert _scan(step, "Goblin Raider") == ()
 
 
 def test_an_event_driven_trigger_is_never_reported_by_the_clock() -> None:

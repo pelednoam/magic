@@ -17,7 +17,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Final
+from typing import TYPE_CHECKING, Final
+
+if TYPE_CHECKING:
+    from mtgcoach.core.ids import InstanceId
 
 #: The five colours.
 COLORS: Final[frozenset[str]] = frozenset("WUBRG")
@@ -123,7 +126,7 @@ class ManaSource:
     an empty set, which pays generic costs and nothing else.
     """
 
-    instance_id: str
+    instance_id: InstanceId
     produces: frozenset[str] = field(default_factory=frozenset[str])
 
     def can_pay(self, symbol: frozenset[str]) -> bool:

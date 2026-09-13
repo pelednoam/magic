@@ -4,8 +4,9 @@ An assistant for learning Magic: The Gathering at the kitchen table. Point a pho
 or at the board, and get a clear answer to *"what can I do this turn, and what should I do?"*
 
 **Status:** M0–M3 merged to `main`. M4 (the four solvers — mana, legality, combat, triggers)
-on `m4-engine`: 689 tests, 100% line and branch, with **52% of the Beginner Box fully
-modelled** and eleven keywords implemented. M5 next; see §10.
+on `m4-engine`, ensemble-reviewed and the findings fixed: 726 tests, 100% line and branch,
+with **52% of the Beginner Box fully modelled** and eleven keywords implemented. M5 next;
+see §10.
 
 ---
 
@@ -533,9 +534,18 @@ painful to retrofit.
 All four are built (M4), and each one turned out to have a lesson in it.
 
 **1. Mana solver** — `manacost.py`, `manasolver.py`. Given untapped sources and a cost like
-`{2}{G}{G}`, can you pay — and *how*? Backtracking over sources → pips, instant at box scale.
-Returns **all** valid tappings, ranked fewest-lands-tapped then most-colours-spare, because
-"tap these three, keep the Island up" is coaching and a boolean is not.
+`{2}{G}{G}`, can you pay — and *how*? Returns **all** valid tappings, ranked
+fewest-lands-tapped then most-colours-spare, because "tap these three, keep the Island up" is
+coaching and a boolean is not.
+
+The search enumerates *sets* of sources and tests each for a perfect matching (Kuhn's
+algorithm), rather than enumerating assignments of sources to pips. The first version did the
+latter and was factorial: five coloured pips across twenty sources is 1.8M ordered assignments
+against 15,504 sets, and the answers are identical because a payment is a set of lands to tap —
+which land paid for which pip is not something a player can act on. `can_pay` stops at the
+first payment, so a legality check on a big board no longer costs what a full recommendation
+costs; `payments` refuses past `MAX_PAYMENTS` rather than returning a truncated list that looks
+complete.
 
 `parse` refuses what it cannot model rather than approximating: `{2/W}` and `{W/P}` raise
 `UnsupportedCostError`. Neither appears on the 124 box cards — all of them parse — but a
@@ -548,17 +558,24 @@ and the booleans are the empty-reasons case. "You can't cast that" teaches nothi
 one more Forest" and "that's a sorcery, so only in your main phase" are the two sentences a
 beginner needs most, and a rules engine usually throws them away on the way to a boolean.
 
-Mana failures are diagnosed rather than reported: too few sources, no source of a colour, or —
-the awkward one — enough sources of the right colours that still cannot be assigned.
+Mana failures are diagnosed rather than reported: a `{C}` pip nothing can make, too few
+sources, no source of a colour, or — the awkward one — enough sources of the right colours
+that still cannot be assigned. "No source of a colour" counts only single-colour pips: a
+hybrid `{W/U}` demands neither in particular, and naming one as missing is the wrong lesson.
+
+Untap and cleanup are refused outright (CR 502.4, 514.3): no player gets priority there, so an
+instant that reads as castable during untap is not a harmless approximation, it is the one
+moment when "hold your Giant Growth" is wrong.
 
 One check is deliberately missing. CR 117.1a also requires an empty stack for sorcery speed,
 and `GameState` has no stack, because nothing before casting can put an object on one and a
 field no event can change is a field no test can cover. `_sorcery_timing` is the site that will
 need it, and says so.
 
-**3. Combat simulator** — `combat/`. Brute-force every attack subset (≤ 8 attackers, 256
-plans) against the defender's best blocks. Two bugs found here, both by tests written for
-behaviour that looked obviously right:
+**3. Combat simulator** — `combat/`. Brute-force every attack subset against the defender's
+best blocks, and within each of those the attacker's best assignment of damage. This is the
+component that produced the most bugs, every one of them found by a test written for behaviour
+that looked obviously right:
 
 - damage within a step was applied as it was computed, so a blocker killed by an earlier
   attacker never struck back. A 5/5 survived a 1/1 with deathtouch. Damage in a step is
@@ -566,21 +583,40 @@ behaviour that looked obviously right:
 - the blockers' damage loop was nested inside the attackers' loop, so an attacker that skipped
   the regular step (first strike) skipped its blockers' damage too. A 2/2 first striker
   survived a 5/5. The two directions are now independent loops.
-
-Both are exactly the kind of error that would have produced confident, wrong advice.
+- a blocked attacker whose blockers all died in the first-strike step looked *unblocked* in the
+  regular step and hit the player. CR 509.1h: blocked is blocked. This turned a double striker
+  into an unblockable one.
+- without trample the attacker assigned its whole power to the first blocker, so a 4/4 blocked
+  by two 1/1s killed one of them. CR 510.1a assigns lethal to each in turn.
+- the blocker order was the caller's list order, not the attacking player's choice (CR 509.2),
+  so the same board coached differently depending on how it was passed in.
+- lifelink was modelled for attackers only, though `SUPPORTED_KEYWORDS` claimed it flatly. A
+  blocking lifelinker gains the *defender* life, which can make a lethal attack survivable.
+  `Outcome` now tracks both sides.
 
 The defender is assumed to block *well*, and "well" is ordered: survive, then don't lose
 creatures for nothing, then take less damage. That middle term has to outrank damage or the
-model chump-blocks everything at twenty life and every attack looks bad.
+model chump-blocks everything at twenty life and every attack looks bad. The attacker's
+ordering is the mirror image, with "kill the bigger creature" as the tiebreak.
 
-A creature whose power is `*` stops the evaluation with a `ValueError` instead of being read as
-zero — Consuming Aberration would otherwise look harmless.
+Two refusals rather than two guesses. A creature whose power is `*` stops the evaluation —
+Consuming Aberration would otherwise look harmless. And the board itself is bounded: the attack
+subsets are 2^A but the block assignments are (A+1)^B, so the **blockers** are the exponent,
+and capping only attackers guarded nothing — eight against eight is ~11e9 resolutions, a hang
+rather than an answer. `budget.py` bounds both dimensions and their product, and raises rather
+than falling back to a heuristic, because a coach that silently changes method is one whose
+answers cannot be told apart.
 
 **4. Trigger scanner** — `triggerscan.py`. At each step boundary, walk the battlefield for
-triggers matching the transition. Only clock-driven triggers can be found this way; "whenever
-you gain life" is driven by an event, not the clock. `every_event_is_classified()` is checked
-by a test so a new `TriggerEvent` has to be filed as one or the other rather than silently
-never firing.
+triggers matching the transition. Only triggers the *clock alone* decides can be found this
+way, and that list is shorter than it first looks: "at the beginning of your upkeep" fires for
+every permanent you control, so the step is the whole condition, but "whenever this creature
+attacks" needs to know who attacked — and this function is handed the battlefield, not the
+attackers. Reporting it would remind you about every creature you own including the ones that
+stayed home, which is noise dressed as help. Attacking, blocking and dealing combat damage are
+therefore event-driven, reported by the module that observes the event.
+`every_event_is_classified()` is checked by a test so a new `TriggerEvent` has to be filed as
+one or the other rather than silently never firing.
 
 **Keywords.** `SUPPORTED_KEYWORDS` was empty through M3 and now holds eleven: flying, reach,
 first strike, double strike, deathtouch, trample, lifelink, menace, indestructible, defender,
@@ -777,7 +813,7 @@ ensemble review (§6) before the next begins.
 | **M1** ✅ | `core`: state model, events, `reduce`, step walker. 100% + property tests. | The spine. No UI needed to test it. |
 | **M2** ✅ | `carddata`: Scryfall ingestion, `Collection`, the `sets add / audit` commands, FDN decklists as data. | Establishes the set-agnostic data layer before any set-specific work exists to bias it. |
 | **M3** ✅ | Effect extraction pipeline + review CLI + FDN golden fixture and signed manifest. Card explainer CLI. | Useful immediately; proves the build-time Claude pattern *and* the multi-set pipeline in one go. |
-| **M4** ✅ | Mana solver, legality, trigger scanner, combat simulator. Hypothesis suites. Convergence-loop review. | The engine. This is what makes it a coach rather than a notepad. |
+| **M4** | Mana solver, legality, trigger scanner, combat simulator. Hypothesis suites. Convergence-loop review. | The engine. This is what makes it a coach rather than a notepad. |
 | **M5** | FastAPI + WebSocket; Expo app as a **manual** tracker (tap cards in from your decklist). | **Probably 70% of the total value.** Ship before touching the camera. |
 | **M6** | Claude coach + rules Q&A over M4's output. | Turns correct answers into understandable ones. |
 | **M7** | Single-card scan, then board scan → state diff → one-tap accept. Accuracy corpus. | The original ask, now with a tracker behind it to correct mistakes. |

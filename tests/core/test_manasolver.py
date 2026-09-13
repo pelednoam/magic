@@ -15,6 +15,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from mtgcoach.core.ids import InstanceId
 from mtgcoach.core.manacost import ManaCost, ManaSource, parse
 from mtgcoach.core.manasolver import can_pay, payments
 
@@ -25,7 +26,7 @@ COLORS = "WUBRG"
 
 
 def land(name: str, colors: str) -> ManaSource:
-    return ManaSource(name, frozenset(colors))
+    return ManaSource(InstanceId(name), frozenset(colors))
 
 
 BOARD = [
@@ -123,7 +124,7 @@ costs = st.builds(
 boards = st.lists(
     st.sets(st.sampled_from(COLORS), min_size=0, max_size=2).map(frozenset),
     max_size=5,
-).map(lambda colors: [ManaSource(f"s{i}", c) for i, c in enumerate(colors)])
+).map(lambda colors: [ManaSource(InstanceId(f"s{i}"), c) for i, c in enumerate(colors)])
 
 
 @settings(max_examples=150, deadline=None)

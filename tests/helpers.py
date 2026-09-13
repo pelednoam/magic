@@ -7,6 +7,7 @@ fixture cannot reach.
 
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -96,9 +97,19 @@ def facts(
     )
 
 
+_serial = itertools.count()
+
+
 def creature(name: str, power: int, toughness: int, *keywords: str) -> Creature:
-    """A settled, untapped creature on the battlefield."""
+    """A settled, untapped creature on the battlefield.
+
+    Each call gets its own ``InstanceId``. Deriving it from the name made two
+    copies of one card a single creature to the engine -- damage on either
+    killed both, blocks on either applied to both -- and two copies of a card is
+    the most ordinary board state in Magic.
+    """
+    instance = InstanceId(f"{name}#{next(_serial)}")
     return Creature(
-        Permanent(CardInstance(InstanceId(name), OracleId(name))).settle(),
+        Permanent(CardInstance(instance, OracleId(name))).settle(),
         facts(name, "", *keywords, power=power, toughness=toughness, creature=True),
     )
