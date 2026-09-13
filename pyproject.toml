@@ -94,7 +94,8 @@ packages/core/src:\
 packages/carddata/src:\
 packages/vision/src:\
 services/api/src:\
-tools\
+tools:\
+tests\
 """
 
 # ---------------------------------------------------------------- pyright
@@ -107,6 +108,7 @@ extraPaths = [
     "packages/vision/src",
     "services/api/src",
     "tools",
+    "tests",
 ]
 typeCheckingMode = "strict"
 pythonVersion = "3.12"
@@ -116,7 +118,7 @@ reportMissingTypeStubs = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["tools"]
+pythonpath = ["tools", "tests"]
 addopts = "-q --strict-markers --strict-config"
 
 # ---------------------------------------------------------------- mutmut

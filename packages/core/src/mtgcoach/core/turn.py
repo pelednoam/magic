@@ -1,0 +1,73 @@
+"""Advancing through the steps of a turn.
+
+Separated from the reducer because turn structure is the one part of the rules
+that never varies by card, set or format: it is pure sequencing, and it deserves
+to be readable on its own.
+"""
+
+from __future__ import annotations
+
+from dataclasses import replace
+from typing import TYPE_CHECKING
+
+from mtgcoach.core.errors import IllegalEventError
+from mtgcoach.core.steps import Step, next_step
+
+if TYPE_CHECKING:
+    from mtgcoach.core.ids import PlayerId
+    from mtgcoach.core.state import GameState
+
+#: The turn on which the starting player skips their draw step (CR 103.7a).
+FIRST_TURN = 1
+
+
+def advance(state: GameState) -> GameState:
+    """Move to the next step, applying that step's turn-based actions.
+
+    Wrapping past cleanup begins the next player's turn. Turn-based actions
+    happen automatically and receive no priority, which is exactly why they
+    belong here and not in a player-issued event.
+    """
+    upcoming = next_step(state.step)
+    if upcoming is Step.UNTAP:
+        state = replace(
+            state,
+            turn=state.turn + 1,
+            active_player=state.opponent_of(state.active_player),
+        )
+    state = replace(state, step=upcoming)
+    return _on_enter(state, upcoming)
+
+
+def _on_enter(state: GameState, step: Step) -> GameState:
+    if step is Step.UNTAP:
+        return _untap_step(state)
+    if step is Step.DRAW and state.turn != FIRST_TURN:
+        return draw_card(state, state.active_player)
+    return state
+
+
+def _untap_step(state: GameState) -> GameState:
+    active = state.player(state.active_player)
+    return state.with_player(
+        state.active_player,
+        replace(active.untap_all(), lands_played_this_turn=0),
+    )
+
+
+def draw_card(state: GameState, player_id: PlayerId) -> GameState:
+    """Move the top card of a library into its owner's hand.
+
+    Raises:
+        IllegalEventError: If the library is empty. Drawing from an empty
+            library loses the game rather than being illegal, but losing is a
+            state-based action and those arrive with the rules engine in M4;
+            refusing loudly now is better than silently continuing.
+    """
+    player = state.player(player_id)
+    if not player.library:
+        msg = f"{player_id!r} cannot draw from an empty library"
+        raise IllegalEventError(msg)
+    top, rest = player.library[0], player.library[1:]
+    drawn = replace(player, library=rest, hand=(*player.hand, top))
+    return state.with_player(player_id, drawn)
