@@ -3,9 +3,9 @@
 An assistant for learning Magic: The Gathering at the kitchen table. Point a phone at a card
 or at the board, and get a clear answer to *"what can I do this turn, and what should I do?"*
 
-**Status:** M0 and M1 merged to `main`. M2 (card data, collection, mechanic audit, the
-ten Foundations decklists, the store and the CLI) on `m2-carddata`: 335 tests, 100% line
-and branch. M3 next; see §10.
+**Status:** M0–M2 merged to `main`. M3 (the effect and ability schema, the extraction
+pipeline, the sealed FDN fixture and its signed manifest) on `m3-effects`: 562 tests, 100%
+line and branch, **52% of the Beginner Box fully modelled**. M4 next; see §10.
 
 ---
 
@@ -108,8 +108,17 @@ that's what makes this scale past the first box.
 An unsupported mechanic must not disqualify a set. `Unmodeled` is **permanent infrastructure**,
 not a temporary hatch: a card whose effect can't be modelled is still tracked, still recognised,
 still countable in a library, still shown in hand — the coach just says "I don't fully
-understand this one" and shows the card text instead of claiming a line. The test is
-per-enabled-set and threshold-based ("zero `Unmodeled` in FDN", "≤ 5% in BLB"), not global.
+understand this one" and shows the card text instead of claiming a line.
+
+**Coverage is measured, not promised.** An earlier draft of this plan said the target for
+Foundations was zero `Unmodeled`, asserted by a test. Having extracted all 124 cards, that was
+wrong and should not have been written: **52% of the box is fully modelled** (65 of 124), and
+the rest are replacement effects, intervening-if triggers, modal spells and granted abilities —
+real Magic complexity, not a shortfall in effort. The manifest records the number and `effects
+check` audits it, so the claim is a fact about the sealed data rather than a line in a
+document. It first read 73%, because the check looked only for unmodelled *abilities* and
+missed unmodelled *effects* nested inside modelled ones; that is exactly why the number is
+audited now.
 
 ---
 
@@ -580,12 +589,19 @@ With effects alone, coverage was 43%: "whenever you gain life, put a +1/+1 count
 creature" was discarded whole even though `PutCounters` expressed its effect perfectly, because
 nothing could say *when*. Worse, `{T}: Add {G}` — the most ordinary ability in the game — was
 unmodellable, which would have left the M4 mana solver with nothing to read. The ability layer
-took coverage to 73% and produced 22 activated abilities for the solver.
+took coverage from 43% to 52% and produced 22 activated abilities for the solver.
 
-**Populated by a build-time Claude pass, reviewed by a human, committed as data.** `claude-opus-5`
-reads each owned card's oracle text once and proposes structured JSON; `mtgcoach effects review`
-walks you through accepting, editing or rejecting each one; `seal` writes the fixture and its
-signed manifest. Exactly the right division of labour: the LLM does the hard
+**Populated by a build-time Claude pass, reviewed by a human, committed as data.** The
+extractor reads each owned card's oracle text once and proposes structured JSON;
+`mtgcoach effects review` reports the unmodelled and the low-confidence cards; `seal --accept`
+writes the fixture and its signed manifest, refusing without that flag so the human step is
+taken rather than assumed.
+
+Two details differ from an earlier draft of this paragraph. Review **reports**; it does not walk
+you through accepting or editing each card, which is a screen and arrives with the UI. And the
+extractor runs through the Claude Code CLI on the `opus` alias rather than a pinned
+`claude-opus-5`, so the manifest records the model string that produced a fixture — without it a
+sealed file cannot say what made it. Exactly the right division of labour: the LLM does the hard
 natural-language→structure conversion *once*, offline, where it's cheap and reviewable; runtime
 stays deterministic, fast, offline, free, and testable.
 
