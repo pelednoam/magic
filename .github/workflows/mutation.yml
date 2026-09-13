@@ -1,0 +1,26 @@
+name: Mutation
+
+# 100% coverage proves the lines ran, not that anything was asserted.
+# This is the gate that catches vacuous tests. Nightly, because it is slow.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  mutmut:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv sync --all-groups
+
+      - name: mutate packages/core
+        run: uv run mutmut run --paths-to-mutate packages/core/src
+
+      - name: report
+        if: always()
+        run: uv run mutmut results

@@ -1,0 +1,141 @@
+[project]
+name = "magic-coach"
+version = "0.0.0"
+description = "A Magic: The Gathering turn coach for learning at the kitchen table."
+requires-python = ">=3.12"
+dependencies = [
+    "mtgcoach-core",
+    "mtgcoach-carddata",
+    "mtgcoach-vision",
+    "mtgcoach-api",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/*", "services/*"]
+
+[tool.uv.sources]
+mtgcoach-core = { workspace = true }
+mtgcoach-carddata = { workspace = true }
+mtgcoach-vision = { workspace = true }
+mtgcoach-api = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "mypy>=1.13",
+    "pyright>=1.1.390",
+    "ruff>=0.8",
+    "pytest>=8",
+    "pytest-cov>=6",
+    "hypothesis>=6.120",
+    "pre-commit>=4",
+]
+mutation = ["mutmut>=3"]
+
+# ---------------------------------------------------------------- ruff
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# Vendored, not ours: the review agent installs into scripts/ and is cloned
+# beside the project. We configure it (scripts/preflight/config.py) but do not
+# own its style.
+extend-exclude = ["scripts", "multi-model-code-review-agent"]
+src = [
+    "packages/core/src",
+    "packages/carddata/src",
+    "packages/vision/src",
+    "services/api/src",
+    "tools",
+]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "D203",    # conflicts with D211
+    "D213",    # conflicts with D212
+    "COM812",  # conflicts with the formatter
+    "ISC001",  # conflicts with the formatter
+    "TRY003",  # long messages outside the exception class; we prefer them readable
+    "CPY001",  # no copyright header on every file
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "PLR2004", "D100", "D103", "INP001"]
+"tools/**" = ["T201", "INP001"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 8
+
+[tool.ruff.lint.pylint]
+max-args = 5
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+# ---------------------------------------------------------------- mypy
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+disallow_any_explicit = true
+warn_unreachable = true
+namespace_packages = true
+explicit_package_bases = true
+files = ["packages", "services", "tools", "tests"]
+mypy_path = """\
+packages/core/src:\
+packages/carddata/src:\
+packages/vision/src:\
+services/api/src:\
+tools\
+"""
+
+# ---------------------------------------------------------------- pyright
+
+[tool.pyright]
+include = ["packages", "services", "tools", "tests"]
+extraPaths = [
+    "packages/core/src",
+    "packages/carddata/src",
+    "packages/vision/src",
+    "services/api/src",
+    "tools",
+]
+typeCheckingMode = "strict"
+pythonVersion = "3.12"
+reportMissingTypeStubs = true
+
+# ---------------------------------------------------------------- pytest
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tools"]
+addopts = "-q --strict-markers --strict-config"
+
+# ---------------------------------------------------------------- coverage
+
+[tool.coverage.run]
+branch = true
+source = [
+    "packages/core/src",
+    "packages/carddata/src",
+    "packages/vision/src",
+    "services/api/src",
+    "tools",
+]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 100
+# Exclusions live here, NOT as `# pragma: no cover` comments -- the pragma
+# allowlist (tools/check_pragma_allowlist.py) keeps those confined to paths
+# where coverage is genuinely impossible. These are unreachable by design.
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "assert_never\\(",
+    "@overload",
+]
