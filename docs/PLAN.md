@@ -3,7 +3,8 @@
 An assistant for learning Magic: The Gathering at the kitchen table. Point a phone at a card
 or at the board, and get a clear answer to *"what can I do this turn, and what should I do?"*
 
-**Status:** planning. Nothing implemented yet.
+**Status:** M0 complete — scaffolding, toolchain and gates, on branch `m0-scaffolding`.
+M1 next; see §10.
 
 ---
 
@@ -395,15 +396,30 @@ SOURCE_DIRS = [
     "tools/",
 ]
 TEST_DIRS = ["tests/"]
-COVERAGE_TARGET = 100
 ARTIFACT_DIRS = ["data/sets/"]
-SIGNED_MANIFESTS = ["data/sets/*/manifest.json"]
+COVERAGE_TARGET = 100
+
+# A dict, not a list, and no glob support: one explicit entry per sealed set,
+# added by `mtgcoach effects seal`. A configured-but-missing manifest counts as
+# a warning, so this stays empty until M3 seals FDN.
+SIGNED_MANIFESTS: dict[str, str] = {}   # "effects_FDN": "data/sets/FDN/manifest.json"
 ```
 
-The gate's `mypy scripts/` needs repointing at `packages services tools`. `COVERAGE_TARGET` is
-global at 100, which is why `vision`'s OpenCV pipeline uses the pragma allowlist from §5 —
-the agent's per-file opt-out and our allowlist check are the same mechanism viewed from two
-directions.
+Three things the agent's source says that its README does not, each of which changed a
+decision here:
+
+- **`SIGNED_MANIFESTS` is a `dict[str, str]` of explicit paths**, not a glob list. Every set
+  needs its own entry — a small chore per set, and the reason drift gets caught at all.
+- **The preflight resolves changed files against `origin/main` with no fallback.** A branch
+  whose base is not on the remote reports zero changed files and the coverage gate silently
+  does nothing. (The reviewers' own diff collection *does* fall back to `HEAD~1`; the audit
+  does not.) So: push the base branch before reviewing.
+- **Its suspicious-pattern scanner flags `except Exception`, bare `except:`, and hardcoded
+  `/home/` paths.** Worth knowing before writing them.
+
+The gate's `mypy scripts/` needs repointing at our targets. `COVERAGE_TARGET` is global at 100,
+which is why `vision`'s OpenCV pipeline uses the pragma allowlist from §5 — the agent's
+per-file opt-out and our allowlist check are the same mechanism viewed from two directions.
 
 ### Cadence
 
