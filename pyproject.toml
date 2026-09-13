@@ -70,6 +70,17 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "PLR2004", "D100", "D103", "INP001"]
 "tools/**" = ["T201", "INP001"]
+# An exhaustive match over a closed union has one branch per member by
+# construction. Cyclomatic complexity counts those branches as difficulty; here
+# they are the opposite -- every arm is three trivial lines, and the only way to
+# reduce the count is a lookup table, which silently loses the exhaustiveness
+# check that makes adding an effect kind safe. Confined to the codec, where the
+# shape is forced.
+"packages/carddata/src/mtgcoach/carddata/effect*.py" = [
+    "C901",
+    "PLR0911",
+    "PLR0912",
+]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 8
