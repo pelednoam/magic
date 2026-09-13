@@ -1,0 +1,503 @@
+[
+  {
+    "booster": true,
+    "border_color": "black",
+    "cmc": 2.0,
+    "collector_number": "188",
+    "color_identity": [
+      "R"
+    ],
+    "colors": [
+      "R"
+    ],
+    "digital": false,
+    "finishes": [
+      "nonfoil",
+      "foil"
+    ],
+    "foil": true,
+    "frame": "2015",
+    "full_art": false,
+    "game_changer": false,
+    "games": [
+      "paper",
+      "arena",
+      "mtgo"
+    ],
+    "highres_image": true,
+    "id": "548947dc-a5ca-43b5-9531-bcef20fa4ae5",
+    "keywords": [],
+    "lang": "en",
+    "layout": "normal",
+    "mana_cost": "{1}{R}",
+    "name": "Abrade",
+    "nonfoil": true,
+    "object": "card",
+    "oracle_id": "f9db72dc-9a5b-48a4-a86e-7464d9a2166a",
+    "oracle_text": "Choose one \u2014\n\u2022 Abrade deals 3 damage to target creature.\n\u2022 Destroy target artifact.",
+    "oversized": false,
+    "preview": {
+      "previewed_at": "2024-10-30",
+      "source": "Wizards of the Coast",
+      "source_uri": ""
+    },
+    "promo": false,
+    "rarity": "uncommon",
+    "released_at": "2024-11-15",
+    "reprint": true,
+    "reserved": false,
+    "set": "fdn",
+    "set_name": "Foundations",
+    "set_type": "core",
+    "story_spotlight": false,
+    "textless": false,
+    "type_line": "Instant",
+    "variation": false
+  },
+  {
+    "booster": true,
+    "border_color": "black",
+    "cmc": 1.0,
+    "collector_number": "249",
+    "color_identity": [],
+    "colors": [],
+    "digital": false,
+    "finishes": [
+      "nonfoil",
+      "foil"
+    ],
+    "foil": true,
+    "frame": "2015",
+    "full_art": false,
+    "game_changer": false,
+    "games": [
+      "paper",
+      "arena",
+      "mtgo"
+    ],
+    "highres_image": true,
+    "id": "361f9b99-5b5d-40da-b4b9-5ad90f6280ee",
+    "keywords": [
+      "Equip",
+      "Landfall"
+    ],
+    "lang": "en",
+    "layout": "normal",
+    "mana_cost": "{1}",
+    "name": "Adventuring Gear",
+    "nonfoil": true,
+    "object": "card",
+    "oracle_id": "17042684-7af4-43a6-88c7-885032cfb27c",
+    "oracle_text": "Landfall \u2014 Whenever a land you control enters, equipped creature gets +2/+2 until end of turn.\nEquip {1} ({1}: Attach to target creature you control. Equip only as a sorcery.)",
+    "oversized": false,
+    "preview": {
+      "previewed_at": "2024-10-28",
+      "source": "Aims",
+      "source_uri": "https://x.com/AimsTV/status/1850992934167949476"
+    },
+    "promo": false,
+    "rarity": "uncommon",
+    "released_at": "2024-11-15",
+    "reprint": true,
+    "reserved": false,
+    "set": "fdn",
+    "set_name": "Foundations",
+    "set_type": "core",
+    "story_spotlight": false,
+    "textless": false,
+    "type_line": "Artifact \u2014 Equipment",
+    "variation": false
+  },
+  {
+    "booster": true,
+    "border_color": "black",
+    "cmc": 1.0,
+    "collector_number": "150",
+    "color_identity": [
+      "U"
+    ],
+    "colors": [
+      "U"
+    ],
+    "digital": false,
+    "finishes": [
+      "nonfoil",
+      "foil"
+    ],
+    "foil": true,
+    "frame": "2015",
+    "full_art": false,
+    "game_changer": false,
+    "games": [
+      "paper",
+      "arena",
+      "mtgo"
+    ],
+    "highres_image": true,
+    "id": "c7f2014a-fbc9-447c-a440-e06d01066bb9",
+    "keywords": [],
+    "lang": "en",
+    "layout": "normal",
+    "mana_cost": "{U}",
+    "name": "Aegis Turtle",
+    "nonfoil": true,
+    "object": "card",
+    "oracle_id": "f84c30e7-2ea8-43ff-9356-1f907558cfd9",
+    "oracle_text": "",
+    "oversized": false,
+    "power": "0",
+    "promo": false,
+    "rarity": "common",
+    "released_at": "2024-11-15",
+    "reprint": true,
+    "reserved": false,
+    "set": "fdn",
+    "set_name": "Foundations",
+    "set_type": "core",
+    "story_spotlight": false,
+    "textless": false,
+    "toughness": "5",
+    "type_line": "Creature \u2014 Turtle",
+    "variation": false
+  },
+  {
+    "booster": false,
+    "border_color": "black",
+    "cmc": 6.0,
+    "collector_number": "651",
+    "color_identity": [
+      "R",
+      "W"
+    ],
+    "colors": [
+      "R",
+      "W"
+    ],
+    "digital": false,
+    "finishes": [
+      "nonfoil"
+    ],
+    "foil": false,
+    "frame": "2015",
+    "frame_effects": [
+      "legendary"
+    ],
+    "full_art": false,
+    "game_changer": false,
+    "games": [
+      "paper",
+      "arena",
+      "mtgo"
+    ],
+    "highres_image": true,
+    "id": "bc6ffc1c-575b-4116-83c9-d13b29886c35",
+    "keywords": [
+      "Flying",
+      "Vigilance",
+      "Haste"
+    ],
+    "lang": "en",
+    "layout": "normal",
+    "mana_cost": "{2}{R}{R}{W}{W}",
+    "name": "Aurelia, the Warleader",
+    "nonfoil": true,
+    "object": "card",
+    "oracle_id": "0f5a3a09-2f07-4774-9e0f-e99d9a444166",
+    "oracle_text": "Flying, vigilance, haste\nWhenever Aurelia attacks for the first time each turn, untap all creatures you control. After this phase, there is an additional combat phase.",
+    "oversized": false,
+    "power": "3",
+    "promo": false,
+    "promo_types": [
+      "startercollection"
+    ],
+    "rarity": "mythic",
+    "released_at": "2024-11-15",
+    "reprint": true,
+    "reserved": false,
+    "security_stamp": "oval",
+    "set": "fdn",
+    "set_name": "Foundations",
+    "set_type": "core",
+    "story_spotlight": false,
+    "textless": false,
+    "toughness": "4",
+    "type_line": "Legendary Creature \u2014 Angel",
+    "variation": false
+  },
+  {
+    "booster": true,
+    "border_color": "black",
+    "cmc": 0.0,
+    "collector_number": "259",
+    "color_identity": [
+      "B",
+      "R"
+    ],
+    "colors": [],
+    "digital": false,
+    "finishes": [
+      "nonfoil",
+      "foil"
+    ],
+    "foil": true,
+    "frame": "2015",
+    "full_art": false,
+    "game_changer": false,
+    "games": [
+      "paper",
+      "arena",
+      "mtgo"
+    ],
+    "highres_image": true,
+    "id": "8b90dc92-cb66-41d9-89f9-2b6e3cfc8082",
+    "keywords": [],
+    "lang": "en",
+    "layout": "normal",
+    "mana_cost": "",
+    "name": "Bloodfell Caves",
+    "nonfoil": true,
+    "object": "card",
+    "oracle_id": "64e29bfc-9313-4e8c-808c-bc27f6b018a6",
+    "oracle_text": "This land enters tapped.\nWhen this land enters, you gain 1 life.\n{T}: Add {B} or {R}.",
+    "oversized": false,
+    "produced_mana": [
+      "B",
+      "R"
+    ],
+    "promo": false,
+    "promo_types": [
+      "startercollection"
+    ],
+    "rarity": "common",
+    "released_at": "2024-11-15",
+    "reprint": true,
+    "reserved": false,
+    "set": "fdn",
+    "set_name": "Foundations",
+    "set_type": "core",
+    "story_spotlight": false,
+    "textless": false,
+    "type_line": "Land",
+    "variation": false
+  },
+  {
+    "booster": true,
+    "border_color": "black",
+    "cmc": 5.0,
+    "collector_number": "238",
+    "color_identity": [
+      "B",
+      "U"
+    ],
+    "colors": [
+      "B",
+      "U"
+    ],
+    "digital": false,
+    "finishes": [
+      "nonfoil",
+      "foil"
+    ],
+    "foil": true,
+    "frame": "2015",
+    "full_art": false,
+    "game_changer": false,
+    "games": [
+      "paper",
+      "arena",
+      "mtgo"
+    ],
+    "highres_image": true,
+    "id": "bc2b28fd-66b0-457c-80ea-7caed2cc7926",
+    "keywords": [],
+    "lang": "en",
+    "layout": "normal",
+    "mana_cost": "{3}{U}{B}",
+    "name": "Consuming Aberration",
+    "nonfoil": true,
+    "object": "card",
+    "oracle_id": "9b55fb72-237d-4935-b645-8ebc6eb4140e",
+    "oracle_text": "Consuming Aberration's power and toughness are each equal to the number of cards in your opponents' graveyards.\nWhenever you cast a spell, each opponent reveals cards from the top of their library until they reveal a land card, then puts those cards into their graveyard.",
+    "oversized": false,
+    "power": "*",
+    "preview": {
+      "previewed_at": "2024-10-28",
+      "source": "Arin Hanson",
+      "source_uri": "https://x.com/egoraptor/status/1850975615014551991"
+    },
+    "promo": false,
+    "promo_types": [
+      "startercollection"
+    ],
+    "rarity": "rare",
+    "released_at": "2024-11-15",
+    "reprint": true,
+    "reserved": false,
+    "security_stamp": "oval",
+    "set": "fdn",
+    "set_name": "Foundations",
+    "set_type": "core",
+    "story_spotlight": false,
+    "textless": false,
+    "toughness": "*",
+    "type_line": "Creature \u2014 Horror",
+    "variation": false
+  },
+  {
+    "booster": true,
+    "border_color": "black",
+    "card_faces": [
+      {
+        "colors": [
+          "G"
+        ],
+        "mana_cost": "{2}{G}",
+        "name": "Trystan, Callous Cultivator",
+        "object": "card_face",
+        "oracle_text": "Deathtouch\nWhenever this creature enters or transforms into Trystan, Callous Cultivator, mill three cards. Then if there is an Elf card in your graveyard, you gain 2 life.\nAt the beginning of your first main phase, you may pay {B}. If you do, transform Trystan.",
+        "power": "3",
+        "toughness": "4",
+        "type_line": "Legendary Creature \u2014 Elf Druid"
+      },
+      {
+        "color_indicator": [
+          "B"
+        ],
+        "colors": [
+          "B"
+        ],
+        "mana_cost": "",
+        "name": "Trystan, Penitent Culler",
+        "object": "card_face",
+        "oracle_text": "Deathtouch\nWhenever this creature transforms into Trystan, Penitent Culler, mill three cards, then you may exile an Elf card from your graveyard. If you do, each opponent loses 2 life.\nAt the beginning of your first main phase, you may pay {G}. If you do, transform Trystan.",
+        "power": "3",
+        "toughness": "4",
+        "type_line": "Legendary Creature \u2014 Elf Warlock"
+      }
+    ],
+    "cmc": 3.0,
+    "collector_number": "199",
+    "color_identity": [
+      "B",
+      "G"
+    ],
+    "digital": false,
+    "finishes": [
+      "nonfoil",
+      "foil"
+    ],
+    "foil": true,
+    "frame": "2015",
+    "frame_effects": [
+      "legendary"
+    ],
+    "full_art": false,
+    "game_changer": false,
+    "games": [
+      "paper",
+      "arena",
+      "mtgo"
+    ],
+    "highres_image": true,
+    "id": "2094f9b6-ce84-47d9-8819-81db14ba483f",
+    "keywords": [
+      "Transform",
+      "Mill",
+      "Deathtouch"
+    ],
+    "lang": "en",
+    "layout": "transform",
+    "name": "Trystan, Callous Cultivator // Trystan, Penitent Culler",
+    "nonfoil": true,
+    "object": "card",
+    "oracle_id": "961d1128-a022-480c-918e-16ba0abf844b",
+    "oversized": false,
+    "promo": false,
+    "rarity": "rare",
+    "released_at": "2026-01-23",
+    "reprint": false,
+    "reserved": false,
+    "resource_id": "203468B74023538419F6DC5387401A832E8D5D1EEE69E013D365DD7CD0F6EA71",
+    "security_stamp": "oval",
+    "set": "ecl",
+    "set_name": "Lorwyn Eclipsed",
+    "set_type": "expansion",
+    "story_spotlight": false,
+    "textless": false,
+    "type_line": "Legendary Creature \u2014 Elf Druid // Legendary Creature \u2014 Elf Warlock",
+    "variation": false
+  },
+  {
+    "booster": false,
+    "border_color": "black",
+    "card_faces": [
+      {
+        "mana_cost": "{3}",
+        "name": "My Precious",
+        "object": "card_face",
+        "oracle_text": "Equipped creature has hexproof and can't be blocked.\nEquip\u2014{2}, Pay 2 life.",
+        "type_line": "Legendary Artifact \u2014 Equipment"
+      },
+      {
+        "mana_cost": "{1}{B}",
+        "name": "Allure of Power",
+        "object": "card_face",
+        "oracle_text": "As an additional cost to cast this spell, sacrifice a creature.\nDraw two cards.",
+        "type_line": "Instant \u2014 Adventure"
+      }
+    ],
+    "cmc": 3.0,
+    "collector_number": "176",
+    "color_identity": [
+      "B"
+    ],
+    "colors": [],
+    "digital": false,
+    "finishes": [
+      "nonfoil",
+      "foil"
+    ],
+    "foil": true,
+    "frame": "2015",
+    "frame_effects": [
+      "legendary"
+    ],
+    "full_art": false,
+    "game_changer": false,
+    "games": [
+      "paper",
+      "mtgo",
+      "arena"
+    ],
+    "highres_image": true,
+    "id": "15ae4d50-be2f-412c-bb6b-b0a06b60474a",
+    "keywords": [
+      "Equip"
+    ],
+    "lang": "en",
+    "layout": "adventure",
+    "mana_cost": "{3} // {1}{B}",
+    "name": "My Precious // Allure of Power",
+    "nonfoil": true,
+    "object": "card",
+    "oracle_id": "2e728381-6db0-4c66-883d-82d718fef833",
+    "oversized": false,
+    "promo": false,
+    "promo_types": [
+      "universesbeyond"
+    ],
+    "rarity": "rare",
+    "released_at": "2026-08-14",
+    "reprint": false,
+    "reserved": false,
+    "resource_id": "0950C71B70BE889152AF658AB5C731B187931FAF6FB9E4DA5B5D7500E561CEDA",
+    "security_stamp": "oval",
+    "set": "hob",
+    "set_name": "The Hobbit",
+    "set_type": "expansion",
+    "story_spotlight": false,
+    "textless": false,
+    "type_line": "Legendary Artifact \u2014 Equipment // Instant \u2014 Adventure",
+    "variation": false
+  }
+]
