@@ -96,7 +96,8 @@ def test_audit_reports_unmodelled_mechanics(stocked: Path) -> None:
     assert code == 0
     assert f"FDN: {FDN_IN_FIXTURE} cards" in out
     assert "not modelled" in out
-    assert "Flying (1 card)" in out, "singular, not '1 cards'"
+    assert "Vigilance (1 card)" in out, "singular, not '1 cards'"
+    assert "Flying" not in out, "a modelled keyword is not a cost"
 
 
 def test_audit_of_an_unknown_set_fails(db: Path) -> None:

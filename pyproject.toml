@@ -68,6 +68,9 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+# A test builder mirrors the shape of the thing it builds; CardFacts has eight
+# fields and a helper that hides half of them behind a dict would be worse.
+"tests/helpers.py" = ["S101", "PLR2004", "D100", "D103", "INP001", "PLR0913"]
 "tests/**" = ["S101", "PLR2004", "D100", "D103", "INP001"]
 "tools/**" = ["T201", "INP001"]
 # An exhaustive match over a closed union has one branch per member by

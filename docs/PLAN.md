@@ -3,9 +3,9 @@
 An assistant for learning Magic: The Gathering at the kitchen table. Point a phone at a card
 or at the board, and get a clear answer to *"what can I do this turn, and what should I do?"*
 
-**Status:** M0–M2 merged to `main`. M3 (the effect and ability schema, the extraction
-pipeline, the sealed FDN fixture and its signed manifest) on `m3-effects`: 562 tests, 100%
-line and branch, **52% of the Beginner Box fully modelled**. M4 next; see §10.
+**Status:** M0–M3 merged to `main`. M4 (the four solvers — mana, legality, combat, triggers)
+on `m4-engine`: 689 tests, 100% line and branch, with **52% of the Beginner Box fully
+modelled** and eleven keywords implemented. M5 next; see §10.
 
 ---
 
@@ -519,9 +519,10 @@ otherwise:
   legality question. The opponent-knowledge reasoning the coach needs (§3's "two burn spells
   left in their deck") is computed from their registered decklist, not from a deliberately
   impoverished state.
-- **There is no `stack` field yet.** Nothing before M4 can put an object on it, and a field no
-  event can change is a field no test can cover. It arrives with spell casting, alongside
-  `counters` and attachments on `Permanent`.
+- **There is no `stack` field yet.** Nothing can put an object on one until spells can be cast,
+  and a field no event can change is a field no test can cover. M4's legality layer already
+  marks the one check this costs (the empty-stack half of CR 117.1a) at the site that will need
+  it. It arrives with spell casting, alongside `counters` and attachments on `Permanent`.
 
 **Event-sourced.** Store the event log, derive state via `reduce.apply`. Free undo, free replay,
 free end-of-game review, and the strongest property test in the suite. Costs nothing now,
@@ -529,23 +530,64 @@ painful to retrofit.
 
 ### Four solvers
 
-**1. Mana solver.** Given untapped sources and a cost like `{2}{G}{G}`, can you pay — and *how*?
-Bipartite matching (sources → pips), complicated by dual lands, hybrid, and "any colour"
-producers. With ≤ 12 sources, backtracking is instant. Return **all** valid tappings, ranked to
-preserve future flexibility — "tap these three, keep the Island up" is coaching, not legality.
+All four are built (M4), and each one turned out to have a lesson in it.
 
-**2. Timing & legality.** Sorcery speed (your main phase, empty stack) vs. instant speed; one
-land per turn; summoning sickness for attacking and for `{T}` abilities; whether a legal target
-exists right now.
+**1. Mana solver** — `manacost.py`, `manasolver.py`. Given untapped sources and a cost like
+`{2}{G}{G}`, can you pay — and *how*? Backtracking over sources → pips, instant at box scale.
+Returns **all** valid tappings, ranked fewest-lands-tapped then most-colours-spare, because
+"tap these three, keep the Island up" is coaching and a boolean is not.
 
-**3. Combat simulator.** The highest-value component, and what humans get wrong most. With ≤ 8
-creatures, brute-force every attack subset (256) and the opponent's best blocking assignment
-for each. Handle first strike, double strike, deathtouch, trample, flying/reach, menace,
-indestructible, lifelink, vigilance, ward. Output per plan: damage through, creatures lost each
-side, life swing, lethal or not.
+`parse` refuses what it cannot model rather than approximating: `{2/W}` and `{W/P}` raise
+`UnsupportedCostError`. Neither appears on the 124 box cards — all of them parse — but a
+hybrid cost silently read as generic would misprice a spell, and the whole point of this layer
+is that its answers can be trusted.
 
-**4. Trigger scanner.** At each step boundary, walk the battlefield for triggers matching the
-transition. Falls out of the effect model.
+**2. Timing & legality** — `legality.py`. Built the other way round from the usual: the
+primitives are `why_not_cast`, `why_not_play_land`, `why_not_attack`, each returning *reasons*,
+and the booleans are the empty-reasons case. "You can't cast that" teaches nothing; "you need
+one more Forest" and "that's a sorcery, so only in your main phase" are the two sentences a
+beginner needs most, and a rules engine usually throws them away on the way to a boolean.
+
+Mana failures are diagnosed rather than reported: too few sources, no source of a colour, or —
+the awkward one — enough sources of the right colours that still cannot be assigned.
+
+One check is deliberately missing. CR 117.1a also requires an empty stack for sorcery speed,
+and `GameState` has no stack, because nothing before casting can put an object on one and a
+field no event can change is a field no test can cover. `_sorcery_timing` is the site that will
+need it, and says so.
+
+**3. Combat simulator** — `combat/`. Brute-force every attack subset (≤ 8 attackers, 256
+plans) against the defender's best blocks. Two bugs found here, both by tests written for
+behaviour that looked obviously right:
+
+- damage within a step was applied as it was computed, so a blocker killed by an earlier
+  attacker never struck back. A 5/5 survived a 1/1 with deathtouch. Damage in a step is
+  simultaneous (CR 510.2); the fix collects every hit before applying any.
+- the blockers' damage loop was nested inside the attackers' loop, so an attacker that skipped
+  the regular step (first strike) skipped its blockers' damage too. A 2/2 first striker
+  survived a 5/5. The two directions are now independent loops.
+
+Both are exactly the kind of error that would have produced confident, wrong advice.
+
+The defender is assumed to block *well*, and "well" is ordered: survive, then don't lose
+creatures for nothing, then take less damage. That middle term has to outrank damage or the
+model chump-blocks everything at twenty life and every attack looks bad.
+
+A creature whose power is `*` stops the evaluation with a `ValueError` instead of being read as
+zero — Consuming Aberration would otherwise look harmless.
+
+**4. Trigger scanner** — `triggerscan.py`. At each step boundary, walk the battlefield for
+triggers matching the transition. Only clock-driven triggers can be found this way; "whenever
+you gain life" is driven by an event, not the clock. `every_event_is_classified()` is checked
+by a test so a new `TriggerEvent` has to be filed as one or the other rather than silently
+never firing.
+
+**Keywords.** `SUPPORTED_KEYWORDS` was empty through M3 and now holds eleven: flying, reach,
+first strike, double strike, deathtouch, trample, lifelink, menace, indestructible, defender,
+haste. Each is there because a specific rule reads it and a test pins the behaviour — a test
+greps the engine for every claimed keyword, so the registry cannot drift into decoration.
+Vigilance is deliberately absent: it governs whether attacking *taps* the creature, and nothing
+taps attackers yet. Ward is not in the box's vocabulary yet either.
 
 ### The effect model — and the best use of an LLM in this project
 
@@ -734,8 +776,8 @@ ensemble review (§6) before the next begins.
 | **M0** ✅ | `git init`; `uv` workspace; the full §5 toolchain failing-on-violation from commit one; review agent installed and configured. | Standards and the review loop are free on day one, expensive to retrofit. |
 | **M1** ✅ | `core`: state model, events, `reduce`, step walker. 100% + property tests. | The spine. No UI needed to test it. |
 | **M2** ✅ | `carddata`: Scryfall ingestion, `Collection`, the `sets add / audit` commands, FDN decklists as data. | Establishes the set-agnostic data layer before any set-specific work exists to bias it. |
-| **M3** | Effect extraction pipeline + review CLI + FDN golden fixture and signed manifest. Card explainer CLI. | Useful immediately; proves the build-time Claude pattern *and* the multi-set pipeline in one go. |
-| **M4** | Mana solver, legality, trigger scanner, combat simulator. Hypothesis suites. Convergence-loop review. | The engine. This is what makes it a coach rather than a notepad. |
+| **M3** ✅ | Effect extraction pipeline + review CLI + FDN golden fixture and signed manifest. Card explainer CLI. | Useful immediately; proves the build-time Claude pattern *and* the multi-set pipeline in one go. |
+| **M4** ✅ | Mana solver, legality, trigger scanner, combat simulator. Hypothesis suites. Convergence-loop review. | The engine. This is what makes it a coach rather than a notepad. |
 | **M5** | FastAPI + WebSocket; Expo app as a **manual** tracker (tap cards in from your decklist). | **Probably 70% of the total value.** Ship before touching the camera. |
 | **M6** | Claude coach + rules Q&A over M4's output. | Turns correct answers into understandable ones. |
 | **M7** | Single-card scan, then board scan → state diff → one-tap accept. Accuracy corpus. | The original ask, now with a tracker behind it to correct mistakes. |

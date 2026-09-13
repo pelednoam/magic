@@ -17,14 +17,40 @@ if TYPE_CHECKING:
     from mtgcoach.carddata.cards import Card
     from mtgcoach.core.ids import SetCode
 
-#: Keywords the engine actually models.
+#: Keywords the engine actually models, each with a tested implementation.
 #:
-#: Empty on purpose. M1 built the state model and the reducer; it has no effect
-#: model, no combat and no legality rules, so it understands no keyword at all.
-#: Reporting that honestly is the entire point of the audit -- a registry
-#: seeded with optimistic guesses would turn this report into decoration. It
-#: grows in M4, one entry per mechanic that gains a tested implementation.
-SUPPORTED_KEYWORDS: Final[frozenset[str]] = frozenset()
+#: Empty until M4, because until then there was no combat and no legality to
+#: model them in, and a registry seeded with optimistic guesses would have made
+#: this report decoration. Every entry below is here because a specific rule
+#: reads it and a test pins the behaviour:
+#:
+#: - Flying and Reach decide who may block (CR 702.9b).
+#: - First strike and Double strike decide which damage step a creature deals in.
+#: - Deathtouch makes any nonzero damage lethal (CR 702.2b).
+#: - Trample spills the excess through to the defender.
+#: - Lifelink turns damage dealt into life gained.
+#: - Menace requires two blockers or none (CR 702.111a).
+#: - Indestructible survives lethal damage.
+#: - Defender cannot attack; Haste attacks the turn it arrives.
+#:
+#: Vigilance is deliberately absent. It governs whether attacking taps the
+#: creature, and nothing taps attackers yet, so claiming it would be the kind of
+#: overstatement this registry exists to prevent.
+SUPPORTED_KEYWORDS: Final[frozenset[str]] = frozenset(
+    {
+        "Flying",
+        "Reach",
+        "First strike",
+        "Double strike",
+        "Deathtouch",
+        "Trample",
+        "Lifelink",
+        "Menace",
+        "Indestructible",
+        "Defender",
+        "Haste",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)

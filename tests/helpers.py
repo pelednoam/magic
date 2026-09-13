@@ -13,8 +13,12 @@ from typing import TYPE_CHECKING
 from mtgcoach.carddata.extraction import Confidence, ExtractionResult, Proposal
 from mtgcoach.core.abilities import ActivatedAbility, UnmodeledAbility
 from mtgcoach.core.cards import CardInstance
+from mtgcoach.core.combat.model import Creature
 from mtgcoach.core.effects import ProduceMana
+from mtgcoach.core.facts import CardFacts
 from mtgcoach.core.ids import InstanceId, OracleId, PlayerId
+from mtgcoach.core.manacost import parse
+from mtgcoach.core.permanents import Permanent
 from mtgcoach.core.vocabulary import AbilityCost
 
 if TYPE_CHECKING:
@@ -66,3 +70,35 @@ class FakeExtractor:
             for index, card in enumerate(cards)
         )
         return ExtractionResult(proposals, self.failures)
+
+
+def facts(
+    name: str,
+    cost: str = "",
+    *keywords: str,
+    power: int | None = None,
+    toughness: int | None = None,
+    creature: bool = False,
+    land: bool = False,
+    instant: bool = False,
+) -> CardFacts:
+    """Card facts for a rules test, named so failures read like the board."""
+    return CardFacts(
+        oracle_id=OracleId(name),
+        name=name,
+        cost=parse(cost),
+        is_land=land,
+        is_creature=creature,
+        is_instant_speed=instant,
+        power=power,
+        toughness=toughness,
+        keywords=frozenset(keywords),
+    )
+
+
+def creature(name: str, power: int, toughness: int, *keywords: str) -> Creature:
+    """A settled, untapped creature on the battlefield."""
+    return Creature(
+        Permanent(CardInstance(InstanceId(name), OracleId(name))).settle(),
+        facts(name, "", *keywords, power=power, toughness=toughness, creature=True),
+    )

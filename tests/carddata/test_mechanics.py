@@ -12,9 +12,17 @@ FIXTURE = Path(__file__).resolve().parent.parent / "fixtures" / "scryfall_fdn_sa
 FDN = SetCode("FDN")
 
 
-def test_the_registry_is_empty_until_the_effect_model_exists() -> None:
-    """M1 has no effect model, so claiming support for anything would be a lie."""
-    assert not SUPPORTED_KEYWORDS
+def test_the_registry_holds_only_keywords_a_rule_actually_reads() -> None:
+    """Every entry has to be findable in the engine, or it is decoration."""
+    combat = Path(__file__).resolve().parents[2] / "packages" / "core" / "src" / "mtgcoach"
+    engine = "\n".join(path.read_text(encoding="utf-8") for path in combat.rglob("*.py"))
+    for keyword in SUPPORTED_KEYWORDS:
+        assert f'"{keyword}"' in engine, f"{keyword} is claimed but never read"
+
+
+def test_vigilance_is_not_claimed() -> None:
+    """It decides whether attacking taps the creature, and nothing taps yet."""
+    assert "Vigilance" not in SUPPORTED_KEYWORDS
 
 
 def test_an_empty_set_audits_cleanly() -> None:
@@ -29,8 +37,8 @@ def test_the_fixture_reports_its_real_mechanics() -> None:
     report = audit(FDN, cards_in(FIXTURE))
     assert report.set_code == FDN
     assert report.card_count == 8
-    assert "Flying" in report.unsupported
     assert "Landfall" in report.unsupported
+    assert "Flying" not in report.unsupported, "modelled since M4"
     assert not report.fully_supported
 
 
@@ -56,8 +64,8 @@ def test_supporting_a_keyword_shrinks_the_report() -> None:
     """The point of the parameter: cost a plan before committing to it."""
     cards = list(cards_in(FIXTURE))
     before = audit(FDN, cards)
-    after = audit(FDN, cards, supported=frozenset({"Flying", "Vigilance", "Haste"}))
-    assert "Flying" not in after.unsupported
+    after = audit(FDN, cards, supported=SUPPORTED_KEYWORDS | {"Vigilance", "Equip"})
+    assert "Vigilance" not in after.unsupported
     assert len(after.unsupported) < len(before.unsupported)
     assert after.affected_cards < before.affected_cards
 
