@@ -20,6 +20,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from mtgcoach.carddata.cards import Card, CardFace
+from mtgcoach.carddata.facecolors import colors_in
 from mtgcoach.carddata.jsondata import (
     JsonObject,
     MalformedJsonError,
@@ -31,7 +32,6 @@ from mtgcoach.carddata.jsondata import (
     string_set,
 )
 from mtgcoach.carddata.jsonstream import stream_objects
-from mtgcoach.carddata.manacost import colors_in
 from mtgcoach.carddata.paths import validate_set_code
 from mtgcoach.core.ids import OracleId, SetCode
 
