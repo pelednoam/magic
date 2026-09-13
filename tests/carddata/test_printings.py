@@ -85,3 +85,33 @@ def test_printings_jsonl_skips_a_scalar_line(tmp_path: Path) -> None:
     path.write_text(json.dumps(_by_name("Abrade")) + "\n42\n" + '"a string"\n', encoding="utf-8")
     pairs = list(read_printings(path))
     assert [card.name for card, _ in pairs] == ["Abrade"]
+
+
+def test_an_invalid_set_code_is_rejected() -> None:
+    """A set code from a document is validated like any other."""
+    obj = {**_by_name("Abrade"), "set": "../etc"}
+    with pytest.raises(MalformedCardError, match="well-formed set code"):
+        printing_from_json(obj)
+
+
+def test_a_malformed_card_stops_the_read_by_default(tmp_path: Path) -> None:
+    """Silently dropping rules data is how a coach ends up confidently wrong."""
+    path = tmp_path / "bulk.json"
+    good = _by_name("Abrade")
+    bad = {k: v for k, v in good.items() if k != "cmc"}
+    path.write_text(json.dumps([good, bad]), encoding="utf-8")
+    with pytest.raises(MalformedCardError):
+        list(read_printings(path))
+
+
+def test_a_caller_can_ask_to_skip_malformed_cards(tmp_path: Path) -> None:
+    """A 500 MB bulk file should not be abandoned over one odd card."""
+    path = tmp_path / "bulk.json"
+    good = _by_name("Abrade")
+    bad = {k: v for k, v in good.items() if k != "cmc"}
+    path.write_text(json.dumps([bad, good, bad]), encoding="utf-8")
+
+    errors: list[MalformedCardError] = []
+    pairs = list(read_printings(path, on_error=errors.append))
+    assert [card.name for card, _ in pairs] == ["Abrade"]
+    assert len(errors) == 2

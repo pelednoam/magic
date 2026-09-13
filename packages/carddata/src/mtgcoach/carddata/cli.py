@@ -13,7 +13,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from mtgcoach.carddata import commands
+from mtgcoach.carddata.jsondata import MalformedJsonError
 from mtgcoach.carddata.paths import validate_set_code
+from mtgcoach.carddata.schema import SchemaError
 from mtgcoach.carddata.store import CardStore
 from mtgcoach.core.ids import SetCode
 
@@ -89,14 +91,24 @@ def _dispatch(args: argparse.Namespace, store: CardStore, data_root: Path, out: 
 
 
 def main(argv: Sequence[str] | None = None, out: TextIO | None = None) -> int:
-    """Run one command. Returns the process exit code."""
+    """Run one command. Returns the process exit code.
+
+    Expected failures -- a missing file, a malformed export, a corrupted
+    database row -- are reported as a diagnostic and a non-zero code. A
+    traceback is the right answer for a bug in this code and the wrong one for
+    a typo in a filename, and a user cannot tell the two apart.
+    """
     parser = build_parser()
     args = parser.parse_args(argv)
     stream = out if out is not None else sys.stdout
     db_path: Path = args.db
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    with CardStore.open(str(db_path)) as store:
-        return _dispatch(args, store, args.data, stream)
+    try:
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        with CardStore.open(str(db_path)) as store:
+            return _dispatch(args, store, args.data, stream)
+    except (OSError, MalformedJsonError, SchemaError, ValueError) as exc:
+        print(f"error: {commands.safe(str(exc))}", file=stream)
+        return commands.FAILED
 
 
 if __name__ == "__main__":

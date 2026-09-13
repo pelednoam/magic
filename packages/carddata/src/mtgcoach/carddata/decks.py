@@ -60,6 +60,20 @@ class DeckEntry:
     name: str
     quantity: int
 
+    def __post_init__(self) -> None:
+        """Reject a quantity that is not a number of physical cards.
+
+        The loader checks this too, but a decklist can also be built directly --
+        by a deck importer, or a scan -- and a zero-quantity entry would make
+        ``total`` disagree with the cards actually present.
+
+        Raises:
+            ValueError: If the quantity is not a positive integer.
+        """
+        if self.quantity < 1:
+            msg = f"{self.name}: quantity must be positive, got {self.quantity}"
+            raise ValueError(msg)
+
 
 @dataclass(frozen=True, slots=True)
 class Decklist:

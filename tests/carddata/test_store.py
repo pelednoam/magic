@@ -9,7 +9,7 @@ import pytest
 
 from mtgcoach.carddata.collection import Collection
 from mtgcoach.carddata.schema import SchemaError, as_real, as_string_set, as_text
-from mtgcoach.carddata.scryfall import cards_from_json_array
+from mtgcoach.carddata.scryfall import cards_in
 from mtgcoach.carddata.store import CardStore
 from mtgcoach.core.ids import OracleId, SetCode
 
@@ -22,12 +22,12 @@ SAMPLE_SIZE = 8
 @pytest.fixture
 def store() -> CardStore:
     loaded = CardStore.open()
-    loaded.add((card, FDN) for card in cards_from_json_array(FIXTURE))
+    loaded.add((card, FDN) for card in cards_in(FIXTURE))
     return loaded
 
 
 def test_cards_round_trip(store: CardStore) -> None:
-    original = {c.oracle_id: c for c in cards_from_json_array(FIXTURE)}
+    original = {c.oracle_id: c for c in cards_in(FIXTURE)}
     for oracle_id, expected in original.items():
         assert store.get(oracle_id) == expected
 
@@ -49,7 +49,7 @@ def test_a_missing_card_is_none(store: CardStore) -> None:
 def test_reimporting_is_idempotent(store: CardStore) -> None:
     """The bulk file refreshes daily; re-importing is the normal update path."""
     before = store.count_in(FDN)
-    store.add((card, FDN) for card in cards_from_json_array(FIXTURE))
+    store.add((card, FDN) for card in cards_in(FIXTURE))
     assert store.count_in(FDN) == before
 
 
@@ -120,7 +120,7 @@ def test_disabling_a_set_keeps_its_cards(store: CardStore) -> None:
 def test_a_file_backed_store_survives_reopening(tmp_path: Path) -> None:
     path = str(tmp_path / "cards.sqlite3")
     with CardStore.open(path) as first:
-        first.add((card, FDN) for card in cards_from_json_array(FIXTURE))
+        first.add((card, FDN) for card in cards_in(FIXTURE))
         first.enable_set(FDN)
     with CardStore.open(path) as second:
         assert second.count_in(FDN) == SAMPLE_SIZE
@@ -138,3 +138,9 @@ def test_a_row_of_the_wrong_type_is_reported() -> None:
         as_real(truthy, "cmc")
     with pytest.raises(SchemaError, match="JSON array"):
         as_string_set(json.dumps({"a": 1}), "keywords")
+
+
+def test_a_column_holding_invalid_json_is_reported() -> None:
+    """The module promises a bad row surfaces clearly; a decode error is one."""
+    with pytest.raises(SchemaError, match="does not hold valid JSON"):
+        as_string_set("{not json", "keywords")

@@ -19,8 +19,7 @@ from mtgcoach.carddata.jsondata import as_array, as_object
 from mtgcoach.carddata.scryfall import (
     MalformedCardError,
     card_from_json,
-    cards_from_json_array,
-    cards_from_jsonl,
+    cards_in,
 )
 
 if TYPE_CHECKING:
@@ -42,7 +41,7 @@ def _by_name(name: str) -> JsonObject:
 
 
 def test_the_whole_fixture_parses() -> None:
-    cards = list(cards_from_json_array(FIXTURE))
+    cards = list(cards_in(FIXTURE))
     assert len(cards) == len(_raw())
 
 
@@ -119,7 +118,7 @@ def test_jsonl_streaming(tmp_path: Path) -> None:
     """Scryfall's bulk file is one object per line, too big to load at once."""
     path = tmp_path / "bulk.jsonl"
     path.write_text("\n".join(json.dumps(obj) for obj in _raw()) + "\n", encoding="utf-8")
-    assert len(list(cards_from_jsonl(path))) == len(_raw())
+    assert len(list(cards_in(path))) == len(_raw())
 
 
 def test_jsonl_tolerates_array_punctuation(tmp_path: Path) -> None:
@@ -127,28 +126,30 @@ def test_jsonl_tolerates_array_punctuation(tmp_path: Path) -> None:
     path = tmp_path / "bulk.json"
     body = ",\n".join(json.dumps(obj) for obj in _raw())
     path.write_text(f"[\n{body}\n]\n", encoding="utf-8")
-    assert len(list(cards_from_jsonl(path))) == len(_raw())
+    assert len(list(cards_in(path))) == len(_raw())
 
 
 def test_jsonl_skips_blank_lines(tmp_path: Path) -> None:
     path = tmp_path / "bulk.jsonl"
     path.write_text(json.dumps(_by_name("Abrade")) + "\n\n\n", encoding="utf-8")
-    assert len(list(cards_from_jsonl(path))) == 1
+    assert len(list(cards_in(path))) == 1
 
 
 def test_non_object_entries_in_an_array_are_skipped(tmp_path: Path) -> None:
     """A bulk file with a stray scalar should import what it can."""
     path = tmp_path / "mixed.json"
     path.write_text(json.dumps(["not a card", 42, None, _by_name("Abrade")]), encoding="utf-8")
-    cards = list(cards_from_json_array(path))
+    cards = list(cards_in(path))
     assert len(cards) == 1
     assert cards[0].name == "Abrade"
 
 
-def test_a_non_array_document_yields_nothing(tmp_path: Path) -> None:
+def test_a_document_that_is_not_a_card_is_reported(tmp_path: Path) -> None:
+    """The streaming reader finds the object; the card parser rejects it."""
     path = tmp_path / "object.json"
     path.write_text(json.dumps({"object": "error"}), encoding="utf-8")
-    assert list(cards_from_json_array(path)) == []
+    with pytest.raises(MalformedCardError, match="'name'"):
+        list(cards_in(path))
 
 
 def test_jsonl_skips_non_object_lines(tmp_path: Path) -> None:
@@ -157,6 +158,6 @@ def test_jsonl_skips_non_object_lines(tmp_path: Path) -> None:
         "\n".join(["42", '"a string"', json.dumps(_by_name("Abrade"))]) + "\n",
         encoding="utf-8",
     )
-    cards = list(cards_from_jsonl(path))
+    cards = list(cards_in(path))
     assert len(cards) == 1
     assert cards[0].name == "Abrade"

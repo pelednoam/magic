@@ -7,6 +7,8 @@ that a value which arrived here as a string really is one.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from mtgcoach.carddata.jsondata import (
@@ -17,6 +19,7 @@ from mtgcoach.carddata.jsondata import (
     object_list,
     optional_str,
     require_float,
+    require_object,
     require_str,
     string_set,
 )
@@ -74,26 +77,66 @@ def test_nullable_str_distinguishes_absent_from_empty() -> None:
     assert nullable_str({"power": "*"}, "power") == "*"
 
 
-def test_string_set_filters_non_strings() -> None:
-    assert string_set({"keywords": ["Flying", 3, None, "Haste"]}, "keywords") == {
+def test_string_set_reads_a_list_of_strings() -> None:
+    assert string_set({"keywords": ["Flying", "Haste"]}, "keywords") == {
         "Flying",
         "Haste",
     }
 
 
-def test_string_set_on_absent_or_wrong_type() -> None:
+def test_string_set_treats_absent_and_null_as_empty() -> None:
     assert string_set({}, "keywords") == frozenset()
     assert string_set({"keywords": None}, "keywords") == frozenset()
-    assert string_set({"keywords": "Flying"}, "keywords") == frozenset()
 
 
-def test_object_list_keeps_only_objects() -> None:
-    assert object_list({"card_faces": [{"a": 1}, "x", None]}, "card_faces") == ({"a": 1},)
+def test_string_set_rejects_a_mixed_list() -> None:
+    """Dropping the odd element would mean a card quietly losing a keyword."""
+    with pytest.raises(MalformedJsonError, match="a list of strings"):
+        string_set({"keywords": ["Flying", 3]}, "keywords")
 
 
-def test_object_list_on_absent_or_wrong_type() -> None:
+def test_string_set_rejects_a_non_list() -> None:
+    with pytest.raises(MalformedJsonError, match="a list of strings"):
+        string_set({"keywords": "Flying"}, "keywords")
+
+
+def test_object_list_reads_a_list_of_objects() -> None:
+    assert object_list({"card_faces": [{"a": 1}, {"b": 2}]}, "card_faces") == (
+        {"a": 1},
+        {"b": 2},
+    )
+
+
+def test_object_list_treats_absent_and_null_as_empty() -> None:
     assert object_list({}, "card_faces") == ()
-    assert object_list({"card_faces": {}}, "card_faces") == ()
+    assert object_list({"card_faces": None}, "card_faces") == ()
+
+
+def test_object_list_rejects_a_list_containing_a_non_object() -> None:
+    """A dropped entry here would be a card silently losing a face."""
+    with pytest.raises(MalformedJsonError, match="a list of objects"):
+        object_list({"card_faces": [{"a": 1}, "x"]}, "card_faces")
+
+
+def test_object_list_rejects_a_non_list() -> None:
+    with pytest.raises(MalformedJsonError, match="a list of objects"):
+        object_list({"card_faces": {}}, "card_faces")
+
+
+@pytest.mark.parametrize("bad", ["NaN", "Infinity", "-Infinity"])
+def test_require_float_rejects_non_finite_numbers(bad: str) -> None:
+    """json.loads accepts these as bare literals, so a document can carry them."""
+    with pytest.raises(MalformedJsonError, match="a finite number"):
+        require_float({"cmc": json.loads(bad)}, "cmc", "Card")
+
+
+@pytest.mark.parametrize("value", [3, None, ["x"]])
+def test_optional_and_nullable_reject_wrong_types(value: object) -> None:
+    if value is not None:
+        with pytest.raises(MalformedJsonError, match="a string"):
+            optional_str({"oracle_text": value}, "oracle_text")  # type: ignore[dict-item]
+        with pytest.raises(MalformedJsonError, match="a string"):
+            nullable_str({"power": value}, "power")  # type: ignore[dict-item]
 
 
 def test_as_object_accepts_a_string_keyed_dict() -> None:
@@ -121,3 +164,13 @@ def test_as_array_rejects_non_lists() -> None:
     assert as_array({"a": 1}) is None
     assert as_array("abc") is None
     assert as_array(None) is None
+
+
+def test_require_object_narrows_a_dict() -> None:
+    assert require_object({"a": 1}, "doc") == {"a": 1}
+
+
+@pytest.mark.parametrize("value", [[1], "x", 3, None])
+def test_require_object_rejects_everything_else(value: object) -> None:
+    with pytest.raises(MalformedJsonError, match="should be an object"):
+        require_object(value, "doc")

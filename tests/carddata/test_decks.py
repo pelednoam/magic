@@ -129,3 +129,13 @@ def test_the_expected_size_is_a_parameter() -> None:
     deck = _deck(("Plains", 40))
     assert verify(deck, frozenset({"Plains"}), expected=40).is_verified
     assert JUMPSTART_DECK_SIZE == 20
+
+
+@pytest.mark.parametrize("quantity", [0, -1])
+def test_a_deck_entry_rejects_a_non_positive_quantity(quantity: int) -> None:
+    """A decklist can also be built directly, by an importer or a scan.
+
+    A zero-quantity entry would make ``total`` disagree with the cards present.
+    """
+    with pytest.raises(ValueError, match="quantity must be positive"):
+        DeckEntry("Plains", quantity)

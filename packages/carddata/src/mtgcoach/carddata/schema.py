@@ -110,7 +110,11 @@ def as_real(value: object, column: str) -> float:
 
 def as_string_set(value: object, column: str) -> frozenset[str]:
     """Read a column holding a JSON array of strings."""
-    decoded: object = json.loads(as_text(value, column))
+    try:
+        decoded: object = json.loads(as_text(value, column))
+    except json.JSONDecodeError as exc:
+        msg = f"column {column!r} does not hold valid JSON"
+        raise SchemaError(msg) from exc
     if not isinstance(decoded, list):
         msg = f"column {column!r} should hold a JSON array"
         raise SchemaError(msg)

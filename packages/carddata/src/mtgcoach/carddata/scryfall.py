@@ -17,15 +17,12 @@ fails on an unfamiliar key.
 
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING
 
 from mtgcoach.carddata.cards import Card, CardFace
 from mtgcoach.carddata.jsondata import (
     JsonObject,
     MalformedJsonError,
-    as_array,
-    as_object,
     nullable_str,
     object_list,
     optional_str,
@@ -33,10 +30,13 @@ from mtgcoach.carddata.jsondata import (
     require_str,
     string_set,
 )
+from mtgcoach.carddata.jsonstream import stream_objects
+from mtgcoach.carddata.manacost import colors_in
+from mtgcoach.carddata.paths import validate_set_code
 from mtgcoach.core.ids import OracleId, SetCode
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
     from pathlib import Path
 
 #: Re-exported so callers catch one error type from this module.
@@ -44,15 +44,23 @@ MalformedCardError = MalformedJsonError
 
 
 def _face_from(obj: JsonObject, fallback_name: str) -> CardFace:
-    """Build a face from either a ``card_faces`` entry or a whole card object."""
+    """Build a face from either a ``card_faces`` entry or a whole card object.
+
+    Adventure faces carry no ``colors`` field at all, and the card's top-level
+    one is empty, so reading it directly made both halves of every adventure
+    card colourless -- including the black half of a ``{1}{B}`` adventure. An
+    absent field means undeclared, and CR 105.2 says the mana cost decides.
+    """
+    mana_cost = optional_str(obj, "mana_cost")
+    declared = string_set(obj, "colors")
     return CardFace(
         name=optional_str(obj, "name", fallback_name),
-        mana_cost=optional_str(obj, "mana_cost"),
+        mana_cost=mana_cost,
         type_line=optional_str(obj, "type_line"),
         oracle_text=optional_str(obj, "oracle_text"),
         power=nullable_str(obj, "power"),
         toughness=nullable_str(obj, "toughness"),
-        colors=string_set(obj, "colors"),
+        colors=declared if "colors" in obj else colors_in(mana_cost),
     )
 
 
@@ -82,39 +90,9 @@ def card_from_json(obj: JsonObject) -> Card:
     )
 
 
-def _objects(raw: object) -> Iterator[JsonObject]:
-    items = as_array(raw)
-    if items is None:
-        return
-    for item in items:
-        obj = as_object(item)
-        if obj is not None:
-            yield obj
-
-
-def cards_from_json_array(path: Path) -> Iterator[Card]:
-    """Read a JSON array of Scryfall card objects."""
-    with path.open(encoding="utf-8") as handle:
-        raw: object = json.load(handle)
-        yield from (card_from_json(obj) for obj in _objects(raw))
-
-
-def cards_from_jsonl(path: Path) -> Iterator[Card]:
-    """Read Scryfall's bulk format: one card object per line.
-
-    Streamed rather than loaded. The ``default-cards`` bulk file is hundreds of
-    megabytes, and holding it in memory to import a few hundred cards from one
-    set is the difference between this running on a laptop and not.
-    """
-    with path.open(encoding="utf-8") as handle:
-        for line in handle:
-            stripped = line.strip().rstrip(",")
-            if not stripped or stripped in {"[", "]"}:
-                continue
-            parsed: object = json.loads(stripped)
-            obj = as_object(parsed)
-            if obj is not None:
-                yield card_from_json(obj)
+def cards_in(path: Path) -> Iterator[Card]:
+    """Read every card in a file, whatever shape the file takes."""
+    return (card_from_json(obj) for obj in stream_objects(path))
 
 
 def printing_from_json(obj: JsonObject) -> tuple[Card, SetCode]:
@@ -122,43 +100,35 @@ def printing_from_json(obj: JsonObject) -> tuple[Card, SetCode]:
 
     The set is taken from the document, never from a caller-supplied flag: a
     bulk file spans every set, and tagging its contents with whatever set the
-    user asked for would quietly mislabel every card in it.
+    user asked for would quietly mislabel every card in it. It is validated
+    like any other set code, so a malformed one cannot reach the database.
     """
     card = card_from_json(obj)
-    return card, SetCode(require_str(obj, "set", card.name).upper())
+    code = SetCode(require_str(obj, "set", card.name).upper())
+    try:
+        validate_set_code(code)
+    except ValueError as exc:
+        msg = f"{card.name}: {exc}"
+        raise MalformedJsonError(msg) from exc
+    return card, code
 
 
-def printings_from_json_array(path: Path) -> Iterator[tuple[Card, SetCode]]:
-    """Read a JSON array, yielding each card with its set code."""
-    with path.open(encoding="utf-8") as handle:
-        raw: object = json.load(handle)
-        yield from (printing_from_json(obj) for obj in _objects(raw))
+def read_printings(
+    path: Path,
+    on_error: Callable[[MalformedJsonError], None] | None = None,
+) -> Iterator[tuple[Card, SetCode]]:
+    """Read every printing in a file.
 
-
-def printings_from_jsonl(path: Path) -> Iterator[tuple[Card, SetCode]]:
-    """Read Scryfall's bulk format, yielding each card with its set code."""
-    with path.open(encoding="utf-8") as handle:
-        for line in handle:
-            stripped = line.strip().rstrip(",")
-            if not stripped or stripped in {"[", "]"}:
-                continue
-            parsed: object = json.loads(stripped)
-            obj = as_object(parsed)
-            if obj is not None:
-                yield printing_from_json(obj)
-
-
-def read_printings(path: Path) -> Iterator[tuple[Card, SetCode]]:
-    """Read either shape, choosing by the file's first non-blank character.
-
-    Scryfall's own bulk downloads are JSON arrays; exports and hand-made slices
-    are often one object per line. Sniffing beats asking the user which it is.
+    By default a malformed card stops the read, because silently dropping rules
+    data is how a coach ends up confidently wrong. A caller that would rather
+    import what it can -- a several-hundred-megabyte bulk file should not be
+    abandoned over one odd card in a set you do not own -- passes ``on_error``
+    and decides what to report.
     """
-    with path.open(encoding="utf-8") as handle:
-        first = handle.read(1)
-        while first and first.isspace():
-            first = handle.read(1)
-    if first == "[":
-        yield from printings_from_json_array(path)
-    else:
-        yield from printings_from_jsonl(path)
+    for obj in stream_objects(path):
+        try:
+            yield printing_from_json(obj)
+        except MalformedJsonError as exc:
+            if on_error is None:
+                raise
+            on_error(exc)
