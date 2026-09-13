@@ -184,7 +184,7 @@ def test_blocking_nothing_is_a_legal_assignment() -> None:
 
 def test_resolve_handles_an_attacker_with_no_blocks_entry() -> None:
     bear = creature("Bear", 2, 2)
-    assert resolve([bear], Blocks()).damage_to_defender == 2
+    assert resolve([bear], Blocks(), STARTING_LIFE).damage_to_defender == 2
 
 
 def test_value_counts_trades_and_losses() -> None:

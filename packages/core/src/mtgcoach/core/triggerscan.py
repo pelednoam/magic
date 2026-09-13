@@ -91,8 +91,11 @@ def triggers_at(
 
     A known gap, stated because it is a gap and not a decision: the schema's
     ``TriggerEvent`` does not distinguish "your upkeep" from "each upkeep", so a
-    card with the latter is not reported on the opponent's turn. None is in the
-    Beginner Box. Splitting the event is the fix, and it needs a re-extraction.
+    card with the latter is not reported on the opponent's turn. The same
+    applies to the end step, and applies harder -- "at the beginning of the end
+    step" is the commoner printing of the two, so this is where the gap will
+    first cost something. Neither is in the Beginner Box. Splitting the event is
+    the fix, and it needs a re-extraction.
     """
     event = AT_STEP.get(step)
     if event is None or not your_turn:

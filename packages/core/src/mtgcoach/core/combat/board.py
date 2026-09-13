@@ -57,6 +57,7 @@ class Board:
 
     marked: dict[InstanceId, int] = field(default_factory=dict[InstanceId, int])
     lethal: set[InstanceId] = field(default_factory=set[InstanceId])
+    dead: set[InstanceId] = field(default_factory=set[InstanceId])
     to_defender: int = 0
     attacker_lifelink: int = 0
     defender_lifelink: int = 0
@@ -67,13 +68,28 @@ class Board:
             return
         self.marked[target.instance_id] = self.marked.get(target.instance_id, 0) + amount
         # CR 702.2b: any nonzero damage from a deathtouch source is lethal.
-        is_lethal = deathtouch or self.marked[target.instance_id] >= target.toughness
-        if is_lethal and not target.has("Indestructible"):
+        if deathtouch or self.marked[target.instance_id] >= target.toughness:
             self.lethal.add(target.instance_id)
+            if not target.has("Indestructible"):
+                self.dead.add(target.instance_id)
+
+    def has_lethal(self, creature: Creature) -> bool:
+        """Whether lethal damage has been *assigned* to this creature.
+
+        Not the same as dying: an indestructible blocker has still been assigned
+        lethal damage, and CR 510.1c does not ask an attacker to spend a second
+        helping on it. Conflating the two cost a double-striking deathtouch
+        trampler one point of damage every combat.
+        """
+        return creature.instance_id in self.lethal
 
     def is_dead(self, creature: Creature) -> bool:
-        """Whether this creature has been dealt lethal damage."""
-        return creature.instance_id in self.lethal
+        """Whether this creature has been dealt lethal damage and will die."""
+        return creature.instance_id in self.dead
+
+    def defender_is_dead(self, defender_life: int) -> bool:
+        """Whether the defending player has lost, as of the damage so far."""
+        return defender_life - self.to_defender + self.defender_lifelink <= 0
 
 
 @dataclass(frozen=True, slots=True)

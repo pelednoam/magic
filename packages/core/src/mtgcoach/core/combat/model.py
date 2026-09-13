@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 from mtgcoach.core.ids import InstanceId
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Mapping, Sequence
 
     from mtgcoach.core.facts import CardFacts
     from mtgcoach.core.permanents import Permanent
@@ -54,6 +54,17 @@ class Creature:
     def toughness(self) -> int:
         """Toughness, zero when the card has none printed."""
         return self.card.toughness or 0
+
+    @property
+    def damage(self) -> int:
+        """How much combat damage this creature deals.
+
+        CR 107.1b: a negative power is treated as zero. Nothing prints one, but
+        an effect can produce one, and left unclamped it dealt *negative*
+        damage -- healing the defender and, with lifelink, taking life from its
+        own controller.
+        """
+        return max(self.power, 0)
 
     @property
     def has_fixed_stats(self) -> bool:
@@ -107,3 +118,21 @@ def can_block(blocker: Creature, attacker: Creature) -> bool:
 
 #: Menace: a creature with it cannot be blocked except by two or more (CR 702.111a).
 MENACE_MINIMUM = 2
+
+
+def check_stats(*groups: Sequence[Creature]) -> None:
+    """Refuse a combat containing a creature whose power is not knowable.
+
+    Every public entry point has to ask. ``power`` returns ``self.card.power or
+    0``, so a Consuming Aberration passed to a function that skipped this check
+    was quietly evaluated as 0/0 -- which is the single thing the refusal exists
+    to prevent, and it lived only in ``plans`` while ``best_defence`` is public
+    and directly callable.
+
+    Raises:
+        ValueError: If any creature has no fixed power or toughness.
+    """
+    unknown = sorted(c.name for group in groups for c in group if not c.has_fixed_stats)
+    if unknown:
+        msg = f"cannot evaluate combat: {', '.join(unknown)} {UNKNOWN_STATS}"
+        raise ValueError(msg)

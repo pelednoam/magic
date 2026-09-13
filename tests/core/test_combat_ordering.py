@@ -6,8 +6,14 @@ happened to build a list in.
 
 from __future__ import annotations
 
-from helpers import creature
+import pytest
+
+from helpers import creature, facts
+from mtgcoach.core.cards import CardInstance
+from mtgcoach.core.combat.model import Creature
 from mtgcoach.core.combat.search import best_defence
+from mtgcoach.core.ids import InstanceId, OracleId
+from mtgcoach.core.permanents import Permanent
 
 STARTING_LIFE = 20
 
@@ -42,3 +48,46 @@ def test_two_copies_of_a_card_are_two_separate_creatures() -> None:
     outcome = best_defence(twins, [creature("Squire", 1, 1)], 20)
     assert outcome.damage_to_defender == 4
     assert len({c.instance_id for c in twins}) == 2
+
+
+# --- life gained is part of the answer --------------------------------------
+
+
+def test_the_defender_takes_the_free_point_of_life() -> None:
+    """Two blocks that differ only in a lifelinker are not equal.
+
+    Ranking on damage alone tied them exactly, so the defender declined a free
+    point whenever the caller listed the other blocker first.
+    """
+    attacker = creature("Bear", 2, 4)
+    cleric = creature("Cleric", 1, 3, "Lifelink")
+    guard = creature("Guard", 1, 3)
+    for order in ([cleric, guard], [guard, cleric]):
+        outcome = best_defence([attacker], order, STARTING_LIFE)
+        assert outcome.defender_life_gained == 1
+        assert not outcome.blockers_lost
+
+
+def test_the_attacker_prefers_the_assignment_that_gains_it_life() -> None:
+    attacker = creature("Vampire", 3, 3, "Lifelink")
+    outcome = best_defence([attacker], [creature("Wall", 0, 5)], STARTING_LIFE)
+    assert outcome.attacker_life_gained == 3
+
+
+def test_best_defence_refuses_a_creature_with_no_fixed_power() -> None:
+    """It is public and directly callable, so the guard cannot live in `plans`."""
+    star = Creature(
+        Permanent(CardInstance(InstanceId("ca"), OracleId("ca"))).settle(),
+        facts("Consuming Aberration", creature=True),
+    )
+    with pytest.raises(ValueError, match="no fixed power"):
+        best_defence([star], [], STARTING_LIFE)
+
+
+def test_best_defence_refuses_an_unknown_blocker_too() -> None:
+    star = Creature(
+        Permanent(CardInstance(InstanceId("ca"), OracleId("ca"))).settle(),
+        facts("Consuming Aberration", creature=True),
+    )
+    with pytest.raises(ValueError, match="no fixed power"):
+        best_defence([creature("Bear", 2, 2)], [star], STARTING_LIFE)

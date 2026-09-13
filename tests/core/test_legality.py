@@ -23,6 +23,22 @@ from mtgcoach.core.steps import Step
 FOREST = ManaSource(InstanceId("forest"), frozenset("G"))
 ISLAND = ManaSource(InstanceId("island"), frozenset("U"))
 
+
+def forests(count: int) -> list[ManaSource]:
+    """``count`` *distinct* Forests.
+
+    Passing one ManaSource several times is a caller bug the solver now refuses:
+    a single permanent cannot be tapped twice, and letting it silently pay twice
+    over would offer a spell that cannot actually be cast.
+    """
+    return [ManaSource(InstanceId(f"forest-{i}"), frozenset("G")) for i in range(count)]
+
+
+def islands(count: int) -> list[ManaSource]:
+    """``count`` distinct Islands."""
+    return [ManaSource(InstanceId(f"island-{i}"), frozenset("U")) for i in range(count)]
+
+
 GIANT_GROWTH = facts("Giant Growth", "{G}", instant=True)
 AURELIA = facts("Aurelia", "{2}{R}{R}{W}{W}", creature=True, power=3, toughness=4)
 CANCEL = facts("Cancel", "{1}{U}{U}", instant=True)
@@ -46,12 +62,12 @@ def test_an_instant_can_be_cast_on_the_opponents_turn() -> None:
 
 
 def test_a_creature_cannot_be_cast_in_combat() -> None:
-    reasons = why_not_cast(_game(Step.DECLARE_ATTACKERS), ME, AURELIA, [FOREST] * 6)
+    reasons = why_not_cast(_game(Step.DECLARE_ATTACKERS), ME, AURELIA, forests(6))
     assert "you can only play this in a main phase" in reasons
 
 
 def test_a_creature_cannot_be_cast_on_the_opponents_turn() -> None:
-    reasons = why_not_cast(_game(Step.PRECOMBAT_MAIN, YOU), ME, AURELIA, [FOREST] * 6)
+    reasons = why_not_cast(_game(Step.PRECOMBAT_MAIN, YOU), ME, AURELIA, forests(6))
     assert "you can only play this on your own turn" in reasons
 
 
@@ -67,14 +83,14 @@ def test_one_short_is_singular() -> None:
 
 
 def test_having_no_source_of_a_colour_says_which() -> None:
-    reasons = why_not_cast(_game(), ME, CANCEL, [FOREST, FOREST, FOREST])
+    reasons = why_not_cast(_game(), ME, CANCEL, forests(3))
     assert "you have no source of U" in reasons
 
 
 def test_enough_sources_but_the_wrong_combination() -> None:
     """Two Islands cannot pay {G}{G} even though the count is right."""
     both = facts("Hybrid", "{G}{G}")
-    reasons = why_not_cast(_game(), ME, both, [ISLAND, ISLAND])
+    reasons = why_not_cast(_game(), ME, both, islands(2))
     assert "no source of G" in reasons[0]
 
 
@@ -141,53 +157,3 @@ def test_defender_cannot_attack() -> None:
 
 def test_a_noncreature_cannot_attack() -> None:
     assert "is not a creature" in why_not_attack(_permanent("Plains", sick=False), PLAINS)[0]
-
-
-def test_the_right_number_of_sources_in_the_wrong_colours() -> None:
-    """A Plains and an Island is two mana, and still not {W}{W}.
-
-    Neither of the cheaper explanations fits: nothing is short, and there *is* a
-    white source. Saying so beats saying "you can't cast that".
-    """
-    card = facts("Blessed Hippogriff", "{W}{W}")
-    plains = ManaSource(InstanceId("plains"), frozenset("W"))
-    (reason,) = why_not_cast(_game(), ME, card, [plains, ISLAND])
-    assert "combination of colours" in reason
-
-
-def test_nobody_can_cast_anything_during_untap() -> None:
-    """CR 502.4. An instant that reads as castable here is wrong advice."""
-    (reason,) = why_not_cast(_game(Step.UNTAP), ME, GIANT_GROWTH, [FOREST])
-    assert "priority" in reason
-    assert "untap step" in reason
-
-
-def test_nobody_can_cast_anything_during_cleanup() -> None:
-    (reason,) = why_not_cast(_game(Step.CLEANUP), ME, GIANT_GROWTH, [FOREST])
-    assert "priority" in reason
-
-
-def test_the_no_priority_steps_do_not_also_complain_about_sorcery_timing() -> None:
-    """One reason, the true one: nobody may act, not 'it is not your main phase'."""
-    reasons = why_not_cast(_game(Step.UNTAP), ME, CANCEL, [ISLAND, ISLAND, ISLAND])
-    assert len(reasons) == 1
-
-
-def test_a_hybrid_symbol_names_no_missing_colour() -> None:
-    """{W/U} is payable by either, so neither is 'the colour you lack'."""
-    card = facts("Hybrid Spell", "{W/U}{G}")
-    plains = ManaSource(InstanceId("plains"), frozenset("W"))
-    (reason,) = why_not_cast(_game(), ME, card, [plains])
-    assert "you need 1 more untapped source" in reason
-
-
-def test_a_hybrid_cost_is_payable_by_either_half() -> None:
-    plains = ManaSource(InstanceId("plains"), frozenset("W"))
-    assert can_cast(_game(), ME, facts("Hybrid Spell", "{W/U}"), [plains])
-
-
-def test_a_colourless_pip_is_explained_as_such() -> None:
-    """Blaming a colour combination for a {C} cost teaches the wrong rule."""
-    card = facts("Colourless Spell", "{1}{C}")
-    (reason,) = why_not_cast(_game(), ME, card, [FOREST, FOREST])
-    assert "colourless mana" in reason

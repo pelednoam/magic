@@ -10,10 +10,10 @@ and ``plans`` runs one per attack subset. At the caps those two stories admitted
 eight attackers against six blockers, which takes five minutes.
 
 So the bound is measured, not reasoned about. ``resolutions_for`` counts what
-the search actually does -- every block assignment, times every order the
-attacker could assign damage in -- and it tracks real time to within a few
+the search actually does -- every block assignment, times every division of
+damage the attacker could choose -- and it tracks real time to within a few
 percent across every board shape tried. The constant below is that count at
-roughly four seconds.
+roughly three seconds.
 
 And it is a refusal, not a fallback. A coach that silently switches to a
 heuristic on a big board is worse than one that says it cannot be sure, because
@@ -35,12 +35,12 @@ if TYPE_CHECKING:
 MAX_ATTACKERS: Final = 8
 MAX_BLOCKERS: Final = 6
 
-#: How many combats the exact search will resolve before refusing. Measured:
-#: about 38 microseconds each, so this is a shade under four seconds. It admits
-#: six attackers against four blockers, eight against three, or four against
-#: four -- past anything the Beginner Box fields, and short of the boards that
-#: would make the coach appear to have hung.
-MAX_RESOLUTIONS: Final = 100_000
+#: How many combats the exact search will resolve before refusing. Measured at
+#: about 11 microseconds each, so this is a shade over three seconds. It admits
+#: eight attackers against three blockers, six against four, four against five,
+#: or three against six -- past anything the Beginner Box fields, and short of
+#: the boards that would make the coach appear to have hung.
+MAX_RESOLUTIONS: Final = 320_000
 
 
 class TooManyCombinationsError(ValueError):
@@ -53,18 +53,17 @@ class TooManyCombinationsError(ValueError):
 
 
 def _arrangements(attackers: int, blockers: int) -> int:
-    """Every way to block ``attackers``, each group in every damage order.
+    """Every block, times every division of damage the attacker could choose.
 
-    Choosing which blockers block, which attacker each one blocks, and the order
-    the attacking player assigns damage within a group, is exactly arranging
-    some of the blockers into ``attackers`` ordered lists. That is the rising
-    factorial, summed over how many blockers are used.
+    Each blocker either sits out or blocks one attacker, and then within each
+    attacker's group the attacker picks which of them to kill -- a subset. So
+    for ``j`` blocking, that is ``attackers ** j`` blocks and ``2 ** j``
+    subsets between them, summed over ``j``: ``(1 + 2 * attackers) ** blockers``.
+
+    A slight over-estimate, because a group of one has only one division and the
+    formula gives it two. Over-estimating is the safe direction for a bound.
     """
-    total = 0
-    for used in range(blockers + 1):
-        rising = math.prod(attackers + step for step in range(used))
-        total += math.comb(blockers, used) * rising
-    return total
+    return int((1 + 2 * attackers) ** blockers)
 
 
 def resolutions_for(attackers: int, blockers: int) -> int:

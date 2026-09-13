@@ -15,15 +15,18 @@ from mtgcoach.core.combat.model import Blocks, Creature
 if TYPE_CHECKING:
     from mtgcoach.core.combat.board import Outcome
 
+#: A life total high enough that nothing here is lethal by accident.
+LIFE = 20
+
 
 def _one(attacker: Creature, *blockers: Creature) -> Outcome:
     """One attacker, blocked by these creatures."""
-    return resolve([attacker], Blocks({attacker.instance_id: tuple(blockers)}))
+    return resolve([attacker], Blocks({attacker.instance_id: tuple(blockers)}), LIFE)
 
 
 def test_an_unblocked_creature_hits_the_player() -> None:
     bear = creature("Bear", 2, 2)
-    outcome = resolve([bear], Blocks())
+    outcome = resolve([bear], Blocks(), LIFE)
     assert outcome.damage_to_defender == 2
     assert not outcome.attacker_names
 
@@ -57,7 +60,7 @@ def test_first_strike_does_not_save_you_from_a_bigger_creature() -> None:
 
 
 def test_double_strike_deals_damage_twice() -> None:
-    outcome = resolve([creature("Hero", 2, 2, "Double strike")], Blocks())
+    outcome = resolve([creature("Hero", 2, 2, "Double strike")], Blocks(), LIFE)
     assert outcome.damage_to_defender == 4
 
 
@@ -98,7 +101,7 @@ def test_no_trample_means_nothing_gets_through() -> None:
 
 
 def test_lifelink_gains_life_for_damage_dealt() -> None:
-    outcome = resolve([creature("Cleric", 3, 3, "Lifelink")], Blocks())
+    outcome = resolve([creature("Cleric", 3, 3, "Lifelink")], Blocks(), LIFE)
     assert outcome.attacker_life_gained == 3
 
 
@@ -107,6 +110,7 @@ def test_an_attacker_short_of_lethal_for_two_kills_only_the_first() -> None:
     outcome = resolve(
         [attacker],
         Blocks({attacker.instance_id: (creature("A", 2, 2), creature("B", 2, 2))}),
+        LIFE,
     )
     assert outcome.blocker_names == ("A",)
 
@@ -121,6 +125,7 @@ def test_two_blockers_can_gang_up() -> None:
     outcome = resolve(
         [attacker],
         Blocks({attacker.instance_id: (creature("A", 2, 2), creature("B", 2, 2))}),
+        LIFE,
     )
     assert outcome.attacker_names == ("Giant",)
     assert outcome.blocker_names == ("A", "B"), "lethal to each in turn (CR 510.1a)"
@@ -128,7 +133,7 @@ def test_two_blockers_can_gang_up() -> None:
 
 def test_several_attackers_at_once() -> None:
     a, b = creature("A", 2, 2), creature("B", 3, 3)
-    assert resolve([a, b], Blocks()).damage_to_defender == 5
+    assert resolve([a, b], Blocks(), LIFE).damage_to_defender == 5
 
 
 def test_a_creature_killed_by_first_strike_deals_no_damage() -> None:

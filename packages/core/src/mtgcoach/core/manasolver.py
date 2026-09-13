@@ -16,9 +16,14 @@ payment is a set of lands to tap -- which one paid for which pip is not
 something a player can act on.
 
 Even so, an exact enumeration has a size, and a board can be bigger than one.
-``payments`` refuses past ``MAX_PAYMENTS`` rather than returning a truncated
-list that looks complete, and ``can_pay`` never reaches the limit because it
-stops at the first payment it finds.
+``MAX_SOURCES`` is where the refusal lives, and it is on the sources rather than
+on the payments because the expensive question is the *failing* one: a cost that
+cannot be paid scans the whole space and finds nothing to stop at, and that is
+the question ``legality`` asks once per card in hand. With the cap in place the
+payment count cannot exceed C(16, 8) either, so no second bound is needed.
+
+``can_pay`` still stops at the first payment it finds, which makes the castable
+case cheap.
 """
 
 from __future__ import annotations
@@ -33,19 +38,30 @@ if TYPE_CHECKING:
     from mtgcoach.core.ids import InstanceId
     from mtgcoach.core.manacost import ManaCost, ManaSource
 
-#: How many distinct payments will be enumerated before the search gives up.
-#: Chosen far above any real board -- twelve sources and a five-pip cost is a
-#: few thousand -- so that reaching it means the caller passed something the
-#: exact answer was never going to fit.
-MAX_PAYMENTS: Final = 50_000
+#: The symbol a {C} pip becomes: payable only by a source that makes no colour.
+#: Represented as a set so it goes through the same matching as every other
+#: symbol, with ``ManaSource.can_pay`` deciding.
+_COLOURLESS: Final[frozenset[str]] = frozenset()
+
+#: Beyond this many untapped sources the exact enumeration is not worth having.
+#: A real board is a dozen; this is well past that, and the refusal is explicit
+#: because the cost of the search does not depend on whether a payment exists --
+#: an *unpayable* cost scans every subset and finds nothing, which is precisely
+#: the question ``legality`` asks for every card in hand.
+MAX_SOURCES: Final = 16
 
 
-class TooManyPaymentsError(ValueError):
-    """The board has more ways to pay than the solver will enumerate.
+class TooManySourcesError(ValueError):
+    """More untapped sources than the exact search will take on."""
 
-    Raised rather than truncated. A list of payments that silently stops short
-    would rank the "best" one out of an arbitrary prefix, and the ranking is the
-    part a player acts on.
+
+class DuplicateSourceError(ValueError):
+    """Two sources with one identifier -- the same permanent tapped twice.
+
+    Payments are keyed by ``instance_id``, so a repeated one let a single Forest
+    pay ``{G}{G}`` and come back as ``tapped=("forest", "forest")``. A caller
+    bug, but a silent one, and the answer it produces is a spell the player
+    cannot actually cast.
     """
 
 
@@ -106,13 +122,16 @@ def options(cost: ManaCost, sources: Sequence[ManaSource]) -> Iterator[Payment]:
     building the whole ranked list means a legality check on a large board costs
     what a full recommendation costs, and it is asked once per card in hand.
     """
-    if cost.colorless:
-        # A {C} symbol needs specifically colourless mana, which no source in
-        # the box makes. Refusing beats quietly treating it as generic.
-        return
+    _check_sources(sources)
+    # A {C} pip needs specifically colourless mana, which a source with no
+    # colours makes -- ManaSource documents exactly that. Refusing it outright
+    # meant the coach told a player with such a source that nothing on their
+    # board could make it, which is a statement about their board that the code
+    # never looked at.
+    symbols = (*cost.symbols, *(_COLOURLESS for _ in range(cost.colorless)))
 
     seen: set[tuple[InstanceId, ...]] = set()
-    for coloured in _colour_sets(cost.symbols, sources):
+    for coloured in _colour_sets(symbols, sources):
         spare_indices = [i for i in range(len(sources)) if i not in coloured]
         for generic in itertools.combinations(spare_indices, cost.generic):
             used = coloured | frozenset(generic)
@@ -139,19 +158,11 @@ def payments(cost: ManaCost, sources: Sequence[ManaSource]) -> tuple[Payment, ..
     asks again with it folded into the generic part.
 
     Raises:
-        TooManyPaymentsError: If the board admits more than ``MAX_PAYMENTS``
-            distinct payments, where an exact ranking is not worth having.
+        DuplicateSourceError: If two sources share an identifier.
+        TooManySourcesError: If there are more untapped sources than the exact
+            search will take on.
     """
-    found: list[Payment] = []
-    for payment in options(cost, sources):
-        found.append(payment)
-        if len(found) > MAX_PAYMENTS:
-            msg = (
-                f"more than {MAX_PAYMENTS} ways to pay {cost.total} mana from "
-                f"{len(sources)} sources; cannot rank them exactly"
-            )
-            raise TooManyPaymentsError(msg)
-    found.sort(key=lambda p: (p.count, -_flexibility(p, sources)))
+    found = sorted(options(cost, sources), key=lambda p: (p.count, -_flexibility(p, sources)))
     return tuple(found)
 
 
@@ -162,6 +173,22 @@ def can_pay(cost: ManaCost, sources: Sequence[ManaSource]) -> bool:
     every payment would not be.
     """
     return any(True for _ in options(cost, sources))
+
+
+def _check_sources(sources: Sequence[ManaSource]) -> None:
+    """Refuse a source list the solver cannot answer honestly for.
+
+    Raises:
+        DuplicateSourceError: If two sources share an identifier.
+        TooManySourcesError: If there are more than ``MAX_SOURCES``.
+    """
+    ids = [s.instance_id for s in sources]
+    if len(set(ids)) != len(ids):
+        msg = "two sources share an identifier; one permanent cannot be tapped twice"
+        raise DuplicateSourceError(msg)
+    if len(sources) > MAX_SOURCES:
+        msg = f"cannot search {len(sources)} untapped sources exactly (limit {MAX_SOURCES})"
+        raise TooManySourcesError(msg)
 
 
 def _flexibility(payment: Payment, sources: Sequence[ManaSource]) -> int:

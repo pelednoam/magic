@@ -3,13 +3,21 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import cast
 
 import pytest
 
 from mtgcoach.core.ids import InstanceId
-from mtgcoach.core.manacost import ManaCost, ManaSource, UnsupportedCostError, parse
+from mtgcoach.core.manacost import (
+    ManaCost,
+    ManaSource,
+    UnsupportedCostError,
+    parse,
+)
+
+_SYMBOL = re.compile(r"\{([^{}]+)\}")
 
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "scryfall_fdn_sample.json"
 
@@ -104,7 +112,12 @@ def test_every_cost_in_the_scryfall_fixture_parses() -> None:
     costs = _face_costs(json.loads(FIXTURE.read_text(encoding="utf-8")))
     assert costs, "the fixture should carry some costs"
     for text in costs:
-        assert parse(text).total >= 0
+        cost = parse(text)
+        # `total >= 0` is what this asserted, which no parse result can fail.
+        # The symbols have to come back out: a parser that silently dropped
+        # every one of them would have passed.
+        assert cost.total == len(_SYMBOL.findall(text)) - _generic_padding(text)
+        assert cost.printed
 
 
 def test_a_two_faced_cards_joined_cost_is_refused() -> None:
@@ -139,3 +152,36 @@ def _face_costs(cards: list[dict[str, object]]) -> list[str]:
         if isinstance(cost, str) and cost:
             found.append(cost)
     return found
+
+
+def test_a_generic_symbol_too_large_to_be_a_cost_is_refused() -> None:
+    """A bare ValueError here slipped past every caller.
+
+    Python refuses to parse an integer literal past a few thousand digits, and
+    raises ``ValueError`` doing it -- not ``UnsupportedCostError``, which is
+    what ``carddata``'s lenient fallback catches.
+    """
+    with pytest.raises(UnsupportedCostError, match="impossible generic cost"):
+        parse("{" + "9" * 5000 + "}")
+
+
+def test_an_absent_cost_is_not_a_zero_cost() -> None:
+    assert not parse("").is_payable
+    assert parse("{0}").is_payable
+    assert parse("").is_free
+    assert parse("{0}").is_free
+
+
+def _generic_padding(text: str) -> int:
+    """How much a cost's generic symbols add beyond one each.
+
+    ``{2}`` is one symbol worth two mana, and ``{X}`` is one symbol worth none.
+    """
+    padding = 0
+    for raw in _SYMBOL.findall(text):
+        symbol = raw.upper()
+        if symbol.isdigit():
+            padding += 1 - int(symbol)
+        elif symbol == "X":
+            padding += 1
+    return padding

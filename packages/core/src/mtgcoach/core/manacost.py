@@ -54,6 +54,12 @@ class ManaCost:
     symbols: tuple[frozenset[str], ...] = ()
     variable: int = 0
     colorless: int = 0
+    #: Whether the card has a printed mana cost at all. A land has none, and so
+    #: does a card like Ancestral Vision -- which is not the same as costing
+    #: zero: a card with no mana cost cannot be cast (CR 202.1a, 117.6a).
+    #: Without the distinction both parsed identically and the engine would have
+    #: offered to cast one for free.
+    printed: bool = True
 
     @property
     def total(self) -> int:
@@ -66,9 +72,33 @@ class ManaCost:
         return self.total == 0 and self.variable == 0
 
     @property
+    def is_payable(self) -> bool:
+        """Whether this cost can be paid at all, at any price.
+
+        A card with no printed mana cost has no way to be cast (CR 202.1a).
+        That is a different thing from a cost of ``{0}``, which is paid by
+        paying nothing.
+        """
+        return self.printed
+
+    @property
     def colors(self) -> frozenset[str]:
         """Every colour this cost could require."""
         return frozenset[str]().union(*self.symbols) if self.symbols else frozenset()
+
+
+#: Python refuses to parse an integer literal past this many digits, and raises
+#: a bare ValueError doing it -- which slipped past every caller catching
+#: UnsupportedCostError. No real cost is anywhere near it.
+_MAX_GENERIC_DIGITS: Final = 6
+
+
+def _amount(symbol: str, text: str) -> int:
+    """The value of a generic symbol, refusing one no card could carry."""
+    if len(symbol) > _MAX_GENERIC_DIGITS:
+        msg = f"{text!r} has an impossible generic cost"
+        raise UnsupportedCostError(msg)
+    return int(symbol)
 
 
 def parse(text: str) -> ManaCost:
@@ -87,7 +117,7 @@ def parse(text: str) -> ManaCost:
     """
     stripped = text.strip()
     if not stripped:
-        return ManaCost()
+        return ManaCost(printed=False)
     if _SYMBOL.sub("", stripped).strip():
         msg = f"{text!r} is not a mana cost"
         raise UnsupportedCostError(msg)
@@ -99,7 +129,7 @@ def parse(text: str) -> ManaCost:
     for raw in _SYMBOL.findall(stripped):
         symbol = raw.upper()
         if _GENERIC.match(symbol):
-            generic += int(symbol)
+            generic += _amount(symbol, text)
         elif symbol == "X":
             variable += 1
         elif symbol == "C":
@@ -145,5 +175,13 @@ class ManaSource:
     produces: frozenset[str] = field(default_factory=frozenset[str])
 
     def can_pay(self, symbol: frozenset[str]) -> bool:
-        """Whether this source can pay one coloured symbol."""
+        """Whether this source can pay one symbol.
+
+        The empty set is the ``{C}`` pip, and only a source that makes no colour
+        makes colourless mana -- which is exactly what an empty ``produces``
+        says. Treating the two empty sets as an intersection made every {C} cost
+        unpayable by every source, including the one kind that can pay it.
+        """
+        if not symbol:
+            return not self.produces
         return bool(self.produces & symbol)

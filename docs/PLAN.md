@@ -543,9 +543,11 @@ algorithm), rather than enumerating assignments of sources to pips. The first ve
 latter and was factorial: five coloured pips across twenty sources is 1.8M ordered assignments
 against 15,504 sets, and the answers are identical because a payment is a set of lands to tap —
 which land paid for which pip is not something a player can act on. `can_pay` stops at the
-first payment, so a legality check on a big board no longer costs what a full recommendation
-costs; `payments` refuses past `MAX_PAYMENTS` rather than returning a truncated list that looks
-complete.
+first payment, so a *castable* spell is cheap to confirm. The expensive case is the failing one
+— nothing to stop at, and the whole space scanned — and that is exactly what `legality` asks
+about for every card in hand, so the bound is `MAX_SOURCES` rather than a bound on payments
+found. Two sources sharing an identifier are refused outright: one permanent cannot be tapped
+twice, and letting it pay twice over offered a spell that could not be cast.
 
 `parse` refuses what it cannot model rather than approximating: `{2/W}` and `{W/P}` raise
 `UnsupportedCostError`, and so does a split card's joined `{3} // {1}{B}` — that card has two

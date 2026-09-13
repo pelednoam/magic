@@ -55,11 +55,18 @@ boards = st.tuples(
 def test_the_advice_does_not_depend_on_the_order_of_the_lists(
     board: tuple[list[Creature], list[Creature]], life: int
 ) -> None:
-    """Two callers with the same board must be coached the same way."""
+    """Two callers with the same board must be coached the same way.
+
+    Every field, not a chosen few: comparing only damage and names let a tie
+    that differed solely in a lifelinker's life gain through, and the defender
+    declined a free point whenever the caller listed the other blocker first.
+    """
     attackers, blockers = board
     forward = best_defence(attackers, blockers, life)
     backward = best_defence(attackers[::-1], blockers[::-1], life)
     assert forward.damage_to_defender == backward.damage_to_defender
+    assert forward.attacker_life_gained == backward.attacker_life_gained
+    assert forward.defender_life_gained == backward.defender_life_gained
     assert sorted(forward.attacker_names) == sorted(backward.attacker_names)
     assert sorted(forward.blocker_names) == sorted(backward.blocker_names)
 
@@ -69,11 +76,18 @@ def test_the_advice_does_not_depend_on_the_order_of_the_lists(
 def test_blocking_is_never_worse_for_the_defender_than_not_blocking(
     board: tuple[list[Creature], list[Creature]], life: int
 ) -> None:
-    """Not blocking is always available, so the best defence is at least it."""
+    """Not blocking is always an option, so the best defence is at least it.
+
+    Stated as survival rather than damage. Once the attack is lethal whatever
+    the defender does, comparing damage totals compares two ways of being dead
+    -- and the ranking is free to prefer the one that takes a creature with it.
+    """
     attackers, blockers = board
     best = best_defence(attackers, blockers, life)
-    idle = resolve(attackers, Blocks())
-    assert best.damage_to_defender <= idle.damage_to_defender or not best.blockers_lost
+    idle = resolve(attackers, Blocks(), life)
+    if idle.defender_life_after(life) > 0:
+        assert best.defender_life_after(life) > 0, "blocking must not be lethal"
+        assert best.defender_life_after(life) >= idle.defender_life_after(life)
 
 
 @settings(max_examples=120, deadline=None)
@@ -83,7 +97,7 @@ def test_unblocked_damage_is_exactly_the_power_that_swung(
 ) -> None:
     """Damage is conserved: nothing is created or lost between the two steps."""
     attackers, _ = board
-    outcome = resolve(attackers, Blocks())
+    outcome = resolve(attackers, Blocks(), STARTING_LIFE)
     expected = sum(c.power * (2 if c.has("Double strike") else 1) for c in attackers)
     assert outcome.damage_to_defender == expected
 
@@ -98,7 +112,7 @@ def test_a_blocked_attacker_never_reaches_the_player_without_trample(
     if not attackers or not blockers:
         return
     blocked = Blocks({attackers[0].instance_id: (blockers[0],)})
-    outcome = resolve([attackers[0]], blocked)
+    outcome = resolve([attackers[0]], blocked, life)
     assert outcome.damage_to_defender == 0 or attackers[0].has("Trample")
     assert life > 0
 
@@ -123,3 +137,17 @@ def test_a_plan_is_lethal_exactly_when_it_empties_the_life_total(
     attackers, blockers = board
     for plan in plans(attackers, blockers, life):
         assert plan.is_lethal == (plan.defender_life_after <= 0)
+
+
+@settings(max_examples=100, deadline=None)
+@given(boards, st.integers(min_value=1, max_value=20))
+def test_the_defender_never_declines_free_life(
+    board: tuple[list[Creature], list[Creature]], life: int
+) -> None:
+    """A block that gains life and costs nothing must beat one that does not."""
+    attackers, blockers = board
+    best = best_defence(attackers, blockers, life)
+    for other in (best_defence(attackers, blockers[::-1], life),):
+        assert best.defender_life_after(life) >= other.defender_life_after(life) or (
+            len(best.blockers_lost) < len(other.blockers_lost)
+        )

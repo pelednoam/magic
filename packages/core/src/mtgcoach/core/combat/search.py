@@ -26,7 +26,8 @@ from mtgcoach.core.combat.assignments import (
 )
 from mtgcoach.core.combat.budget import check_defence_size, check_plan_size
 from mtgcoach.core.combat.damage import resolve
-from mtgcoach.core.combat.model import UNKNOWN_STATS, Blocks
+from mtgcoach.core.combat.model import Blocks, check_stats
+from mtgcoach.core.legality import can_attack
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -36,7 +37,7 @@ if TYPE_CHECKING:
 
 #: How a candidate outcome is ranked. The last term is a total order over the
 #: creatures involved, so that a tie is never broken by list position.
-type _Key = tuple[int, int, int, int, tuple[tuple[str, ...], tuple[str, ...]]]
+type _Key = tuple[int, int, int, int, int, tuple[tuple[str, ...], tuple[str, ...]]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,17 +86,18 @@ def _best_for_attacker(
     best: Outcome | None = None
     best_key: _Key | None = None
     for order in damage_orders(attackers, blocks):
-        outcome = resolve(attackers, order)
+        outcome = resolve(attackers, order, defender_life)
         key = (
             0 if outcome.defender_life_after(defender_life) <= 0 else 1,
             len(outcome.attackers_lost) - len(outcome.blockers_lost),
-            -outcome.damage_to_defender,
+            outcome.defender_life_after(defender_life),
+            -outcome.attacker_life_gained,
             -sum(c.power + c.toughness for c in outcome.blockers_lost),
             identity(outcome),
         )
         if best_key is None or key < best_key:
             best, best_key = outcome, key
-    return best if best is not None else resolve(attackers, blocks)
+    return best if best is not None else resolve(attackers, blocks, defender_life)
 
 
 def best_defence(
@@ -103,19 +105,28 @@ def best_defence(
 ) -> Outcome:
     """The outcome when the defender blocks as well as they can.
 
-    Three tests in order: do not die; do not lose creatures for nothing; then
-    take as little damage as possible. The middle one has to outrank damage or
-    the defender chump-blocks every attack at twenty life, which would make the
-    coach far too timid -- an attack that only *looks* bad because the model
-    assumed a panicked opponent is exactly the advice a beginner cannot afford.
+    In order: do not die; do not lose creatures for nothing; end on as much life
+    as possible; let the attacker gain as little as possible. The second has to
+    outrank the third or the defender chump-blocks every attack at twenty life,
+    which would make the coach far too timid -- an attack that only *looks* bad
+    because the model assumed a panicked opponent is exactly the advice a
+    beginner cannot afford.
 
-    Creature quality is not weighed: trading a 5/5 for a 1/1 with deathtouch
-    counts as an even swap here. That is why a ``Plan`` carries the whole
+    The third term is the life *total*, not the damage. They differ by lifelink,
+    and ranking on damage alone left two blocks that differed only in a
+    lifelinker exactly tied -- so the defender declined a free point of life
+    whenever the caller happened to list the other blocker first.
+
+    Creature quality is weighed only as power plus toughness, and only as the
+    last tiebreak: trading a 5/5 for a 1/1 with deathtouch still counts as an
+    even swap on the terms above it. That is why a ``Plan`` carries the whole
     ``Outcome`` and not just its score.
 
     Raises:
-        TooManyCombinationsError: If this board is too large to search exactly.
+        ValueError: If a creature has no fixed power or toughness, or this board
+            is too large to search exactly.
     """
+    check_stats(attackers, blockers)
     check_defence_size(attackers, blockers)
     best: Outcome | None = None
     best_key: _Key | None = None
@@ -124,13 +135,14 @@ def best_defence(
         key = (
             1 if outcome.defender_life_after(defender_life) <= 0 else 0,
             len(outcome.blockers_lost) - len(outcome.attackers_lost),
-            outcome.damage_to_defender,
+            -outcome.defender_life_after(defender_life),
+            outcome.attacker_life_gained,
             sum(c.power + c.toughness for c in outcome.blockers_lost),
             identity(outcome),
         )
         if best_key is None or key < best_key:
             best, best_key = outcome, key
-    return best if best is not None else resolve(attackers, Blocks())
+    return best if best is not None else resolve(attackers, Blocks(), defender_life)
 
 
 def plans(
@@ -138,20 +150,23 @@ def plans(
 ) -> tuple[Plan, ...]:
     """Every attack worth considering, best first.
 
+    ``attackers`` is everything you control; the ones that cannot legally attack
+    are filtered out rather than searched over. Without that the coach happily
+    recommended swinging with a tapped creature, a summoning-sick one, or one
+    with defender -- advice a player cannot follow, which is worse than none.
+
     Raises:
         ValueError: If a creature has no fixed power or toughness, or the board
             is too large to search exactly. Both are cases where a confident
             answer would be a guess.
     """
-    unknown = [c.name for c in (*attackers, *blockers) if not c.has_fixed_stats]
-    if unknown:
-        msg = f"cannot evaluate combat: {', '.join(sorted(unknown))} {UNKNOWN_STATS}"
-        raise ValueError(msg)
-    check_plan_size(attackers, blockers)
+    check_stats(attackers, blockers)
+    able = [c for c in attackers if can_attack(c.permanent, c.card)]
+    check_plan_size(able, blockers)
 
     found: list[Plan] = []
-    for size in range(len(attackers) + 1):
-        for chosen in itertools.combinations(attackers, size):
+    for size in range(len(able) + 1):
+        for chosen in itertools.combinations(able, size):
             outcome = best_defence(chosen, blockers, defender_life)
             found.append(
                 Plan(
@@ -160,5 +175,16 @@ def plans(
                     defender_life_after=outcome.defender_life_after(defender_life),
                 )
             )
-    found.sort(key=lambda p: (not p.is_lethal, -p.value, len(p.attackers)))
+    found.sort(
+        key=lambda p: (
+            not p.is_lethal,
+            -p.value,
+            len(p.attackers),
+            # The per-outcome ties were closed; this is the same class one level
+            # up. Without it two equal-value subsets of the same size are left
+            # in enumeration order, so `plans(...)[0]` -- what a caller actually
+            # reads -- still changed with the order the attackers came in.
+            tuple(sorted(str(c.instance_id) for c in p.attackers)),
+        )
+    )
     return tuple(found)

@@ -48,16 +48,25 @@ def menace_respected(
 
 
 def damage_orders(attackers: Sequence[Creature], blocks: Blocks) -> Iterator[Blocks]:
-    """Every order the attacking player could assign damage in (CR 509.2).
+    """Every division of damage the attacking player could choose (CR 510.1c).
 
-    The order is the attacking player's choice. It used to be the caller's list
-    order, so a 4/4 blocked by a 3/3 and a 1/1 killed whichever happened to be
-    passed first, and the same board in a different order gave different advice.
+    Foundations removed damage assignment *order*: the attacker now divides its
+    damage among the blockers as it likes, with lethal owed to each blocker it
+    wants to kill and to all of them before anything tramples through. So the
+    real choice is **which blockers to kill**, and the enumeration is over
+    subsets rather than permutations.
+
+    Both fixes at once. Permutations were the old rules, and they missed legal
+    assignments -- a 4/4 that wants to kill the 3/3 and ignore the 1/1 is not
+    any ordering of greedy-lethal. They were also the more expensive of the two:
+    six blockers is 720 orderings and 64 subsets.
+
+    Each subset is emitted as the blockers to kill followed by the rest, because
+    that is the order greedy-lethal assignment then produces the division from.
+    Duplicates are dropped: with one blocker every subset gives the same thing.
     """
     groups = [blocks.on(attacker) for attacker in attackers]
-    per_attacker = [
-        list(itertools.permutations(group)) if len(group) > 1 else [group] for group in groups
-    ]
+    per_attacker = [_divisions(group) for group in groups]
     for combination in itertools.product(*per_attacker) if per_attacker else [()]:
         yield Blocks(
             {
@@ -66,6 +75,19 @@ def damage_orders(attackers: Sequence[Creature], blocks: Blocks) -> Iterator[Blo
                 if order
             }
         )
+
+
+def _divisions(group: tuple[Creature, ...]) -> list[tuple[Creature, ...]]:
+    """Each subset of ``group`` first, then the rest -- deduplicated."""
+    if len(group) < 2:  # noqa: PLR2004 - nothing to choose between
+        return [group]
+    seen: dict[tuple[str, ...], tuple[Creature, ...]] = {}
+    for size in range(len(group) + 1):
+        for chosen in itertools.combinations(group, size):
+            picked = frozenset(c.instance_id for c in chosen)
+            order = (*chosen, *(c for c in group if c.instance_id not in picked))
+            seen.setdefault(tuple(str(c.instance_id) for c in order), order)
+    return list(seen.values())
 
 
 def identity(outcome: Outcome) -> tuple[tuple[str, ...], tuple[str, ...]]:

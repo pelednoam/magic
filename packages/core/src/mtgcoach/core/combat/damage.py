@@ -9,10 +9,19 @@ Within a step all damage is simultaneous, so a creature that will die still
 deals its damage. That too is unintuitive and worth getting right: trading is a
 real play, not an accident.
 
-A creature that was blocked stays blocked (CR 509.1h). If every blocker dies to
-first strike, the attacker does not suddenly connect with the player in the
-regular step -- it assigns its damage to nothing at all. Getting this wrong
-turned a double striker into an unblockable one.
+Three things the *gap between* the steps decides, each of which was wrong here
+until a reviewer built the board that showed it:
+
+- a defender reduced to zero life by first strike has lost. State-based actions
+  are checked before the regular step (CR 704.3), so nothing that happens in it
+  -- a lifelink blocker's damage, say -- can give the life back.
+- a creature that was blocked stays blocked (CR 509.1h). If every blocker dies
+  to first strike, the attacker does not suddenly connect with the player; it
+  assigns its damage to nothing. Getting this wrong made a double striker
+  unblockable.
+- a blocker whose attacker died in the first step has nothing left to damage,
+  and deals none. A double-striking lifelink blocker was gaining life twice for
+  hitting a creature that was no longer there.
 """
 
 from __future__ import annotations
@@ -32,27 +41,33 @@ def _attacker_hits(
 ) -> tuple[list[Hit], int]:
     """How an attacker splits its damage among its blockers, and what spills.
 
-    ``blockers`` is the living ones, in the order the attacking player chose
-    (CR 509.2). Each is assigned lethal damage before the next gets any
-    (CR 510.1a) -- assigning the whole power to the first blocker instead meant
-    a 4/4 blocked by two 1/1s killed exactly one of them.
+    ``blockers`` is the living ones in the order the attacking player chose, and
+    each is assigned lethal damage before the next gets any (CR 510.1c).
+    Assigning the whole power to the first blocker instead meant a 4/4 blocked
+    by two 1/1s killed exactly one of them.
+
+    "Lethal" counts damage already marked, and counts a deathtouch hit as lethal
+    however small it was (CR 702.2b). Without that a double-striking deathtouch
+    trampler spent a second point on a blocker it had already killed in the
+    first step, and one point of trample damage vanished.
 
     A blocked attacker with no living blockers left assigns its damage to
     nothing: the second return value is what reaches the *player*, and only
     trample or being unblocked can put anything there.
     """
     hits: list[Hit] = []
-    remaining = attacker.power
+    remaining = attacker.damage
     deathtouch = attacker.has("Deathtouch")
     for blocker in blockers:
         if remaining <= 0:
             break
-        # Deathtouch makes one point lethal, so the rest may go elsewhere.
-        already = board.marked.get(blocker.instance_id, 0)
-        needed = 1 if deathtouch else max(blocker.toughness - already, 0)
+        needed = (
+            0 if board.has_lethal(blocker) else _lethal_for(blocker, board, deathtouch=deathtouch)
+        )
         assigned = min(remaining, needed)
-        hits.append(Hit(blocker.instance_id, assigned, deathtouch=deathtouch))
-        remaining -= assigned
+        if assigned > 0:
+            hits.append(Hit(blocker.instance_id, assigned, deathtouch=deathtouch))
+            remaining -= assigned
     if remaining > 0 and not attacker.has("Trample") and hits:
         # Nowhere else for it to go, and piling it on is what a player does --
         # it costs nothing and a lifelinker gains the life for it.
@@ -61,6 +76,53 @@ def _attacker_hits(
         remaining = 0
     # CR 702.19b: only trample lets the excess through to the player.
     return hits, remaining if attacker.has("Trample") else 0
+
+
+def _lethal_for(blocker: Creature, board: Board, *, deathtouch: bool) -> int:
+    """How much more damage counts as lethal to this blocker."""
+    if deathtouch:
+        return 1
+    return max(blocker.toughness - board.marked.get(blocker.instance_id, 0), 0)
+
+
+def _offence(attackers: Sequence[Creature], blocks: Blocks, board: Board, *, first: bool) -> Side:
+    """What the attackers deal this step, and what reaches the player."""
+    hits: list[Hit] = []
+    to_defender = 0
+    lifelink = 0
+    for attacker in attackers:
+        if not _deals(attacker, first=first) or board.is_dead(attacker):
+            continue
+        if blocks.on(attacker):
+            living = [b for b in blocks.on(attacker) if not board.is_dead(b)]
+            own, spilled = _attacker_hits(attacker, living, board)
+        else:
+            own, spilled = [], attacker.damage
+        hits.extend(own)
+        to_defender += spilled
+        if attacker.has("Lifelink"):
+            lifelink += sum(h.amount for h in own) + spilled
+    return Side(tuple(hits), lifelink, to_defender)
+
+
+def _defence(attackers: Sequence[Creature], blocks: Blocks, board: Board, *, first: bool) -> Side:
+    """What the blockers deal back this step."""
+    hits: list[Hit] = []
+    lifelink = 0
+    for attacker in attackers:
+        if board.is_dead(attacker):
+            # Nothing left to assign damage to. A blocker does not turn on the
+            # player, and does not go on gaining its controller life.
+            continue
+        for blocker in blocks.on(attacker):
+            if not _deals(blocker, first=first) or board.is_dead(blocker):
+                continue
+            hits.append(
+                Hit(attacker.instance_id, blocker.damage, deathtouch=blocker.has("Deathtouch"))
+            )
+            if blocker.has("Lifelink"):
+                lifelink += blocker.damage
+    return Side(tuple(hits), lifelink)
 
 
 def _step_damage(
@@ -87,52 +149,24 @@ def _step_damage(
     board.defender_lifelink += defence.lifelink
 
 
-def _offence(attackers: Sequence[Creature], blocks: Blocks, board: Board, *, first: bool) -> Side:
-    """What the attackers deal this step, and what reaches the player."""
-    hits: list[Hit] = []
-    to_defender = 0
-    lifelink = 0
-    for attacker in attackers:
-        if not _deals(attacker, first=first) or board.is_dead(attacker):
-            continue
-        if blocks.on(attacker):
-            living = [b for b in blocks.on(attacker) if not board.is_dead(b)]
-            own, spilled = _attacker_hits(attacker, living, board)
-        else:
-            own, spilled = [], attacker.power
-        hits.extend(own)
-        to_defender += spilled
-        if attacker.has("Lifelink"):
-            lifelink += sum(h.amount for h in own) + spilled
-    return Side(tuple(hits), lifelink, to_defender)
-
-
-def _defence(attackers: Sequence[Creature], blocks: Blocks, board: Board, *, first: bool) -> Side:
-    """What the blockers deal back this step."""
-    hits: list[Hit] = []
-    lifelink = 0
-    for attacker in attackers:
-        for blocker in blocks.on(attacker):
-            if not _deals(blocker, first=first) or board.is_dead(blocker):
-                continue
-            hits.append(
-                Hit(attacker.instance_id, blocker.power, deathtouch=blocker.has("Deathtouch"))
-            )
-            if blocker.has("Lifelink"):
-                lifelink += blocker.power
-    return Side(tuple(hits), lifelink)
-
-
 def _deals(creature: Creature, *, first: bool) -> bool:
     """Whether this creature deals damage in this step."""
     return creature.deals_first_strike_damage if first else creature.deals_regular_damage
 
 
-def resolve(attackers: Sequence[Creature], blocks: Blocks) -> Outcome:
-    """Work out what an attack would do, if it were made and blocked this way."""
+def resolve(attackers: Sequence[Creature], blocks: Blocks, defender_life: int) -> Outcome:
+    """Work out what an attack would do, if it were made and blocked this way.
+
+    ``defender_life`` is needed, not merely useful: if first strike takes the
+    defender to zero the game is over before the regular step (CR 704.3), and
+    without knowing the life total this went on to resolve a step that could
+    hand the life back.
+    """
     board = Board()
     for first in (True, False):
         _step_damage(attackers, blocks, board, first=first)
+        if board.defender_is_dead(defender_life):
+            break
     return Outcome(
         damage_to_defender=board.to_defender,
         attackers_lost=_dead(attackers, board),

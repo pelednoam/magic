@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 
 from mtgcoach.core.manasolver import can_pay
 from mtgcoach.core.player import MAX_LAND_DROPS_PER_TURN
-from mtgcoach.core.steps import has_priority, is_main_phase
+from mtgcoach.core.steps import Step, has_priority, is_main_phase
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -25,7 +25,6 @@ if TYPE_CHECKING:
     from mtgcoach.core.manacost import ManaSource
     from mtgcoach.core.permanents import Permanent
     from mtgcoach.core.state import GameState
-    from mtgcoach.core.steps import Step
 
 
 def why_not_play_land(state: GameState, player_id: PlayerId, card: CardFacts) -> tuple[str, ...]:
@@ -48,8 +47,15 @@ def why_not_cast(
 ) -> tuple[str, ...]:
     """Reasons this card cannot be cast now, empty when it can."""
     reasons: list[str] = []
+    # Raises for an unknown player, as every other predicate here does. An
+    # instant used to skip every state lookup, so a bad id came back "castable".
+    state.player(player_id)
     if card.is_land:
         reasons.append("lands are played, not cast")
+    if not card.cost.is_payable:
+        # CR 202.1a: no printed mana cost means no way to cast it. Not the same
+        # as costing {0}, which both parsed identically until they were split.
+        reasons.append(f"{card.name} has no mana cost, so it cannot be cast")
     if not has_priority(state.step):
         # CR 502.4, 514.3. Without this an instant reads as castable during
         # untap, where nobody may do anything at all -- the one step where even
@@ -88,10 +94,11 @@ def _mana_shortfall(card: CardFacts, sources: Sequence[ManaSource]) -> str:
     Distinguishing "one short" from "no green at all" is the difference between
     a player waiting a turn and a player reading the wrong lesson.
     """
-    if card.cost.colorless:
-        # The solver refuses {C} outright, so every later branch would invent a
-        # colour story for a cost that has nothing to do with colours.
-        return "that needs colourless mana, which nothing here makes"
+    if card.cost.colorless and not any(not source.produces for source in sources):
+        # Checked, not asserted: the earlier version returned this sentence
+        # whenever the cost had a {C} pip, which is a claim about the player's
+        # board that the code never looked at.
+        return "you have no source of colourless mana"
     available = len(sources)
     needed = card.cost.total
     if available < needed:
@@ -133,10 +140,37 @@ def can_cast(
     return not why_not_cast(state, player_id, card, sources)
 
 
-def why_not_attack(permanent: Permanent, card: CardFacts) -> tuple[str, ...]:
-    """Reasons this creature cannot attack, empty when it can.
+def why_not_declare_attackers(state: GameState, player_id: PlayerId) -> tuple[str, ...]:
+    """Reasons no attack can be declared right now, empty when one can.
 
-    Vigilance is not checked here: it governs whether attacking *taps* the
+    Separate from ``why_not_attack`` because they are separate questions with
+    separate answers. This one is about the clock -- CR 508.1a, your own
+    declare-attackers step -- and is asked once; the other is about a creature,
+    and is asked once per creature. A caller that asked only the second got a
+    confident "yes, Grizzly Bears can attack" during its controller's upkeep.
+
+    ``Permanent`` carries no controller, which is why the player is a separate
+    argument rather than read off the creature.
+    """
+    if state.active_player != player_id:
+        return ("you can only attack on your own turn",)
+    if state.step is not Step.DECLARE_ATTACKERS:
+        return ("attackers are declared in the declare attackers step",)
+    return ()
+
+
+def can_declare_attackers(state: GameState, player_id: PlayerId) -> bool:
+    """Whether an attack can be declared right now."""
+    return not why_not_declare_attackers(state, player_id)
+
+
+def why_not_attack(permanent: Permanent, card: CardFacts) -> tuple[str, ...]:
+    """Reasons this *creature* cannot attack, empty when it can.
+
+    Timing is not checked here -- see ``why_not_declare_attackers``, which the
+    coach asks once for the whole attack rather than once per creature.
+
+    Vigilance is not checked either: it governs whether attacking *taps* the
     creature (CR 702.20b), not whether it may attack.
     """
     reasons: list[str] = []
@@ -152,5 +186,5 @@ def why_not_attack(permanent: Permanent, card: CardFacts) -> tuple[str, ...]:
 
 
 def can_attack(permanent: Permanent, card: CardFacts) -> bool:
-    """Whether this creature can be declared as an attacker."""
+    """Whether this creature could be declared as an attacker."""
     return not why_not_attack(permanent, card)
