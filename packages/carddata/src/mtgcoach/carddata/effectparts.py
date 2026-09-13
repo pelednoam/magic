@@ -11,13 +11,14 @@ from typing import TYPE_CHECKING
 
 from mtgcoach.carddata.jsondata import (
     MalformedJsonError,
+    optional_str,
     require_object,
     require_str,
     string_set,
 )
 from mtgcoach.core.amounts import Amount, Dynamic, Quantity
-from mtgcoach.core.effects import TokenSpec
 from mtgcoach.core.targets import Condition, Controller, TargetKind, TargetSpec
+from mtgcoach.core.vocabulary import TokenSpec
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -84,7 +85,10 @@ def _enum_set[T](obj: JsonObject, key: str, factory: type[T], context: str) -> f
 def decode_target(value: JsonValue, context: str) -> TargetSpec:
     """Read a target spec."""
     obj = require_object(value, context)
-    controller = require_str(obj, "controller", context)
+    # Absent or null means "any", which is what TargetSpec already defaults to.
+    # Demanding it rejected sixteen otherwise-valid cards on the first run: a
+    # field with a sensible default has no business being mandatory.
+    controller = optional_str(obj, "controller", Controller.ANY.value, context)
     try:
         who = Controller(controller)
     except ValueError as exc:

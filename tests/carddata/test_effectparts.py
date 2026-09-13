@@ -14,8 +14,8 @@ from mtgcoach.carddata.effectparts import (
 )
 from mtgcoach.carddata.jsondata import JsonValue, MalformedJsonError
 from mtgcoach.core.amounts import Dynamic, Quantity
-from mtgcoach.core.effects import TokenSpec
 from mtgcoach.core.targets import ANY_CREATURE, Condition, Controller, TargetKind, TargetSpec
+from mtgcoach.core.vocabulary import TokenSpec
 
 GOBLIN = TokenSpec(
     name="Goblin",

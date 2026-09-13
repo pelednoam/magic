@@ -542,11 +542,45 @@ transition. Falls out of the effect model.
 
 What cards *do*, as a closed discriminated union — not free text:
 
+Two layers, because the first extraction run proved one was not enough. An **Ability** says
+*when* — a spell resolving, a trigger firing, a cost being paid, a continuous truth — and the
+**Effects** inside it say *what*:
+
 ```python
+type Ability = (
+    SpellAbility
+    | TriggeredAbility
+    | ActivatedAbility
+    | StaticModifier
+    | StaticRestriction
+    | UnmodeledAbility
+)
+
 type Effect = (
-    DealDamage | Destroy | Draw | GainLife | PumpUntilEOT | CreateToken | Counter | Unmodeled
+    DealDamage
+    | Destroy
+    | ExileTarget
+    | MoveTo
+    | CounterSpell
+    | Draw
+    | Discard
+    | ChangeLife
+    | Scry
+    | ModifyStats
+    | GrantKeywords
+    | PutCounters
+    | SetTappedEffect
+    | CreateTokens
+    | ProduceMana
+    | Unmodeled
 )
 ```
+
+With effects alone, coverage was 43%: "whenever you gain life, put a +1/+1 counter on this
+creature" was discarded whole even though `PutCounters` expressed its effect perfectly, because
+nothing could say *when*. Worse, `{T}: Add {G}` — the most ordinary ability in the game — was
+unmodellable, which would have left the M4 mana solver with nothing to read. The ability layer
+took coverage to 73% and produced 22 activated abilities for the solver.
 
 **Populated by a build-time Claude pass, reviewed by a human, committed as data.** `claude-opus-5`
 reads each owned card's oracle text once and proposes structured JSON; `mtgcoach effects review`

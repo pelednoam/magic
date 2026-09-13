@@ -10,30 +10,28 @@ import json
 
 import pytest
 
+from mtgcoach.carddata.effectdecode import decode
 from mtgcoach.carddata.effectencode import encode
-from mtgcoach.carddata.effectparts import (
-    encode_target,
-)
+from mtgcoach.carddata.effectparts import encode_target
+from mtgcoach.carddata.jsondata import MalformedJsonError
 from mtgcoach.core.amounts import Dynamic, Quantity
 from mtgcoach.core.effects import (
     ChangeLife,
-    CounterKind,
     CounterSpell,
     CreateTokens,
     DealDamage,
     Destroy,
     Discard,
     Draw,
-    Duration,
     Effect,
     ExileTarget,
     GrantKeywords,
     ModifyStats,
     MoveTo,
+    ProduceMana,
     PutCounters,
     Scry,
     SetTappedEffect,
-    TokenSpec,
     Unmodeled,
 )
 from mtgcoach.core.targets import (
@@ -43,6 +41,7 @@ from mtgcoach.core.targets import (
     TargetKind,
     TargetSpec,
 )
+from mtgcoach.core.vocabulary import CounterKind, Duration, TokenSpec
 from mtgcoach.core.zones import ZoneName
 
 GOBLIN = TokenSpec(
@@ -103,7 +102,8 @@ def test_deadly_riposte() -> None:
             "minimum": 1,
             "maximum": 1,
         },
-    }
+        "source": None,
+    }, "the card itself deals the damage, so there is no separate source"
     assert encode(ChangeLife(2, Controller.YOU)) == {
         "kind": "change_life",
         "amount": 2,
@@ -126,3 +126,70 @@ def test_sets_are_sorted_so_output_is_stable() -> None:
     body = encode_target(spec)
     assert body["kinds"] == ["artifact", "enchantment"]
     assert body["conditions"] == ["has_flying", "nonland"]
+
+
+def test_bite_down_names_the_creature_dealing_the_damage() -> None:
+    """Bite Down: "target creature you control deals damage equal to its power".
+
+    The extractor found this gap: without a source, source_power was ambiguous
+    about whose power it meant.
+    """
+    mine = TargetSpec(kinds=frozenset({TargetKind.CREATURE}), controller=Controller.YOU)
+    body = encode(DealDamage(Dynamic(Quantity.SOURCE_POWER), ANY_CREATURE, mine))
+    assert body["amount"] == {"quantity": "source_power"}
+    assert body["source"] == encode_target(mine)
+
+
+def test_produce_mana_round_trips() -> None:
+    """`{T}: Add {G}` -- the effect the mana solver reads."""
+    for effect in (ProduceMana("{G}"), ProduceMana("{C}", Dynamic(Quantity.X))):
+        assert decode(encode(effect), "test") == effect
+
+
+def test_a_missing_target_is_rejected() -> None:
+    """Every targeted effect needs one; a default would invent a legal target."""
+    with pytest.raises(MalformedJsonError, match="'target' is required"):
+        decode({"kind": "destroy"}, "test")
+
+
+def test_a_missing_token_is_rejected() -> None:
+    with pytest.raises(MalformedJsonError, match="'token' is required"):
+        decode({"kind": "create_tokens", "count": 1}, "test")
+
+
+@pytest.mark.parametrize("kind", ["draw", "discard"])
+def test_an_unknown_controller_in_an_effect_is_rejected(kind: str) -> None:
+    with pytest.raises(MalformedJsonError, match="unknown controller"):
+        decode({"kind": kind, "count": 1, "who": "everyone"}, "test")
+
+
+def test_an_unknown_zone_is_rejected() -> None:
+    body = encode(MoveTo(ANY_CREATURE, ZoneName.HAND))
+    body["to_zone"] = "the_bin"
+    with pytest.raises(MalformedJsonError, match="unknown zone"):
+        decode(body, "test")
+
+
+def test_an_unknown_duration_is_rejected() -> None:
+    body = encode(ModifyStats(1, 1, ANY_CREATURE, Duration.UNTIL_END_OF_TURN))
+    body["duration"] = "forever_and_ever"
+    with pytest.raises(MalformedJsonError, match="unknown duration"):
+        decode(body, "test")
+
+
+def test_an_unknown_counter_kind_is_rejected() -> None:
+    body = encode(PutCounters(CounterKind.PLUS_ONE_PLUS_ONE, 1, ANY_CREATURE))
+    body["counter"] = "+5/+5"
+    with pytest.raises(MalformedJsonError, match="unknown counter"):
+        decode(body, "test")
+
+
+@pytest.mark.parametrize("kind", ["draw", "scry"])
+def test_a_non_integer_count_is_rejected(kind: str) -> None:
+    with pytest.raises(MalformedJsonError, match="must be an integer"):
+        decode({"kind": kind, "count": "two", "who": "you"}, "test")
+
+
+def test_an_unknown_effect_kind_is_rejected() -> None:
+    with pytest.raises(MalformedJsonError, match="unknown effect kind"):
+        decode({"kind": "telekinesis"}, "test")

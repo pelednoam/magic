@@ -15,6 +15,8 @@ from enum import StrEnum
 class Quantity(StrEnum):
     """A number read off the game state when the effect resolves."""
 
+    #: The power of whatever is dealing the damage -- the card itself, or the
+    #: permanent named by ``DealDamage.source`` when there is one.
     SOURCE_POWER = "source_power"
     SOURCE_TOUGHNESS = "source_toughness"
     TARGET_POWER = "target_power"

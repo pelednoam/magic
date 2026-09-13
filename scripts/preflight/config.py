@@ -18,7 +18,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 # empty until the first set is sealed in M3: a configured-but-missing manifest
 # is reported as a warning, which fails the preflight.
 # Convention: "effects_<SET>": "data/sets/<SET>/manifest.json"
-SIGNED_MANIFESTS: dict[str, str] = {}
+SIGNED_MANIFESTS: dict[str, str] = {
+    "effects_FDN": "data/sets/FDN/manifest.json",
+}
 
 # Directories containing JSON artifacts. Changed files under these
 # directories are parsed and key fields extracted. Uses os.sep-aware

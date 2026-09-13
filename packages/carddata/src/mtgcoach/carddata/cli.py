@@ -12,7 +12,8 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from mtgcoach.carddata import commands
+from mtgcoach.carddata import commands, effectcommands
+from mtgcoach.carddata.claudecli import ClaudeCliExtractor
 from mtgcoach.carddata.jsondata import MalformedJsonError
 from mtgcoach.carddata.paths import validate_set_code
 from mtgcoach.carddata.schema import SchemaError
@@ -60,6 +61,18 @@ def build_parser() -> argparse.ArgumentParser:
     check = decks.add_parser("verify", help="Verify shipped decklists for a set.")
     check.add_argument("set_code", type=_set_code)
 
+    effects = top.add_parser(
+        "effects", help="Extract, review and seal card behaviour."
+    ).add_subparsers(dest="action", required=True)
+    for name, helptext in (
+        ("extract", "Propose abilities for a set (calls a model)."),
+        ("review", "Show what is waiting to be sealed."),
+        ("seal", "Promote reviewed proposals to the engine's fixture."),
+        ("check", "Verify a sealed fixture matches its manifest."),
+    ):
+        sub = effects.add_parser(name, help=helptext)
+        sub.add_argument("set_code", type=_set_code)
+
     pool = top.add_parser("pool", help="Choose what you own.").add_subparsers(
         dest="action", required=True
     )
@@ -83,6 +96,12 @@ def _dispatch(args: argparse.Namespace, store: CardStore, data_root: Path, out: 
         ("sets", "list"): lambda: commands.sets_list(store, out),
         ("sets", "audit"): lambda: commands.sets_audit(store, args.set_code, out),
         ("decks", "verify"): lambda: commands.decks_verify(store, data_root, args.set_code, out),
+        ("effects", "extract"): lambda: effectcommands.extract(
+            store, ClaudeCliExtractor(), data_root, args.set_code, out
+        ),
+        ("effects", "review"): lambda: effectcommands.review(data_root, args.set_code, out),
+        ("effects", "seal"): lambda: effectcommands.seal(data_root, args.set_code, out),
+        ("effects", "check"): lambda: effectcommands.check(data_root, args.set_code, out),
         ("pool", "show"): lambda: commands.pool_show(store, out),
         ("pool", "enable"): lambda: commands.pool_enable(store, args.set_code, out),
         ("pool", "disable"): lambda: commands.pool_disable(store, args.set_code, out),

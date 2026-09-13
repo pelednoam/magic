@@ -29,6 +29,7 @@ from mtgcoach.core.effects import (
     GrantKeywords,
     ModifyStats,
     MoveTo,
+    ProduceMana,
     PutCounters,
     Scry,
     SetTappedEffect,
@@ -43,11 +44,12 @@ if TYPE_CHECKING:
 def encode(effect: Effect) -> JsonObject:
     """Write one effect as a JSON object."""
     match effect:
-        case DealDamage(amount=amount, target=target):
+        case DealDamage(amount=amount, target=target, source=source):
             return {
                 "kind": "deal_damage",
                 "amount": encode_amount(amount),
                 "target": encode_target(target),
+                "source": encode_target(source) if source is not None else None,
             }
         case Destroy(target=target):
             return {"kind": "destroy", "target": encode_target(target)}
@@ -102,6 +104,12 @@ def encode(effect: Effect) -> JsonObject:
                 "kind": "create_tokens",
                 "count": count,
                 "token": encode_token(token),
+            }
+        case ProduceMana(mana=mana, amount=amount):
+            return {
+                "kind": "produce_mana",
+                "mana": mana,
+                "amount": encode_amount(amount),
             }
         case Unmodeled(text=text, reason=reason):
             return {"kind": "unmodeled", "text": text, "reason": reason}

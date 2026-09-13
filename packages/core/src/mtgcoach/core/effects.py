@@ -16,49 +16,31 @@ the one outcome worth engineering against.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from enum import StrEnum
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mtgcoach.core.amounts import Amount
     from mtgcoach.core.targets import Controller, TargetSpec
+    from mtgcoach.core.vocabulary import CounterKind, Duration, TokenSpec
     from mtgcoach.core.zones import ZoneName
-
-
-class Duration(StrEnum):
-    """How long a continuous effect lasts."""
-
-    UNTIL_END_OF_TURN = "until_end_of_turn"
-    WHILE_ATTACHED = "while_attached"
-    PERMANENT = "permanent"
-
-
-class CounterKind(StrEnum):
-    """Kinds of counter the box can produce."""
-
-    PLUS_ONE_PLUS_ONE = "+1/+1"
-    MINUS_ONE_MINUS_ONE = "-1/-1"
-
-
-@dataclass(frozen=True, slots=True)
-class TokenSpec:
-    """A creature or artifact token an effect creates."""
-
-    name: str
-    type_line: str
-    power: int | None = None
-    toughness: int | None = None
-    colors: frozenset[str] = field(default_factory=frozenset[str])
-    keywords: frozenset[str] = field(default_factory=frozenset[str])
 
 
 @dataclass(frozen=True, slots=True)
 class DealDamage:
-    """Deal damage to a target."""
+    """Deal damage to a target.
+
+    ``source`` is the permanent dealing the damage, and ``None`` means the card
+    itself -- the ordinary case, as in ``Deadly Riposte``. ``Bite Down`` instead
+    reads "target creature you control deals damage equal to its power", where
+    the source is a second chosen creature. Without this field
+    ``Quantity.SOURCE_POWER`` was ambiguous about whose power it meant, which is
+    the kind of quiet wrongness that reaches a player as a confident bad answer.
+    """
 
     amount: Amount
     target: TargetSpec
+    source: TargetSpec | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,6 +148,19 @@ class CreateTokens:
 
 
 @dataclass(frozen=True, slots=True)
+class ProduceMana:
+    """Add mana to a pool.
+
+    ``{T}: Add {G}`` is the most ordinary ability in the game and the one the
+    mana solver exists to read. ``amount`` covers "Add {G} for each Elf you
+    control"; the symbol string is a mana cost fragment like ``{G}`` or ``{W}{U}``.
+    """
+
+    mana: str
+    amount: Amount = 1
+
+
+@dataclass(frozen=True, slots=True)
 class Unmodeled:
     """A card the engine cannot express, kept verbatim and flagged as such.
 
@@ -191,5 +186,6 @@ type Effect = (
     | PutCounters
     | SetTappedEffect
     | CreateTokens
+    | ProduceMana
     | Unmodeled
 )

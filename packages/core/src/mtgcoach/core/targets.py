@@ -37,6 +37,9 @@ class TargetKind(StrEnum):
     PERMANENT = "permanent"
     SPELL = "spell"
     CARD_IN_GRAVEYARD = "card_in_graveyard"
+    #: The permanent the ability is printed on. "Put a +1/+1 counter on this
+    #: creature" has no other way to name its subject.
+    SELF = "self"
 
 
 class Condition(StrEnum):
@@ -71,6 +74,9 @@ class TargetSpec:
         """Whether the effect may choose no target at all."""
         return self.minimum == 0
 
+
+#: The ability's own source.
+SELF = TargetSpec(kinds=frozenset({TargetKind.SELF}))
 
 #: The commonest spec in the box, by a wide margin.
 ANY_CREATURE = TargetSpec(kinds=frozenset({TargetKind.CREATURE}))
