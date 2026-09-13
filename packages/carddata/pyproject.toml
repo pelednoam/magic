@@ -2,7 +2,13 @@
 name = "mtgcoach-carddata"
 version = "0.0.0"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["mtgcoach-core"]
+
+[project.scripts]
+mtgcoach = "mtgcoach.carddata.cli:main"
+
+[tool.uv.sources]
+mtgcoach-core = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

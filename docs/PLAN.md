@@ -3,9 +3,9 @@
 An assistant for learning Magic: The Gathering at the kitchen table. Point a phone at a card
 or at the board, and get a clear answer to *"what can I do this turn, and what should I do?"*
 
-**Status:** M0 (scaffolding, toolchain and gates) merged to `main`. M1 (state model,
-events, reducer, step walker) on `m1-core-state`: 182 tests, 100% line and branch.
-M2 next; see §10.
+**Status:** M0 and M1 merged to `main`. M2 (card data, collection, mechanic audit, the
+ten Foundations decklists, the store and the CLI) on `m2-carddata`: 335 tests, 100% line
+and branch. M3 next; see §10.
 
 ---
 
@@ -683,7 +683,7 @@ ensemble review (§6) before the next begins.
 |---|---|---|
 | **M0** ✅ | `git init`; `uv` workspace; the full §5 toolchain failing-on-violation from commit one; review agent installed and configured. | Standards and the review loop are free on day one, expensive to retrofit. |
 | **M1** ✅ | `core`: state model, events, `reduce`, step walker. 100% + property tests. | The spine. No UI needed to test it. |
-| **M2** | `carddata`: Scryfall ingestion, `Collection`, the `sets add / audit` commands, FDN decklists as data. | Establishes the set-agnostic data layer before any set-specific work exists to bias it. |
+| **M2** ✅ | `carddata`: Scryfall ingestion, `Collection`, the `sets add / audit` commands, FDN decklists as data. | Establishes the set-agnostic data layer before any set-specific work exists to bias it. |
 | **M3** | Effect extraction pipeline + review CLI + FDN golden fixture and signed manifest. Card explainer CLI. | Useful immediately; proves the build-time Claude pattern *and* the multi-set pipeline in one go. |
 | **M4** | Mana solver, legality, trigger scanner, combat simulator. Hypothesis suites. Convergence-loop review. | The engine. This is what makes it a coach rather than a notepad. |
 | **M5** | FastAPI + WebSocket; Expo app as a **manual** tracker (tap cards in from your decklist). | **Probably 70% of the total value.** Ship before touching the camera. |

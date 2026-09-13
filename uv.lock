@@ -609,6 +609,12 @@ source = { editable = "services/api" }
 name = "mtgcoach-carddata"
 version = "0.0.0"
 source = { editable = "packages/carddata" }
+dependencies = [
+    { name = "mtgcoach-core" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "mtgcoach-core", editable = "packages/core" }]
 
 [[package]]
 name = "mtgcoach-core"

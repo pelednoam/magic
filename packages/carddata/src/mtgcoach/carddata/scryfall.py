@@ -33,7 +33,7 @@ from mtgcoach.carddata.jsondata import (
     require_str,
     string_set,
 )
-from mtgcoach.core.ids import OracleId
+from mtgcoach.core.ids import OracleId, SetCode
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -115,3 +115,50 @@ def cards_from_jsonl(path: Path) -> Iterator[Card]:
             obj = as_object(parsed)
             if obj is not None:
                 yield card_from_json(obj)
+
+
+def printing_from_json(obj: JsonObject) -> tuple[Card, SetCode]:
+    """Build a card and the set code of the printing it was read from.
+
+    The set is taken from the document, never from a caller-supplied flag: a
+    bulk file spans every set, and tagging its contents with whatever set the
+    user asked for would quietly mislabel every card in it.
+    """
+    card = card_from_json(obj)
+    return card, SetCode(require_str(obj, "set", card.name).upper())
+
+
+def printings_from_json_array(path: Path) -> Iterator[tuple[Card, SetCode]]:
+    """Read a JSON array, yielding each card with its set code."""
+    with path.open(encoding="utf-8") as handle:
+        raw: object = json.load(handle)
+        yield from (printing_from_json(obj) for obj in _objects(raw))
+
+
+def printings_from_jsonl(path: Path) -> Iterator[tuple[Card, SetCode]]:
+    """Read Scryfall's bulk format, yielding each card with its set code."""
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            stripped = line.strip().rstrip(",")
+            if not stripped or stripped in {"[", "]"}:
+                continue
+            parsed: object = json.loads(stripped)
+            obj = as_object(parsed)
+            if obj is not None:
+                yield printing_from_json(obj)
+
+
+def read_printings(path: Path) -> Iterator[tuple[Card, SetCode]]:
+    """Read either shape, choosing by the file's first non-blank character.
+
+    Scryfall's own bulk downloads are JSON arrays; exports and hand-made slices
+    are often one object per line. Sniffing beats asking the user which it is.
+    """
+    with path.open(encoding="utf-8") as handle:
+        first = handle.read(1)
+        while first and first.isspace():
+            first = handle.read(1)
+    if first == "[":
+        yield from printings_from_json_array(path)
+    else:
+        yield from printings_from_jsonl(path)
