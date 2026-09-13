@@ -58,6 +58,32 @@ def test_non_positive_dimensions_are_an_error(width: float, height: float) -> No
         classify_quad(width, height)
 
 
+@pytest.mark.parametrize(
+    ("width", "height"),
+    [
+        (float("nan"), 88.0),
+        (63.0, float("nan")),
+        (float("inf"), 88.0),
+        (63.0, float("inf")),
+        (float("nan"), float("nan")),
+    ],
+)
+def test_non_finite_dimensions_are_an_error(width: float, height: float) -> None:
+    """NaN must not be waved through as "not a card".
+
+    Every comparison against NaN is False, so a `<= 0` guard accepts it and the
+    function returns None -- indistinguishable from a legitimate non-card quad.
+    Contour geometry divides, so NaN reaches here in practice.
+    """
+    with pytest.raises(ValueError, match="must be finite"):
+        classify_quad(width, height)
+
+
+def test_non_finite_tolerance_is_an_error() -> None:
+    with pytest.raises(ValueError, match="tolerance must be finite"):
+        classify_quad(63.0, 88.0, tolerance=float("nan"))
+
+
 def test_negative_tolerance_is_an_error() -> None:
     with pytest.raises(ValueError, match="tolerance must be non-negative"):
         classify_quad(63.0, 88.0, tolerance=-0.1)

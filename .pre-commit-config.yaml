@@ -1,5 +1,14 @@
 # Fast gates only. The full set (mypy, pyright, coverage) runs in tools/gate.sh
 # and in CI; keeping the hook fast is what keeps it enabled.
+# Vendored, not ours. ruff excludes these via extend-exclude and the coverage
+# gate never sees them; pre-commit must agree or it blocks commits on style we
+# have deliberately chosen not to own.
+exclude: |
+  (?x)^(
+    scripts/|
+    multi-model-code-review-agent/
+  )
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0

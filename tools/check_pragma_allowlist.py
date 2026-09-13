@@ -15,6 +15,7 @@ meaningful.
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
@@ -22,10 +23,13 @@ from typing import TYPE_CHECKING, Final
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-#: Assembled rather than written literally so that this module does not match
-#: its own scan. The review agent's preflight takes the same precaution with
-#: ``SELF_SKIP_PREFIXES`` for its suspicious-pattern regexes.
-PRAGMA: Final = "pragma" + ": no cover"
+#: coverage.py's own default exclude pattern, copied verbatim from
+#: ``coverage.config.DEFAULT_EXCLUDE``. An exact-substring search missed every
+#: other spelling coverage honours -- no space after the hash, a space instead
+#: of the colon, upper case -- so an opt-out could sit outside the allowlist,
+#: be obeyed by coverage, and never be reported. Matching what coverage matches
+#: is the only spelling-proof definition of "an opt-out".
+PRAGMA_PATTERN: Final = re.compile(r"#\s*(pragma|PRAGMA)[:\s]?\s*(no|NO)\s*(cover|COVER)")
 
 #: Path prefixes permitted to opt out of coverage. Empty by design: nothing
 #: qualifies yet. The OpenCV pipeline is added here when it lands in M7, and
@@ -44,7 +48,7 @@ def is_allowed(path: Path, allowed: Iterable[str] = ALLOWED_PREFIXES) -> bool:
 def find_pragmas(path: Path) -> list[int]:
     """Return the 1-based line numbers in ``path`` carrying an opt-out."""
     lines = path.read_text(encoding="utf-8").splitlines()
-    return [number for number, line in enumerate(lines, 1) if PRAGMA in line]
+    return [number for number, line in enumerate(lines, 1) if PRAGMA_PATTERN.search(line)]
 
 
 def find_violations(

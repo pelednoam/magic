@@ -31,6 +31,10 @@ dev = [
     "pytest-cov>=6",
     "hypothesis>=6.120",
     "pre-commit>=4",
+    # Imported by scripts/validate_review_results.py, which the review loop
+    # runs every round. Undeclared, it fails with ImportError at the worst
+    # moment -- after four reviewers have already been paid for.
+    "jsonschema>=4.23",
 ]
 mutation = ["mutmut>=3"]
 
@@ -114,6 +118,14 @@ reportMissingTypeStubs = true
 testpaths = ["tests"]
 pythonpath = ["tools"]
 addopts = "-q --strict-markers --strict-config"
+
+# ---------------------------------------------------------------- mutmut
+
+[tool.mutmut]
+# mutmut 3 removed --paths-to-mutate; source_paths here is the only way to say
+# it. `paths_to_mutate` and `tests_dir` still parse but warn as deprecated.
+source_paths = ["packages/core/src"]
+pytest_add_cli_args_test_selection = ["tests/"]
 
 # ---------------------------------------------------------------- coverage
 

@@ -234,7 +234,7 @@ These are gates, not aspirations. CI fails on any of them.
 | Coverage | `pytest-cov` | branch coverage, per-package targets (below) |
 | Mutation | `mutmut` | on `core` only, nightly not per-commit |
 | Review | **multi-model-code-review-agent** | §6 — the outer loop |
-| Hooks | `pre-commit` | ruff, mypy, file-length, pragma-allowlist |
+| Hooks | `pre-commit` | ruff, file-length, pragma-allowlist — **not** mypy/pyright/coverage; a slow hook is a disabled hook, and CI runs the full set |
 
 ### Small files, enforced
 
@@ -325,8 +325,16 @@ and matches its manifest. Regenerating is a deliberate, reviewable diff — and 
 registered with the review agent's deterministic audit (§6), which is the mechanism that
 catches *set data drifting away from engine code*.
 
+**Nothing may be invisible to the gate.** coverage.py finds unexecuted files by walking the
+source directories, but it will not descend into a directory without an `__init__.py` — and a
+PEP 420 namespace package has none. A module no test imported was therefore not reported as 0%
+but not reported *at all*, and the run still passed at "100%". `tests/test_imports.py` imports
+every module so that an unimported file becomes a traced file and its uncovered lines count.
+
 **Mutation testing on `core`.** 100% coverage proves lines ran, not that anything was asserted.
-`mutmut` nightly is the gate that catches vacuous tests. Expect real holes the first run.
+`mutmut` nightly is the gate that catches vacuous tests. Note that `mutmut run` exits 0 with
+survivors and `mutmut results` only prints, so `tools/check_mutation_survivors.py` turns the
+report into something that can actually fail.
 
 **The LLM is never in a correctness test.** It sits behind the `Coach` protocol, mocked
 everywhere. Prompt quality is measured by a separate `evals/` suite — a dozen fixed board
@@ -354,7 +362,9 @@ This isn't a bolt-on. Three of its mechanisms line up with decisions already mad
    312 cards, the set has 318, nobody notices. Registering each set's manifest makes set-data
    drift a blocking finding rather than a silent wrong answer at the table.
 3. **Its mandatory gate is `ruff check` → `ruff format --check` → `mypy` → `pytest`** — the
-   same four gates §5 already specifies. No reconciliation needed.
+   four of the seven gates §5 specifies, in the same order. The three it does not run —
+   pyright, the module-length limit and the coverage opt-out allowlist — are CI's job, so a
+   clean convergence round is necessary but not sufficient for a green build.
 
 I review my own code with the same blind spots I wrote it with. A second Anthropic model plus
 GPT-5.5 plus Gemini, each with no memory of the conversation that produced the code, is a
@@ -402,7 +412,7 @@ COVERAGE_TARGET = 100
 # A dict, not a list, and no glob support: one explicit entry per sealed set,
 # added by `mtgcoach effects seal`. A configured-but-missing manifest counts as
 # a warning, so this stays empty until M3 seals FDN.
-SIGNED_MANIFESTS: dict[str, str] = {}   # "effects_FDN": "data/sets/FDN/manifest.json"
+SIGNED_MANIFESTS: dict[str, str] = {}  # "effects_FDN": "data/sets/FDN/manifest.json"
 ```
 
 Three things the agent's source says that its README does not, each of which changed a
@@ -410,10 +420,11 @@ decision here:
 
 - **`SIGNED_MANIFESTS` is a `dict[str, str]` of explicit paths**, not a glob list. Every set
   needs its own entry — a small chore per set, and the reason drift gets caught at all.
-- **The preflight resolves changed files against `origin/main` with no fallback.** A branch
-  whose base is not on the remote reports zero changed files and the coverage gate silently
-  does nothing. (The reviewers' own diff collection *does* fall back to `HEAD~1`; the audit
-  does not.) So: push the base branch before reviewing.
+- **The preflight used to resolve changed files against `origin/main` with no fallback**, so a
+  branch whose base was not on the remote reported zero changed files and the coverage gate
+  silently did nothing. Fixed upstream in
+  [#4](https://github.com/pelednoam/multi-model-code-review-agent/pull/4); the audit now falls
+  back to `HEAD~1` like the reviewers' own diff collection always did.
 - **Its suspicious-pattern scanner flags `except Exception`, bare `except:`, and hardcoded
   `/home/` paths.** Worth knowing before writing them.
 
@@ -434,7 +445,7 @@ Relevant exit codes for CI: `0` converged, `2` stuck (identical blocking finding
 mandatory gate failed, `6` max rounds, `7` no reviewer results (auth/network), `8` secrets found
 in the diff. The diff scrubber blocks on credential patterns before anything reaches a model.
 
-Evidence lands in `data/reviews/<timestamp>_<branch>/round-N/` — keep it out of git via
+Evidence lands in `data/reviews/loop_<timestamp>/round-N/` — keep it out of git via
 `.gitignore` but keep it on disk; the audit trail is useful when a reviewer and I disagree.
 
 ### Honest limits

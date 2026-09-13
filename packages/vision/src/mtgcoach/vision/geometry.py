@@ -8,6 +8,7 @@ is how orientation comes out of detection for free.
 
 from __future__ import annotations
 
+import math
 from enum import StrEnum
 from typing import Final
 
@@ -51,11 +52,21 @@ def classify_quad(
         rotated a quarter turn, and ``None`` if it is not a card at all.
 
     Raises:
-        ValueError: If either dimension is not strictly positive, or if
-            ``tolerance`` is negative.
+        ValueError: If either dimension is not finite and strictly positive, or
+            if ``tolerance`` is not finite and non-negative.
     """
+    # Every comparison against NaN is False, so `width_px <= 0` waves NaN
+    # through and the function returns None -- "not a card" -- instead of
+    # reporting that the detector handed us garbage. Contour geometry divides,
+    # so 0/0 and inf/inf reach here as NaN in practice.
+    if not (math.isfinite(width_px) and math.isfinite(height_px)):
+        msg = f"quad dimensions must be finite, got {width_px}x{height_px}"
+        raise ValueError(msg)
     if width_px <= 0 or height_px <= 0:
         msg = f"quad dimensions must be positive, got {width_px}x{height_px}"
+        raise ValueError(msg)
+    if not math.isfinite(tolerance):
+        msg = f"tolerance must be finite, got {tolerance}"
         raise ValueError(msg)
     if tolerance < 0:
         msg = f"tolerance must be non-negative, got {tolerance}"
