@@ -1034,11 +1034,38 @@ eight; the questions and their acceptable references are data, in `tools/retriev
 It went 18/22 → 21/22 across these two fixes with no regressions, and it is in the gate, so a
 change that drops a question fails the build instead of quietly making the coach worse.
 
-The 22nd is written down rather than deleted: *"can a tapped creature block?"* The rule says
-blockers must be **untapped**, which stems to `untap` and not to `tapped` — the question and the
-rule state the same fact in opposite polarity, and no bag of words bridges that. A question marked
-as a known gap does not fail the check, and the check says so when one starts passing, so the note
-cannot outlive the problem.
+That 22nd question is why the gap list exists, and it is what got fixed next.
+
+**The rules state restrictions as requirements; a question states the thing being restricted.** So
+the two describe one fact with opposite signs and share no word: *"can a tapped creature block?"*
+against 509.1a's *"the chosen creatures must be untapped"*. Stemming does not help and must not —
+`tapped` and `untapped` are opposites, and an engine that conflated them would answer that question
+*yes*. What is missing is a bridge, and a bridge is a fact about English rather than about ranking.
+
+`rules/negation.py` carries two, each measured. "Tapped" together with an attacking or blocking
+word adds **"must be untapped"** — a phrase that occurs exactly twice in the whole document, in
+508.1a and 509.1a, which are the answer. "Nobody blocked it", "isn't blocked", "not blocked" add
+**"unblocked creature"**. Both halves are required for the first: *"what does tapped mean?"* wants
+the glossary, and adding the combat restriction would push it out of a list that holds eight.
+
+The second entry taught something the eval had missed. It first added the bare word "unblocked",
+retrieval looked right, and the eval passed — because the ground truth accepted the *glossary entry
+defining* the term. Live, the answer was refused: "unblocked" is the title of two glossary entries,
+a title match is weighted four times a body one, and 510.1b — the rule that says what actually
+happens — was not in the top eight, so there was nothing to cite. The fix is the whole phrase plus
+**"combat damage"**, because a question asking "what happens" never says the word for what happens.
+The ground truth now demands 510.1b and refuses the definition.
+
+That is the lesson worth keeping: *an eval is only as good as its idea of a right answer*, and a
+definition of a term is not an answer to a question about it. The live run is what caught it.
+
+The question set is 28 now, and **28/28** with no known gaps.
+
+Kept apart from `phrasing` on purpose. That module is for a beginner having no word for a concept;
+this one is for a beginner having exactly the right word and the rules having written its opposite.
+A wider rule is easy to write and hard to keep honest — "not X" → "unX" applied blindly turns "not
+less than" into a search for *unless*, which the rules use eighty-seven times and never as a
+negation of "less".
 
 ### Cost, and how to keep it near zero
 

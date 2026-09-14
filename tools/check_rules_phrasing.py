@@ -1,8 +1,9 @@
-"""Check that every phrase ``rules.phrasing`` adds is really in the rules.
+"""Check that every phrase the rules package searches for is really in them.
 
 ``phrasing`` maps a beginner's paraphrase to the wording the Comprehensive
-Rules use, so that a question can match a rule it shares no words with. That
-only works while the wording is still the document's. Wizards revise the rules
+Rules use, and ``negation`` maps a polarity to the rules' opposite one, so that
+a question can match a rule it shares no words with. Both only work while the
+wording is still the document's. Wizards revise the rules
 with every set, and a target they have reworded stops matching anything: the
 question goes back to retrieving the wrong passages, the answer goes back to
 "the rules I was given don't cover this", and *nothing else notices*. The unit
@@ -12,9 +13,10 @@ document where the phrases are still right.
 So this reads the installed rules and looks for each phrase. No model call, no
 network, a second on a one-megabyte file.
 
-The list of phrases is imported rather than copied. A copy is the same failure
-one level up: somebody adds an entry to ``phrasing`` and not here, and the
-check passes having looked for the old ones.
+The list of phrases is imported rather than copied, and imported from
+``terms``, which is where the two maps are composed -- so a third map is one
+line there and nothing here. A copy would be the same failure one level up:
+somebody adds an entry and the check passes having looked for the old ones.
 
 Skipped, loudly, when the rules are not installed. They are not vendored --
 they are Wizards' document and a stale copy is exactly the confidently-wrong
@@ -31,7 +33,7 @@ from pathlib import Path
 from typing import Final
 
 from mtgcoach.rules.library import rules_path
-from mtgcoach.rules.phrasing import TARGETS
+from mtgcoach.rules.terms import TARGETS
 
 #: Where the server looks for the document by default; ``serve --data`` can
 #: point elsewhere, and this check is about the ordinary case.
@@ -63,9 +65,9 @@ def main() -> int:
         return 1
     absent = missing(document)
     for phrase in absent:
-        print(f"{rules} no longer contains {phrase!r}, which rules/phrasing.py searches for")
+        print(f"{rules} no longer contains {phrase!r}, which the rules package searches for")
     if absent:
-        print("A reworded target matches nothing. Update phrasing.py and its tests.")
+        print("A reworded target matches nothing. Update the map and its tests.")
         return 1
     return 0
 

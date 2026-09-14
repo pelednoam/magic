@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import check_rules_phrasing as gate
-from mtgcoach.rules.phrasing import TARGETS
+from mtgcoach.rules.terms import TARGETS
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -32,6 +32,12 @@ it entered the battlefield.
 
 119.6. If a player has 0 or less life, that player loses the game as a
 state-based action.
+
+509.1a. The defending player chooses which creatures they control, if any,
+will block. The chosen creatures must be untapped.
+
+510.1b. An unblocked creature assigns its combat damage to the player or
+planeswalker it's attacking.
 """
 
 
@@ -96,7 +102,7 @@ def test_it_fails_and_names_the_phrase(
     assert gate.main() == 1
     printed = capsys.readouterr().out
     assert "life total" in printed
-    assert "Update phrasing.py" in printed
+    assert "Update the map" in printed
 
 
 def test_a_document_that_cannot_be_read_is_a_failure_not_a_crash(

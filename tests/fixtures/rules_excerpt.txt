@@ -16,6 +16,8 @@ Contents
 
 509. Declare Blockers Step
 
+510. Combat Damage Step
+
 702. Keyword Abilities
 
 Glossary
@@ -48,9 +50,13 @@ It may still use any of the options in section 8.
 
 509. Declare Blockers Step
 
-509.1a The defending player chooses which creatures they control, if any, will block.
+509.1a The defending player chooses which creatures they control, if any, will block. The chosen creatures must be untapped and they can’t also be battles.
 
 509.1b The defending player checks each creature they control to see whether it's affected by any restrictions.
+
+510. Combat Damage Step
+
+510.1b An unblocked creature assigns its combat damage to the player, planeswalker, or battle it’s attacking. If it isn’t currently attacking anything, it assigns no combat damage.
 
 702. Keyword Abilities
 

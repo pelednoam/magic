@@ -82,8 +82,13 @@ for **reach**, the keyword. `rules/keywords.py` sets such a word aside only on p
 that it is a verb — a number after it, a subject pronoun before it — because a question *about* a
 keyword is far commoner, and it reads the keyword list off the document rather than hardcoding it.
 
-`tools/check_retrieval.py` keeps both honest: it asks the installed rules 22 questions a person
-would actually type and fails the gate if an answering rule stops coming back.
+And the third: the rules state restrictions as requirements, a question states the thing being
+restricted, so *"can a tapped creature block?"* and 509.1a's *"must be untapped"* share no word at
+all. `rules/negation.py` bridges the two polarities — deliberately narrowly, since "not X" → "unX"
+applied blindly turns "not less than" into a search for *unless*.
+
+`tools/check_retrieval.py` keeps all three honest: it asks the installed rules 28 questions a
+person would actually type and fails the gate if an answering rule stops coming back.
 
 Without it everything else works, the server says so at startup, and the app shows the
 question box as switched off rather than letting you type into it.

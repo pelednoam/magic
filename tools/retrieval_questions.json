@@ -10,7 +10,9 @@
     "",
     "`gap` marks a question retrieval does not answer yet. Those do not fail",
     "the check -- they are written down so the list stays honest about what is",
-    "still broken, and the check says so when one starts passing."
+    "still broken, and the check says so when one starts passing. There are",
+    "none at the moment: the last one, the tapped/untapped polarity gap, is",
+    "what `rules/negation.py` was written for."
   ],
   "questions": [
     {"ask": "what happens when my hit points reach zero?", "any": ["104.3b", "704.5a", "119.6"],
@@ -48,6 +50,15 @@
      "any": ["514.2", "120.3", "Cleanup Step"]},
 
     {"ask": "can a tapped creature block?", "any": ["509.1a"],
-     "gap": "509.1a says blockers must be *untapped*, which stems to `untap` and not to `tapped`. The question and the rule state the same fact in opposite polarity, and no bag of words bridges that."}
+     "why": "the polarity gap: the rule says blockers must be *untapped*"},
+    {"ask": "can I attack with a tapped creature?", "any": ["508.1a"]},
+    {"ask": "can a tapped creature attack?", "any": ["508.1a"]},
+    {"ask": "what does tapped mean?", "any": ["Tap", "Tapped", "701.21a", "Tap Symbol"],
+     "why": "the same word without the combat context, which must not get the restriction"},
+    {"ask": "what happens if nobody blocks my creature?", "any": ["510.1b"],
+     "why": "the rules have one word for this and a person has three. The glossary entry defining `unblocked` is deliberately NOT accepted: it says what the term means, not what happens, and a run that retrieved only definitions was refused by the answerer for want of a rule to cite."},
+    {"ask": "what happens if my creature is not blocked?", "any": ["510.1b"]},
+    {"ask": "how much damage does an unblocked creature do?", "any": ["510.1b"],
+     "why": "already in the rules' words, and must stay working"}
   ]
 }
