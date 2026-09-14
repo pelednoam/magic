@@ -1,0 +1,94 @@
+"""Reading a rules answer out of the command's output.
+
+The parsing itself lives in ``api.claude`` and is pinned by the explainer
+tests; what is here is the answer-shaped part: which fields are taken, and what
+counts as no answer at all.
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess
+from typing import TYPE_CHECKING
+
+import pytest
+
+from mtgcoach.api.asker import ClaudeCliAsker, parse
+from mtgcoach.coach.advice import ExplainerError
+from test_explainer import envelope
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+ANSWER = {
+    "answer": "Lethal damage goes to the blocker first, then the rest tramples over.",
+    "in_short": "The extra damage still hurts them.",
+    "citations": ["702.19b"],
+    "unsure": "",
+}
+
+
+def test_reads_the_agreed_object() -> None:
+    got = parse(envelope(json.dumps(ANSWER)))
+    assert got.answer.startswith("Lethal damage")
+    assert got.in_short == "The extra damage still hurts them."
+    assert got.citations == ("702.19b",)
+    assert got.unsure == ""
+
+
+def test_citations_that_are_not_strings_are_dropped() -> None:
+    got = parse(envelope(json.dumps({**ANSWER, "citations": ["702.19b", 7, None, ""]})))
+    assert got.citations == ("702.19b",)
+
+
+def test_an_answer_that_is_only_an_admission_of_doubt_survives() -> None:
+    """Saying "these rules do not settle it" is an answer, and a good one."""
+    got = parse(envelope(json.dumps({"unsure": "Nothing here covers that."})))
+    assert got.unsure == "Nothing here covers that."
+    assert got.citations == ()
+
+
+def test_an_answer_with_nothing_in_it_is_an_error() -> None:
+    """The CLI's own error envelope decodes to exactly this."""
+    with pytest.raises(ExplainerError, match="answer was empty"):
+        parse(json.dumps({"type": "result", "is_error": True, "result": None}))
+
+
+def test_an_answer_that_is_only_citations_is_an_error() -> None:
+    with pytest.raises(ExplainerError, match="answer was empty"):
+        parse(envelope(json.dumps({"citations": ["702.19b"]})))
+
+
+def test_prose_with_no_object_is_an_error() -> None:
+    with pytest.raises(ExplainerError, match="did not answer with an object"):
+        parse(envelope("I'm sorry, I can't help with that."))
+
+
+class Fake:
+    """A stand-in for ``subprocess.run`` that records the prompt."""
+
+    def __init__(self, stdout: str) -> None:
+        """Answer every call with this output."""
+        self.completed = subprocess.CompletedProcess(["claude"], 0, stdout, "")
+        self.stdin = ""
+
+    def __call__(self, _argv: Sequence[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        """Record the prompt and return the canned result."""
+        given = kwargs.get("input")
+        self.stdin = given if isinstance(given, str) else ""
+        return self.completed
+
+
+def test_the_briefing_is_what_gets_sent() -> None:
+    """The briefing, and only the briefing.
+
+    The question is already inside it, fenced as data. Sending it separately
+    would put an unfenced copy in front of the model, which is the hazard the
+    fence exists for.
+    """
+    fake = Fake(envelope(json.dumps(ANSWER)))
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(subprocess, "run", fake)
+        got = ClaudeCliAsker().ask("how does trample work?", "the briefing")
+    assert got.citations == ("702.19b",)
+    assert fake.stdin == "the briefing"

@@ -19,9 +19,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from conftest import GREEN, WHITE
-from helpers_api import Canned
+from helpers_api import RULES, Answering, Canned
 from mtgcoach.api.app import create_app
 from mtgcoach.coach.advice import Explanation
+from mtgcoach.rules.answer import Answer
 from snapshot import ask, look, no_coach, send, start, verdicts
 from wire import flag, obj, rows, text, words
 
@@ -46,9 +47,15 @@ def coach() -> Canned:
 
 
 @pytest.fixture
-def client(catalogue: Catalogue, coach: Canned) -> Iterator[TestClient]:
-    """The real server, with that answer standing in for the model."""
-    app = create_app(catalogue, {"green": GREEN, "white": WHITE}, coach)
+def answerer() -> Answering:
+    """The model's rules answer, which each test rewrites."""
+    return Answering(Answer(in_short="not asked yet", unsure="not asked yet"))
+
+
+@pytest.fixture
+def client(catalogue: Catalogue, coach: Canned, answerer: Answering) -> Iterator[TestClient]:
+    """The real server, with those answers standing in for the model."""
+    app = create_app(catalogue, {"green": GREEN, "white": WHITE}, coach, answerer, RULES)
     with TestClient(app) as connected:
         yield connected
 
@@ -108,3 +115,36 @@ def test_no_coach_at_all_is_a_503(catalogue: Catalogue) -> None:
         no_coach(client, session_id)
         # And the engine's own advice is still there, which is the point.
         assert rows(look(client, session_id), "advice", "you", "hand")
+
+
+def test_a_rules_answer_arrives_with_the_rules_it_was_drawn_from(
+    client: TestClient, answerer: Answering
+) -> None:
+    """Search, prompt, answer, check -- over the real engine and real HTTP."""
+    session_id, _ = _main(client)
+    answerer.said = Answer(
+        answer="Lethal goes to the blocker first, then the rest tramples over.",
+        in_short="The extra damage still gets through.",
+        citations=("702.19b",),
+    )
+    body = ask(client, session_id, question="how does trample work when blocked?")
+    assert flag(body, "trusted")
+    assert "702.19b" in [text(rule, "reference") for rule in rows(body, "rules")]
+
+
+def test_a_citation_the_search_did_not_find_is_refused(
+    client: TestClient, answerer: Answering
+) -> None:
+    """A remembered rule looks exactly like this from the outside."""
+    session_id, _ = _main(client)
+    answerer.said = Answer(
+        answer="Rule 104.3a says you win.",
+        in_short="You win!",
+        citations=("104.3a",),
+    )
+    body = ask(client, session_id, question="how does trample work?")
+    assert not flag(body, "trusted")
+    assert "You win!" not in text(obj(body, "answer"), "in_short")
+    # The retrieved rules survive, so the question is answered by the rules
+    # themselves even when the words around them are not.
+    assert rows(body, "rules")

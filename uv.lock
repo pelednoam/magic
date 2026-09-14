@@ -15,6 +15,7 @@ members = [
     "mtgcoach-carddata",
     "mtgcoach-coach",
     "mtgcoach-core",
+    "mtgcoach-rules",
     "mtgcoach-vision",
 ]
 
@@ -663,6 +664,7 @@ dependencies = [
     { name = "mtgcoach-carddata" },
     { name = "mtgcoach-coach" },
     { name = "mtgcoach-core" },
+    { name = "mtgcoach-rules" },
     { name = "mtgcoach-vision" },
 ]
 
@@ -689,6 +691,7 @@ requires-dist = [
     { name = "mtgcoach-carddata", editable = "packages/carddata" },
     { name = "mtgcoach-coach", editable = "packages/coach" },
     { name = "mtgcoach-core", editable = "packages/core" },
+    { name = "mtgcoach-rules", editable = "packages/rules" },
     { name = "mtgcoach-vision", editable = "packages/vision" },
 ]
 
@@ -794,6 +797,17 @@ requires-dist = [{ name = "mtgcoach-core", editable = "packages/core" }]
 name = "mtgcoach-core"
 version = "0.0.0"
 source = { editable = "packages/core" }
+
+[[package]]
+name = "mtgcoach-rules"
+version = "0.0.0"
+source = { editable = "packages/rules" }
+dependencies = [
+    { name = "mtgcoach-coach" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "mtgcoach-coach", editable = "packages/coach" }]
 
 [[package]]
 name = "mtgcoach-vision"

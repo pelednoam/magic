@@ -86,9 +86,17 @@ def refuse(client: TestClient, session_id: str, **event: object) -> str:
     return text(decoded(response.json()), "detail")
 
 
-def ask(client: TestClient, session_id: str, player: str = "you") -> dict[str, object]:
-    """Ask the coach about a player's turn."""
-    response = client.post(f"/games/{session_id}/coach", json={"player": player})
+def ask(
+    client: TestClient, session_id: str, player: str = "you", question: str = ""
+) -> dict[str, object]:
+    """Ask the coach about a player's turn, or about the rules.
+
+    One helper for both because they are the same request shape and the same
+    failure modes; the question is what picks the route.
+    """
+    route = "ask" if question else "coach"
+    body = {"player": player, "question": question} if question else {"player": player}
+    response = client.post(f"/games/{session_id}/{route}", json=body)
     assert response.status_code == HTTP_OK, response.text
     return decoded(response.json())
 

@@ -26,6 +26,8 @@ if TYPE_CHECKING:
     from mtgcoach.api.sessions import Session
     from mtgcoach.api.views import Json
     from mtgcoach.coach.advice import Explainer
+    from mtgcoach.rules.answer import Asker
+    from mtgcoach.rules.search import RuleIndex
 
 
 @dataclass(slots=True)
@@ -37,6 +39,11 @@ class Server:
     hub: Hub
     decks: Mapping[str, tuple[str, ...]]
     explainer: Explainer
+    asker: Asker
+    #: None when the Comprehensive Rules are not installed. The rules question
+    #: route then says so, and everything else works exactly as before -- the
+    #: tracker and the turn coach do not need the rules document.
+    rules: RuleIndex | None
 
 
 def session(server: Server, session_id: str) -> Session:

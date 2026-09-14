@@ -7,8 +7,8 @@
  * not "400").
  */
 
-import type { Coaching, NewGame, Snapshot } from "./wire";
-import { isCoaching } from "./wire";
+import type { Asked, Coaching, NewGame, Snapshot } from "./wire";
+import { isAsked, isCoaching } from "./wire";
 
 /** The server refused, and said why. */
 export class ServerError extends Error {
@@ -77,6 +77,25 @@ export class Coach {
       player,
     });
     if (!isCoaching(body)) {
+      throw new ServerError(0, "the server sent an answer this app cannot read");
+    }
+    return body;
+  }
+
+  /**
+   * Ask a rules question.
+   *
+   * The server searches the Comprehensive Rules first and answers from what it
+   * found, so the reply carries the passages as well as the answer. Slow for
+   * the same reason as `explain`, and 503 when the rules are not installed on
+   * that server -- which is a legitimate way to run it.
+   */
+  async ask(sessionId: string, question: string, player: string): Promise<Asked> {
+    const body = await this.send<unknown>("POST", `/games/${segment(sessionId)}/ask`, {
+      question,
+      player,
+    });
+    if (!isAsked(body)) {
       throw new ServerError(0, "the server sent an answer this app cannot read");
     }
     return body;

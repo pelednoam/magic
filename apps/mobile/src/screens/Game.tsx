@@ -7,18 +7,21 @@
  * rules engine written in the language chosen for not having one.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { ScrollView, StyleSheet, Text } from "react-native";
 
 import { Attacks } from "../components/Attacks";
 import { Board } from "../components/Board";
 import { Coaching } from "../components/Coaching";
+import { Controls } from "../components/Controls";
 import { Hand } from "../components/Hand";
+import { Question } from "../components/Question";
 import { Reminders, Unknown } from "../components/Reminders";
 import type { Coach } from "../client";
 import { turnLine } from "../format";
+import { useCoaching, useQuestions } from "../thinking";
 import { colour, space, text } from "../theme";
-import type { Coaching as Reply, NewGame, Permanent, Playable, Snapshot } from "../wire";
+import type { NewGame, Permanent, Playable, Snapshot } from "../wire";
 import { isSnapshot } from "../wire";
 import { THEM, YOU } from "../wire";
 
@@ -76,43 +79,8 @@ export function Game({
     return () => { socket.close(); };
   }, [accept, coach, game.session_id]);
 
-  // Claude's answer, kept separately from the board and cleared whenever the
-  // board moves. Advice about a turn that has already changed is worse than no
-  // advice: it reads as current, and it is about a position nobody is in.
-  const [reply, setReply] = useState<Reply | null>(null);
-  const [asking, setAsking] = useState(false);
-  const [unavailable, setUnavailable] = useState("");
-  // The version as the callbacks below see it, which is not the version the
-  // callback closed over: `ask` is created once per render, and its promise
-  // resolves a minute later.
-  const version = useRef(snapshot.version);
-  useEffect(() => {
-    version.current = snapshot.version;
-    setReply(null);
-    setUnavailable("");
-  }, [snapshot.version]);
-
-  const ask = useCallback(() => {
-    setAsking(true);
-    setUnavailable("");
-    // The version at the moment of asking. A minute is long enough for someone
-    // to play a card while the model is thinking, and an answer about the board
-    // as it was must not arrive looking like an answer about the board as it is.
-    const asked = version.current;
-    coach
-      .explain(game.session_id, seat)
-      .then((answer: Reply) => {
-        if (asked === version.current) {
-          setReply(answer);
-        }
-      })
-      .catch((error: unknown) => {
-        if (asked === version.current) {
-          setUnavailable(messageOf(error));
-        }
-      })
-      .finally(() => { setAsking(false); });
-  }, [coach, game.session_id, seat]);
+  const coaching = useCoaching(coach, game.session_id, seat, snapshot.version);
+  const questions = useQuestions(coach, game.session_id, seat);
 
   const act = useCallback(
     async (event: Record<string, unknown>): Promise<void> => {
@@ -156,12 +124,12 @@ export function Game({
       />
       <Attacks attacks={advice.attacks} />
       <Coaching
-        reply={reply}
-        asking={asking}
-        problem={unavailable}
+        reply={coaching.reply}
+        asking={coaching.asking}
+        problem={coaching.problem}
         hand={advice.hand}
         plans={advice.attacks.plans}
-        onAsk={ask}
+        onAsk={coaching.ask}
       />
       <Board
         title="Your battlefield"
@@ -177,39 +145,25 @@ export function Game({
       />
       <Board title="Their battlefield" player={theirs} />
       <Unknown cards={advice.unknown} />
+      <Question
+        reply={questions.reply}
+        asking={questions.asking}
+        problem={questions.problem}
+        onAsk={questions.ask}
+      />
 
-      <View style={styles.controls}>
-        <Action label="Next step" onPress={() => { void act({ type: "advance_step" }); }} />
-        <Action
-          label="Draw"
-          onPress={() => { void act({ type: "draw_card", player: seat }); }}
-        />
-        <Action
-          label="Undo"
-          onPress={() => {
-            setProblem("");
-            coach
-              .undo(game.session_id)
-              .then(accept)
-              .catch((error: unknown) => { setProblem(messageOf(error)); });
-          }}
-        />
-      </View>
+      <Controls
+        onStep={() => { void act({ type: "advance_step" }); }}
+        onDraw={() => { void act({ type: "draw_card", player: seat }); }}
+        onUndo={() => {
+          setProblem("");
+          coach
+            .undo(game.session_id)
+            .then(accept)
+            .catch((error: unknown) => { setProblem(messageOf(error)); });
+        }}
+      />
     </ScrollView>
-  );
-}
-
-function Action({
-  label,
-  onPress,
-}: {
-  readonly label: string;
-  readonly onPress: () => void;
-}) {
-  return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={styles.action}>
-      <Text style={styles.actionLabel}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -223,19 +177,6 @@ const styles = StyleSheet.create({
   },
   problem: { color: colour.no, fontSize: text.body, marginBottom: space.medium },
   stale: { color: colour.warn, fontSize: text.small, marginBottom: space.medium },
-  controls: { flexDirection: "row", gap: space.small },
-  action: {
-    backgroundColor: colour.accent,
-    borderRadius: 8,
-    flex: 1,
-    paddingVertical: space.medium,
-  },
-  actionLabel: {
-    color: "#0d1016",
-    fontSize: text.body,
-    fontWeight: "700",
-    textAlign: "center",
-  },
 });
 
 /** JSON, or undefined. A frame that is not JSON is not an exception here. */

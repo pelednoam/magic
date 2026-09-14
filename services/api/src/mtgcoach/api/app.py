@@ -16,9 +16,10 @@ from typing import TYPE_CHECKING
 
 from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.status import HTTP_400_BAD_REQUEST, HTTP_503_SERVICE_UNAVAILABLE
+from starlette.status import HTTP_400_BAD_REQUEST
 
-from mtgcoach.api.coaching import coached
+from mtgcoach.api import thinking
+from mtgcoach.api.asker import ClaudeCliAsker
 from mtgcoach.api.context import Server, session, snapshot
 from mtgcoach.api.dealing import library
 from mtgcoach.api.eventspec import BadEventError, parse
@@ -26,8 +27,6 @@ from mtgcoach.api.explainer import ClaudeCliExplainer
 from mtgcoach.api.guard import check
 from mtgcoach.api.hub import Hub
 from mtgcoach.api.sessions import SessionStore, UnknownSessionError
-from mtgcoach.coach.advice import ExplainerError
-from mtgcoach.coach.report import advise
 from mtgcoach.core.errors import IllegalEventError
 from mtgcoach.core.ids import PlayerId
 
@@ -37,12 +36,16 @@ if TYPE_CHECKING:
     from mtgcoach.api.cards import Catalogue
     from mtgcoach.api.views import Json
     from mtgcoach.coach.advice import Explainer
+    from mtgcoach.rules.answer import Asker
+    from mtgcoach.rules.search import RuleIndex
 
 
 def create_app(
     catalogue: Catalogue,
     decks: Mapping[str, tuple[str, ...]],
     explainer: Explainer | None = None,
+    asker: Asker | None = None,
+    rules: RuleIndex | None = None,
 ) -> FastAPI:
     """Build the application around a set of cards and the decks it can deal.
 
@@ -50,9 +53,13 @@ def create_app(
     rather than read from disk so a test can deal a three-card deck and a real
     run can deal the Beginner Box's ten.
 
-    ``explainer`` defaults to the local ``claude`` command. Injected so that a
-    test can run the whole route without a subprocess -- and so that the day
-    this moves to the API, or to a different model, is a change to one caller.
+    ``explainer`` and ``asker`` default to the local ``claude`` command.
+    Injected so that a test can run the whole route without a subprocess -- and
+    so that the day this moves to the API, or to a different model, is a change
+    to one caller.
+
+    ``rules`` is the Comprehensive Rules index, or None when the document is
+    not installed. Everything except the rules question route works without it.
     """
     server = Server(
         catalogue=catalogue,
@@ -60,6 +67,8 @@ def create_app(
         hub=Hub(),
         decks=decks,
         explainer=explainer if explainer is not None else ClaudeCliExplainer(),
+        asker=asker if asker is not None else ClaudeCliAsker(),
+        rules=rules,
     )
     app = FastAPI(title="Magic Coach", version="0.1.0")
     # The web build is served by Metro on a different port, so every request
@@ -81,11 +90,12 @@ def create_app(
 def _routes(app: FastAPI, server: Server) -> None:
     """Attach every route.
 
-    Split in two by whether the route changes the game, which is also the line
-    between the routes that broadcast and the routes that do not.
+    Three groups: the ones that only look, the ones that change the game and
+    broadcast, and the two that ask Claude and take a minute over it.
     """
     _reading(app, server)
     _playing(app, server)
+    thinking.routes(app, server)
 
 
 def _reading(app: FastAPI, server: Server) -> None:
@@ -125,7 +135,7 @@ def _reading(app: FastAPI, server: Server) -> None:
         return snapshot(server, session(server, session_id))
 
 
-def _playing(app: FastAPI, server: Server) -> None:  # noqa: C901 - one route each, no branching
+def _playing(app: FastAPI, server: Server) -> None:
     """The routes that change the game, or take a minute to answer."""
 
     @app.post("/games/{session_id}/events", response_model=None)
@@ -154,25 +164,6 @@ def _playing(app: FastAPI, server: Server) -> None:  # noqa: C901 - one route ea
         server.store.record(undone)
         await server.hub.broadcast(session_id, board)
         return board
-
-    # Deliberately not `async def`. Asking the coach is a subprocess that can
-    # take a minute, and an async route would hold the event loop for all of
-    # it -- freezing every other player's socket. FastAPI runs a plain `def`
-    # in a threadpool, which is exactly the behaviour wanted here.
-    @app.post("/games/{session_id}/coach", response_model=None)
-    def coach(session_id: str, body: dict[str, str]) -> dict[str, Json]:
-        """Ask Claude what to do about this player's turn."""
-        game = session(server, session_id)
-        player = PlayerId(body.get("player", "you"))
-        if player not in game.state.players:
-            raise HTTPException(HTTP_400_BAD_REQUEST, f"no player {player}")
-        try:
-            return coached(server.explainer, advise(game.state, player, server.catalogue))
-        except ExplainerError as unavailable:
-            # Not a server fault and not fatal: the deterministic panel is
-            # already on screen and already right. 503 says "try again", which
-            # is the truth about a flaky subprocess.
-            raise HTTPException(HTTP_503_SERVICE_UNAVAILABLE, str(unavailable)) from unavailable
 
     @app.websocket("/games/{session_id}/watch")
     async def watch(websocket: WebSocket, session_id: str) -> None:

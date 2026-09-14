@@ -4,6 +4,10 @@ The limit is not aesthetic. Small modules keep ``mypy --strict`` errors local,
 make 100% branch coverage reachable file by file, keep mutation testing finite,
 and keep review-agent diffs small enough for four models to reason about in one
 pass. Ruff has no file-length rule, so this fills the gap.
+
+It covers the app's TypeScript as well as the Python. It did not, once, and the
+result was a 319-line ``wire.ts`` that nobody had decided to write -- the limit
+had simply never been applied to the half of the project it was not looking at.
 """
 
 from __future__ import annotations
@@ -18,7 +22,21 @@ if TYPE_CHECKING:
 
 MAX_LINES: Final = 200
 
-DEFAULT_ROOTS: Final[tuple[str, ...]] = ("packages", "services", "tools", "tests")
+DEFAULT_ROOTS: Final[tuple[str, ...]] = (
+    "packages",
+    "services",
+    "tools",
+    "tests",
+    "apps/mobile/src",
+    "apps/mobile/tests",
+)
+
+#: What counts as a module here. Not ``.json`` or ``.md``: the limit is about
+#: how much code one person holds in their head at a time.
+SUFFIXES: Final[tuple[str, ...]] = (".py", ".ts", ".tsx")
+
+#: Directories that are never ours, whatever they contain.
+SKIP: Final[frozenset[str]] = frozenset({"__pycache__", "node_modules", ".expo", "dist"})
 
 
 def count_lines(path: Path) -> int:
@@ -39,14 +57,15 @@ def find_violations(
     return sorted(violations, key=lambda item: item[1], reverse=True)
 
 
-def collect_python_files(roots: Iterable[Path]) -> list[Path]:
-    """Return every ``.py`` file under ``roots``, sorted, skipping caches."""
+def collect_source_files(roots: Iterable[Path]) -> list[Path]:
+    """Return every source file under ``roots``, sorted, skipping build output."""
     found = [
         path
         for root in roots
         if root.exists()
-        for path in root.rglob("*.py")
-        if "__pycache__" not in path.parts
+        for suffix in SUFFIXES
+        for path in root.rglob(f"*{suffix}")
+        if SKIP.isdisjoint(path.parts)
     ]
     return sorted(found)
 
@@ -58,7 +77,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--max-lines", type=int, default=MAX_LINES)
     args = parser.parse_args(argv)
 
-    paths: list[Path] = args.files or collect_python_files([Path(root) for root in DEFAULT_ROOTS])
+    paths: list[Path] = args.files or collect_source_files([Path(root) for root in DEFAULT_ROOTS])
     violations = find_violations(paths, args.max_lines)
     for path, count in violations:
         print(f"{path}: {count} lines exceeds the {args.max_lines}-line limit")

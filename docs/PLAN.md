@@ -11,11 +11,18 @@ tracker works end to end: `packages/coach` turns the four solvers into a turn re
 two-seat Expo client for Android, tablet and the browser. M4 took four rounds of ensemble
 review and M5 two, with every finding fixed by hand.
 
-M6 has landed its first half: the **turn coach**. `advice.py` states what an explanation may
-be and checks every one against the engine; `briefing.py` builds the prompt out of the
-engine's own report; `api/explainer.py` asks Claude through the local CLI, so a turn's advice
-costs no API credits; and the app has a "Coach me" panel that shows a refusal as a refusal.
-1030 Python tests at 100% line and branch, 57 TypeScript tests. Rules Q&A is next; see §10.
+M6 is built, on `m6`, and both halves check themselves:
+
+- The **turn coach**. `coach/advice.py` says what an explanation may be and checks every one
+  against the engine; `coach/briefing.py` builds the prompt out of the engine's own report.
+- **Rules Q&A**. `packages/rules` parses the Comprehensive Rules into 3,480 quotable passages
+  and indexes them in SQLite FTS5. A question is searched *first*, the passages go into the
+  prompt verbatim, and an answer citing anything else is refused.
+
+Both ask Claude through the local CLI, so neither spends API credits. Both are buttons, never
+automatic. The app shows a refusal as a refusal, and shows the retrieved rules whatever the
+model said. 1131 Python tests at 100% line and branch, 73 TypeScript tests; the file-length
+gate now covers the TypeScript too. Ensemble review of M6 is next.
 
 ---
 
@@ -836,9 +843,25 @@ class Coach(Protocol):
 engine's enumerated options + oracle text for cards in play. Output: recommendation, reasoning,
 alternatives, warnings, kid-language explanation.
 
-**Rules Q&A** — `claude-opus-5` with tool use: `lookup_card`, `search_rules` (FTS over the
-Comprehensive Rules), `get_state`, `simulate_combat`. Make it *call* the simulator rather than
-do arithmetic in its head.
+**Rules Q&A** — retrieval first, then one call. FTS5 over the Comprehensive Rules picks the
+passages, they go into the prompt verbatim with their references, and the answer's citations
+are checked against exactly that list.
+
+*This replaces the tool-use design sketched here originally, and the reason is the safety
+property.* With tool use the model chooses what to look up and can still answer from memory
+afterwards; there is nothing to check the answer against. With mandatory retrieval there is:
+every citation must be one of the passages supplied, compared exactly. It also costs one call
+rather than a loop, and it works through the CLI, which is what makes it free.
+
+Two things the original design had that this does not, and should get: `get_state` is covered
+(the board goes into the prompt) but `simulate_combat` is not, so a question about a specific
+combat is answered from the rules rather than from the engine's numbers. A question box that
+could hand the combat solver a hypothetical is the obvious next step.
+
+The first live run refused *every* answer: the model cited `702.19b (Trample)` because that is
+how the passage was labelled, and the checker wanted `702.19b`. The prompt now puts the citable
+reference in brackets and nothing else, and citations are resolved before they are checked —
+decoration comes off, digits do not.
 
 ### Cost, and how to keep it near zero
 

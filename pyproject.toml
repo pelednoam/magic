@@ -7,6 +7,7 @@ dependencies = [
     "mtgcoach-core",
     "mtgcoach-carddata",
     "mtgcoach-coach",
+    "mtgcoach-rules",
     "mtgcoach-vision",
     "mtgcoach-api",
 ]
@@ -21,6 +22,7 @@ members = ["packages/*", "services/*"]
 mtgcoach-core = { workspace = true }
 mtgcoach-carddata = { workspace = true }
 mtgcoach-coach = { workspace = true }
+mtgcoach-rules = { workspace = true }
 mtgcoach-vision = { workspace = true }
 mtgcoach-api = { workspace = true }
 
@@ -57,12 +59,14 @@ src = [
     "packages/core/src",
     "packages/carddata/src",
     "packages/coach/src",
+    "packages/rules/src",
     "packages/vision/src",
     "services/api/src",
     "tools",
     "tests",
     "tests/coach",
     "tests/api",
+    "tests/rules",
     "tests/e2e",
 ]
 
@@ -122,12 +126,14 @@ mypy_path = """\
 packages/core/src:\
 packages/carddata/src:\
 packages/coach/src:\
+packages/rules/src:\
 packages/vision/src:\
 services/api/src:\
 tools:\
 tests:\
 tests/coach:\
 tests/api:\
+tests/rules:\
 tests/e2e\
 """
 
@@ -139,12 +145,14 @@ extraPaths = [
     "packages/core/src",
     "packages/carddata/src",
     "packages/coach/src",
+    "packages/rules/src",
     "packages/vision/src",
     "services/api/src",
     "tools",
     "tests",
     "tests/coach",
     "tests/api",
+    "tests/rules",
     "tests/e2e",
 ]
 typeCheckingMode = "strict"
@@ -155,7 +163,7 @@ reportMissingTypeStubs = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["tools", "tests", "tests/coach", "tests/api", "tests/e2e"]
+pythonpath = ["tools", "tests", "tests/coach", "tests/api", "tests/rules", "tests/e2e"]
 addopts = "-q --strict-markers --strict-config"
 
 # ---------------------------------------------------------------- mutmut
@@ -174,6 +182,7 @@ source = [
     "packages/core/src",
     "packages/carddata/src",
     "packages/coach/src",
+    "packages/rules/src",
     "packages/vision/src",
     "services/api/src",
     "tools",

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from helpers import facts
@@ -12,6 +13,8 @@ from mtgcoach.api.cards import Catalogue
 from mtgcoach.coach.advice import ExplainerError, Explanation
 from mtgcoach.core.abilities import Trigger, TriggeredAbility
 from mtgcoach.core.vocabulary import TriggerEvent
+from mtgcoach.rules.corpus import passages_in
+from mtgcoach.rules.search import RuleIndex
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -20,6 +23,7 @@ if TYPE_CHECKING:
 
     from mtgcoach.coach.advice import Explainer
     from mtgcoach.coach.report import TurnReport
+    from mtgcoach.rules.answer import Answer, Asker
 
 FOREST = facts("Forest", land=True)
 BEAR = facts("Grizzly Bears", "{1}{G}", power=2, toughness=2, creature=True)
@@ -93,13 +97,61 @@ class NoCoach:
         raise ExplainerError(msg)
 
 
+@dataclass(slots=True)
+class Answering:
+    """An answerer that says what the test told it to say."""
+
+    said: Answer
+
+    def ask(self, question: str, briefing: str) -> Answer:
+        """The prepared answer, whatever was asked."""
+        del question, briefing
+        return self.said
+
+
+@dataclass(frozen=True, slots=True)
+class NoAnswers:
+    """An answerer that is never available. The default, for the same reason."""
+
+    def ask(self, question: str, briefing: str) -> Answer:
+        """Never answer.
+
+        Raises:
+            ExplainerError: Always.
+        """
+        del question, briefing
+        msg = "no answerer in this test"
+        raise ExplainerError(msg)
+
+
+#: The rules excerpt, indexed once for every test that needs it. Building it is
+#: a few milliseconds, but a fixture per test would pay that a hundred times.
+RULES = RuleIndex.build(
+    passages_in(
+        (Path(__file__).resolve().parents[1] / "fixtures" / "rules_excerpt.txt").read_text(
+            encoding="utf-8"
+        )
+    )
+)
+
+
 def server(
     decks: Mapping[str, tuple[str, ...]] | None = None,
     explainer: Explainer | None = None,
+    asker: Asker | None = None,
+    rules: RuleIndex | None = None,
 ) -> FastAPI:
-    """An app with the small catalogue and two identical decks."""
+    """An app with the small catalogue and two identical decks.
+
+    Both models default to the ones that refuse, so no test can accidentally
+    spawn a real ``claude``. ``rules`` defaults to *absent*, which is the state
+    a server without the Comprehensive Rules installed is in -- a test that
+    wants the question box working asks for ``RULES``.
+    """
     return create_app(
         CATALOGUE,
         DECKS if decks is None else decks,
         explainer if explainer is not None else NoCoach(),
+        asker if asker is not None else NoAnswers(),
+        rules,
     )

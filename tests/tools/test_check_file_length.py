@@ -48,8 +48,28 @@ def test_collect_skips_caches_and_missing_roots(tmp_path: Path) -> None:
     kept.write_text("x\n", encoding="utf-8")
     (tmp_path / "pkg" / "__pycache__" / "cached.py").write_text("x\n", encoding="utf-8")
 
-    found = gate.collect_python_files([tmp_path / "pkg", tmp_path / "absent"])
+    found = gate.collect_source_files([tmp_path / "pkg", tmp_path / "absent"])
     assert found == [kept]
+
+
+def test_collect_covers_the_app_as_well_as_the_python(tmp_path: Path) -> None:
+    """The limit applied to one half of the project is not the limit."""
+    (tmp_path / "app").mkdir()
+    for name in ("wire.ts", "Game.tsx", "module.py", "package.json", "README.md"):
+        (tmp_path / "app" / name).write_text("x\n", encoding="utf-8")
+
+    found = gate.collect_source_files([tmp_path / "app"])
+    assert [path.name for path in found] == ["Game.tsx", "module.py", "wire.ts"]
+
+
+def test_collect_skips_installed_dependencies(tmp_path: Path) -> None:
+    """node_modules is tens of thousands of files, and none of them are ours."""
+    (tmp_path / "app" / "node_modules" / "pkg").mkdir(parents=True)
+    (tmp_path / "app" / "node_modules" / "pkg" / "index.ts").write_text("x\n", encoding="utf-8")
+    kept = tmp_path / "app" / "mine.ts"
+    kept.write_text("x\n", encoding="utf-8")
+
+    assert gate.collect_source_files([tmp_path / "app"]) == [kept]
 
 
 def test_main_passes_on_short_files(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

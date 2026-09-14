@@ -1,0 +1,60 @@
+Magic: The Gathering Comprehensive Rules
+
+These rules are effective as of February 7, 2025.
+
+Contents
+
+1. Game Concepts
+
+100. General
+
+509. Declare Blockers Step
+
+702. Keyword Abilities
+
+Glossary
+
+Credits
+
+1. Game Concepts
+
+100. General
+
+100.1. These Magic rules apply to any Magic game with two or more players.
+
+100.1a A two-player game is a game that begins with only two players.
+
+509. Declare Blockers Step
+
+509.1a The defending player chooses which creatures they control, if any, will block.
+
+509.1b The defending player checks each creature they control to see whether it's affected by any restrictions.
+
+702. Keyword Abilities
+
+702.2. Deathtouch
+
+702.2a Deathtouch is a static ability.
+
+702.2b Any nonzero amount of combat damage assigned to a creature by a source with deathtouch is deemed to be lethal damage.
+
+702.19. Trample
+
+702.19a Trample is a static ability that modifies the rules for assigning an attacking creature's combat damage.
+
+702.19b The controller of an attacking creature with trample first assigns damage to the creature(s) blocking it.
+
+903.12 Brawl Option
+
+Glossary
+
+Deathtouch
+A keyword ability that makes damage dealt by an object lethal. See rule 702.2, "Deathtouch."
+
+Trample
+A keyword ability that modifies how a creature assigns combat damage.
+See rule 702.19, "Trample."
+
+Credits
+
+Published by Wizards of the Coast LLC.

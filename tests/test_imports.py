@@ -27,6 +27,7 @@ SOURCE_ROOTS = (
     "packages/core/src",
     "packages/carddata/src",
     "packages/coach/src",
+    "packages/rules/src",
     "packages/vision/src",
     "services/api/src",
     "tools",

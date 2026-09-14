@@ -24,6 +24,7 @@ from mtgcoach.carddata.decks import load_set_decks
 from mtgcoach.carddata.paths import effects_path
 from mtgcoach.carddata.store import CardStore
 from mtgcoach.core.ids import SetCode
+from mtgcoach.rules.library import RulesNotInstalledError, index_at, rules_path
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -32,6 +33,7 @@ if TYPE_CHECKING:
 
     from mtgcoach.carddata.decks import Decklist
     from mtgcoach.core.ids import OracleId
+    from mtgcoach.rules.search import RuleIndex
 
 DEFAULT_PORT = 8000
 
@@ -53,7 +55,24 @@ def assemble(db: Path, data_root: Path, set_code: SetCode) -> FastAPI:
         names = {card.name: card.oracle_id for card in cards}
 
     decks = {deck.key: _library(deck, names) for deck in load_set_decks(data_root, set_code)}
-    return create_app(catalogue, decks)
+    return create_app(catalogue, decks, rules=_rules(data_root))
+
+
+def _rules(data_root: Path) -> RuleIndex | None:
+    """The Comprehensive Rules index, or None with a line saying why not.
+
+    Not installing the rules is a legitimate way to run this: the tracker, the
+    engine and the turn coach all work without them, and only the question box
+    goes away. So a missing document is a printed sentence and a server that
+    starts, not a refusal to start -- but it is printed, because a question box
+    that silently answers nothing is worse than one that says it is switched
+    off.
+    """
+    try:
+        return index_at(rules_path(data_root))
+    except RulesNotInstalledError as missing:
+        print(f"rules questions are off: {missing}")  # noqa: T201 - this is a console script
+        return None
 
 
 def _library(deck: Decklist, names: Mapping[str, OracleId]) -> tuple[str, ...]:

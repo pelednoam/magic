@@ -1,0 +1,134 @@
+"""Finding the rules a question is about.
+
+Full-text search over the Comprehensive Rules, so that a question is answered
+with the rule in front of it rather than from memory. SQLite's FTS5, because it
+is already a dependency, it needs no model and no network, and 3,500 short
+passages is a size where BM25 over words is simply the right tool.
+
+The search is a *retrieval*, not an answer. It is allowed to be approximate:
+what it returns goes into a prompt, and the model reads all of it. What is not
+allowed to be approximate is the citation check afterwards, which is exact.
+"""
+
+from __future__ import annotations
+
+import sqlite3
+import threading
+from typing import TYPE_CHECKING, Self
+
+from mtgcoach.rules.corpus import Kind, Passage
+from mtgcoach.rules.terms import query
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
+    from types import TracebackType
+
+_SCHEMA = """
+CREATE VIRTUAL TABLE passages USING fts5(
+    reference UNINDEXED,
+    title,
+    body,
+    kind UNINDEXED,
+    tokenize = 'porter unicode61'
+);
+"""
+
+#: How many passages a question is answered with. Enough to cover a rule, the
+#: subrules under it and the glossary entry; few enough to stay readable.
+DEFAULT_LIMIT = 8
+
+
+class RuleIndex:
+    """A searchable copy of the Comprehensive Rules."""
+
+    def __init__(self, connection: sqlite3.Connection) -> None:
+        """Wrap an open connection. Prefer ``RuleIndex.build``."""
+        self._connection = connection
+        # The index is built once and then only read, but it is read from
+        # FastAPI's threadpool -- the rules route is a plain `def` because
+        # asking Claude blocks for a minute, and a plain `def` runs in a
+        # worker thread. A connection made on the main thread then raised
+        # `ProgrammingError` on every question. `check_same_thread=False`
+        # allows the crossing and hands the serialising to us, which is what
+        # this lock is: queries are sub-millisecond, so holding it costs
+        # nothing next to the subprocess it is about to wait on.
+        self._lock = threading.Lock()
+
+    @classmethod
+    def build(cls, passages: Iterable[Passage], path: str = ":memory:") -> Self:
+        """Index these passages, in memory by default.
+
+        Usable from any thread once built; see ``__init__``.
+        """
+        connection = sqlite3.connect(path, check_same_thread=False)
+        connection.executescript(_SCHEMA)
+        connection.executemany(
+            "INSERT INTO passages (reference, title, body, kind) VALUES (?, ?, ?, ?)",
+            [(p.reference, p.title, p.text, p.kind.value) for p in passages],
+        )
+        connection.commit()
+        return cls(connection)
+
+    def __enter__(self) -> Self:
+        """Enter a context manager that closes the index on exit."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        """Close the connection however the block ended."""
+        del exc_type, exc, traceback
+        self.close()
+
+    def close(self) -> None:
+        """Close the connection."""
+        self._connection.close()
+
+    def search(self, question: str, limit: int = DEFAULT_LIMIT) -> tuple[Passage, ...]:
+        """The passages most likely to answer this, best first.
+
+        Empty when the question has no searchable words in it, which is a real
+        answer -- "what?" is not a question the rules can be looked up for, and
+        returning the eight highest-ranked passages for nothing would be worse
+        than returning none.
+        """
+        wanted = query(question)
+        if not wanted:
+            return ()
+        with self._lock:
+            rows = self._connection.execute(
+                # bm25 weights the title above the body: a question about
+                # trample should find the trample rules before every rule that
+                # mentions it in passing.
+                "SELECT reference, title, body, kind FROM passages "
+                "WHERE passages MATCH ? ORDER BY bm25(passages, 0.0, 4.0, 1.0) LIMIT ?",
+                (wanted, limit),
+            ).fetchall()
+        return tuple(_passage(row) for row in rows)
+
+    def cited(self, references: Sequence[str]) -> tuple[Passage, ...]:
+        """The passages with exactly these references, in the order given.
+
+        Exact, unlike ``search``: this is how a citation is checked, and a
+        near-miss there would defeat the point of checking.
+        """
+        found = [self._exact(reference) for reference in references]
+        return tuple(passage for passage in found if passage is not None)
+
+    def _exact(self, reference: str) -> Passage | None:
+        """One passage by reference, or None."""
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT reference, title, body, kind FROM passages WHERE reference = ? LIMIT 1",
+                (reference,),
+            ).fetchone()
+        return _passage(row) if row is not None else None
+
+
+def _passage(row: tuple[str, str, str, str]) -> Passage:
+    """One row, as the thing it came from."""
+    reference, title, body, kind = row
+    return Passage(reference, title, body, Kind(kind))

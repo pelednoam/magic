@@ -13,45 +13,27 @@ drift apart silently. The failure that causes is a blank space in the UI, found
 at the kitchen table rather than in CI.
 
 So this builds a real snapshot from the real views and reads
-``apps/mobile/src/wire.ts``, in both directions: a field the server sends that
+``apps/mobile/src/wire/``, in both directions: a field the server sends that
 the app has never heard of, and a field the app declares that the server no
 longer sends. Either is a bug; neither raises anything at runtime.
 """
 
 from __future__ import annotations
 
-import re
-from pathlib import Path
-from typing import TYPE_CHECKING
-
 import pytest
 from fastapi.testclient import TestClient
 
-from helpers_api import Canned, server
+from helpers_api import RULES, Answering, Canned, server
 from mtgcoach.coach.advice import Explanation
+from mtgcoach.rules.answer import Answer
 from wire import decoded, named, rows, text
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
-
-WIRE_TS = Path(__file__).resolve().parents[2] / "apps" / "mobile" / "src" / "wire.ts"
-
-#: Keys that are data rather than fields: the server maps player ids to their
-#: state, and those ids are values the app reads at runtime, not names it can
-#: declare. Everything else in the payload is a field with a type.
-DYNAMIC_KEYS = frozenset({"you", "them"})
+from wirefields import DYNAMIC_KEYS, declared, keys, wire_files
 
 #: The status the server returns when an event was accepted.
 HTTP_OK = 200
 
 #: Enough advances to walk a whole turn and into the next player's.
 STEPS_IN_A_TURN = 26
-
-#: Any field in a TypeScript interface, `readonly` or not. Matching only
-#: `readonly` ones let a field added without the modifier escape the check in
-#: both directions -- and the check exists precisely for the fields nobody
-#: thought about carefully.
-FIELD = re.compile(r"^\s*(?:readonly\s+)?(\w+)\??:\s", re.MULTILINE)
 
 
 @pytest.fixture(scope="module")
@@ -75,17 +57,23 @@ def sent() -> frozenset[str]:
         watch_out=("watch out",),
         check_yourself=("check yourself",),
     )
-    with TestClient(server(explainer=Canned(said))) as client:
+    answer = Answer(
+        answer="Lethal damage first, then the rest goes through.",
+        in_short="Some gets through.",
+        citations=("702.19b",),
+        unsure="not everything",
+    )
+    with TestClient(server(explainer=Canned(said), asker=Answering(answer), rules=RULES)) as client:
         created = decoded(client.post("/games", json={"you": "green", "them": "other"}).json())
         session_id = created["session_id"]
         assert isinstance(session_id, str)
-        found.update(_keys(created))
+        found.update(keys(created))
 
         def act(**event: object) -> dict[str, object]:
             response = client.post(f"/games/{session_id}/events", json=event)
             assert response.status_code == HTTP_OK, response.text
             body = decoded(response.json())
-            found.update(_keys(body))
+            found.update(keys(body))
             return body
 
         body = act(type="advance_step")
@@ -120,7 +108,16 @@ def sent() -> frozenset[str]:
         # and reaches the same screen.
         coached = client.post(f"/games/{session_id}/coach", json={"player": "you"})
         assert coached.status_code == HTTP_OK, coached.text
-        found.update(_keys(decoded(coached.json())))
+        found.update(keys(decoded(coached.json())))
+
+        # And the rules question route, whose payload carries the retrieved
+        # passages as well as the answer.
+        asked = client.post(
+            f"/games/{session_id}/ask",
+            json={"player": "you", "question": "how does trample work?"},
+        )
+        assert asked.status_code == HTTP_OK, asked.text
+        found.update(keys(decoded(asked.json())))
     return frozenset(found)
 
 
@@ -129,31 +126,19 @@ def _is(card: dict[str, object], name: str) -> bool:
     return card.get("name") == name
 
 
-def _keys(value: object) -> Iterator[str]:
-    """Every field name anywhere in a payload."""
-    if isinstance(value, dict):
-        for key, nested in value.items():  # pyright: ignore[reportUnknownVariableType]
-            assert isinstance(key, str)
-            yield key
-            yield from _keys(nested)
-    elif isinstance(value, list):
-        for item in value:  # pyright: ignore[reportUnknownVariableType]
-            yield from _keys(item)
-
-
-def _declared() -> frozenset[str]:
-    """Every field the app's types declare."""
-    return frozenset(FIELD.findall(WIRE_TS.read_text(encoding="utf-8")))
-
-
 def test_the_app_knows_every_field_the_server_sends(sent: frozenset[str]) -> None:
     """A field the app has never heard of is a blank space in the UI."""
-    assert (sent - DYNAMIC_KEYS) - _declared() == set()
+    assert (sent - DYNAMIC_KEYS) - declared() == set()
 
 
 def test_the_server_sends_every_field_the_app_declares(sent: frozenset[str]) -> None:
     """A field the app expects and no longer gets is the same bug, mirrored."""
-    assert _declared() - sent == set()
+    assert declared() - sent == set()
+
+
+def test_the_wire_folder_is_where_it_is_thought_to_be() -> None:
+    """A moved or renamed module would make both checks vacuously pass."""
+    assert wire_files() == ["board.ts", "claude.ts", "index.ts", "shapes.ts"]
 
 
 def test_the_turn_actually_covers_the_payload(sent: frozenset[str]) -> None:
@@ -167,5 +152,7 @@ def test_the_turn_actually_covers_the_payload(sent: frozenset[str]) -> None:
         "payment",
         "unknown",
         "check_yourself",
+        "citations",
+        "reference",
     }
     assert corners <= sent
