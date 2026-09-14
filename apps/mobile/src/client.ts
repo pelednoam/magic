@@ -41,22 +41,29 @@ export class Coach {
 
   /** The board and the advice, as they stand. */
   async look(sessionId: string): Promise<Snapshot> {
-    return this.get<Snapshot>(`/games/${sessionId}`);
+    return this.get<Snapshot>(`/games/${segment(sessionId)}`);
   }
 
   /** Apply one event. The server decides whether it is legal. */
   async event(sessionId: string, event: Record<string, unknown>): Promise<Snapshot> {
-    return this.send<Snapshot>("POST", `/games/${sessionId}/events`, event);
+    return this.send<Snapshot>("POST", `/games/${segment(sessionId)}/events`, event);
   }
 
   /** Take the last event back. */
   async undo(sessionId: string): Promise<Snapshot> {
-    return this.send<Snapshot>("POST", `/games/${sessionId}/undo`, {});
+    return this.send<Snapshot>("POST", `/games/${segment(sessionId)}/undo`, {});
   }
 
-  /** The address to watch a game on, for whoever owns the socket. */
+  /**
+   * The address to watch a game on, for whoever owns the socket.
+   *
+   * The scheme swap is explicit rather than `replace(/^http/, "ws")`, which
+   * silently produced a malformed URL for anything that was not lower-case
+   * `http` -- including `HTTPS://`, which browsers accept.
+   */
   watchUrl(sessionId: string): string {
-    return `${this.base.replace(/^http/, "ws")}/games/${sessionId}/watch`;
+    const socketBase = this.base.replace(/^https:/i, "wss:").replace(/^http:/i, "ws:");
+    return `${socketBase}/games/${segment(sessionId)}/watch`;
   }
 
   private async get<T>(path: string): Promise<T> {
@@ -103,4 +110,10 @@ async function detailOf(response: Response): Promise<string> {
     // Not JSON, or the connection went away mid-read. Fall through.
   }
   return `the server said ${response.status}`;
+}
+
+/** One path segment, escaped. A session id comes from the server, but a URL
+ *  built by concatenation is a habit worth not having. */
+function segment(value: string): string {
+  return encodeURIComponent(value);
 }

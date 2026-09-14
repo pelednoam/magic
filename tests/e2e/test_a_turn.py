@@ -27,7 +27,6 @@ from snapshot import (
     verdicts,
     zone,
 )
-
 from wire import flag, number, text, words
 
 if TYPE_CHECKING:

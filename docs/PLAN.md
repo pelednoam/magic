@@ -362,7 +362,7 @@ Reading a response under `mypy --strict` and `pyright --strict` needs help, beca
 type of decoded JSON is a recursive union and every index has to prove what it indexed was a
 mapping. `tests/wire.py` narrows once, loudly, with the path it was walking in the error — so
 it checks the wire format as much as it reads it. Starlette's `TestClient` is not typed well
-enough for strict pyright, and the three modules that touch it say so in a file-level
+enough for strict pyright, and every module that touches it says so in a file-level
 suppression with a reason, rather than the gate being weakened everywhere.
 
 **Property tests (Hypothesis) — where the real bugs are:**
@@ -972,6 +972,20 @@ unions every field the server ever sends, and compares both directions against t
 A field the app has never heard of is a blank space in the UI; a field the app expects and no
 longer gets is the same bug mirrored. Neither raises anything at runtime, which is exactly why
 it needs a test.
+
+**Two things this cannot do yet, which the app has to say out loud.** `core` has no event for
+*casting a spell* — the `Event` union is untap/draw/land/tap/move/life — so the coach can tell
+you a spell is affordable and the tracker cannot record you casting it. `Playable.is_land` is on
+the wire for exactly this reason: the app only offers to play what the engine can record, and
+says so on the cards it cannot. Casting arrives with the stack, alongside `counters` and
+attachments.
+
+The other is identity. There is no notion of *who* is asking: the API is unauthenticated, every
+snapshot carries both players' hands, and `move_card` will move any card from any zone. At a
+kitchen table with one screen that is the intended shape, but it means the server must not be
+exposed beyond the LAN, and §3's "can't see your opponent's hand" is currently enforced by the
+room rather than the code. Both close together, when a session knows which player a connection
+belongs to.
 
 **A package the original tree did not have.** `packages/coach` was added in M5. The four
 solvers each answer a narrow question; something has to assemble them into the one a player

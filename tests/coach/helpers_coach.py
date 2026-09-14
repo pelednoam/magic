@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from helpers import ME, YOU, facts
-from mtgcoach.core.abilities import Ability, ActivatedAbility
+from mtgcoach.core.abilities import Ability, ActivatedAbility, unmodelled_reasons
 from mtgcoach.core.cards import CardInstance
 from mtgcoach.core.effects import ProduceMana
 from mtgcoach.core.facts import CardFacts
@@ -40,6 +40,13 @@ class Book:
     def abilities(self, oracle_id: OracleId) -> Sequence[Ability]:
         """The card's modelled abilities, empty when it has none."""
         return self.rules.get(str(oracle_id), ())
+
+    def modelled(self, oracle_id: OracleId) -> bool:
+        """Whether the book covers this card, all the way down."""
+        abilities = self.rules.get(str(oracle_id))
+        if abilities is None:
+            return False
+        return not any(unmodelled_reasons(ability) for ability in abilities)
 
 
 def land(name: str, mana: str) -> tuple[CardFacts, tuple[Ability, ...]]:

@@ -28,7 +28,9 @@ export function Attacks({ attacks }: { readonly attacks: AttackOptions }) {
     <Panel title="Attacking" note={`${attacks.plans.length} options`}>
       {best.map((plan, index) => (
         <View
-          key={plan.attackers.join("+") || "none"}
+          // Keyed by identity, not name: two Grizzly Bears is the ordinary
+          // case, and names collide the moment a deck runs a playset.
+          key={plan.attacker_ids.join("+") || "hold-back"}
           style={[styles.plan, index === 0 ? styles.top : null]}
         >
           <Text style={styles.attackers}>{planTitle(plan)}</Text>

@@ -29,11 +29,23 @@ export function Game({ coach, game }: { readonly coach: Coach; readonly game: Ne
   // The socket is the other device's changes arriving. Our own come back from
   // the request that caused them, so there is one path for each and neither
   // has to guess.
+  const [watching, setWatching] = useState(true);
   useEffect(() => {
     const socket = new WebSocket(coach.watchUrl(game.session_id));
+    socket.onopen = () => { setWatching(true); };
     socket.onmessage = (message: MessageEvent<string>) => {
-      setSnapshot(JSON.parse(message.data) as Snapshot);
+      try {
+        setSnapshot(JSON.parse(message.data) as Snapshot);
+      } catch {
+        // A frame we cannot read is a broken server, not a broken game. The
+        // board on screen is still the last one the server confirmed.
+        setWatching(false);
+      }
     };
+    // A board that has stopped updating must not keep looking live: the other
+    // device's plays would simply stop appearing, with nothing to say so.
+    socket.onclose = () => { setWatching(false); };
+    socket.onerror = () => { setWatching(false); };
     return () => { socket.close(); };
   }, [coach, game.session_id]);
 
@@ -62,6 +74,11 @@ export function Game({ coach, game }: { readonly coach: Coach; readonly game: Ne
         {turnLine(advice.turn, advice.step, advice.your_turn)}
       </Text>
       {problem === "" ? null : <Text style={styles.problem}>{problem}</Text>}
+      {watching ? null : (
+        <Text style={styles.stale}>
+          Not receiving updates — the other device&apos;s plays will not appear.
+        </Text>
+      )}
 
       <Reminders reminders={advice.reminders} />
       <Hand
@@ -131,6 +148,7 @@ const styles = StyleSheet.create({
     marginBottom: space.medium,
   },
   problem: { color: colour.no, fontSize: text.body, marginBottom: space.medium },
+  stale: { color: colour.warn, fontSize: text.small, marginBottom: space.medium },
   controls: { flexDirection: "row", gap: space.small },
   action: {
     backgroundColor: colour.accent,

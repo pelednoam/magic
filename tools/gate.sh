@@ -10,14 +10,20 @@ echo "== mypy"                && uv run mypy
 echo "== pyright"             && uv run pyright
 echo "== pytest + coverage"   && uv run pytest --cov --cov-branch --cov-report=term-missing
 
-# The app, if its dependencies are installed. Skipped rather than failed when
-# they are not: the Python gate has to run on a machine that has never seen
-# npm, and `apps/*` is strict TS with no coverage gate by design (§5).
+# The app. Skipped only when explicitly allowed: a developer without npm can
+# run the Python gate with SKIP_APP=1, but CI must not report "all gates
+# passed" having silently checked no TypeScript at all.
 if [ -d apps/mobile/node_modules ]; then
   echo "== app typecheck"      && (cd apps/mobile && npx --no-install tsc --noEmit)
   echo "== app tests"          && (cd apps/mobile && npx --no-install vitest run --reporter=dot)
+elif [ "${SKIP_APP:-}" = "1" ]; then
+  echo "== app                 SKIPPED by SKIP_APP=1 -- no TypeScript was checked"
 else
-  echo "== app                 skipped: run 'npm install' in apps/mobile"
+  echo "== app                 FAILED: apps/mobile/node_modules is missing."
+  echo "                       Run 'npm install' in apps/mobile, or set SKIP_APP=1"
+  echo "                       to run the Python gate alone and accept that the"
+  echo "                       TypeScript is unchecked."
+  exit 1
 fi
 
 echo "== all gates passed"

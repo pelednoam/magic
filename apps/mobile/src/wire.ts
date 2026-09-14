@@ -15,6 +15,13 @@
 export interface Playable {
   readonly instance_id: string;
   readonly name: string;
+  /**
+   * Whether playing this is a land drop. The two actions are different events,
+   * and only one of them exists yet -- the engine cannot record *casting* a
+   * spell, so a client that treats every playable card as a land drop sends an
+   * illegal event for every spell the coach just said you can afford.
+   */
+  readonly is_land: boolean;
   readonly playable: boolean;
   /** Empty when playable. Otherwise the engine's own words, printed verbatim. */
   readonly reasons: readonly string[];
@@ -29,7 +36,10 @@ export interface Payment {
 
 /** One attack and what the opponent's best answer does to it. */
 export interface Plan {
+  /** What to call them on screen. Two creatures can share a name. */
   readonly attackers: readonly string[];
+  /** What to key a list on. Two creatures cannot share an identity. */
+  readonly attacker_ids: readonly string[];
   readonly damage: number;
   readonly defender_life_after: number;
   readonly lethal: boolean;

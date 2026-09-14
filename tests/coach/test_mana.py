@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from helpers_coach import Book, land, on_battlefield, taps_for
-
 from helpers import facts
+from helpers_coach import Book, land, on_battlefield, taps_for
 from mtgcoach.coach.mana import available, colours_in
 from mtgcoach.core.abilities import ActivatedAbility, UnmodeledAbility
 from mtgcoach.core.effects import Draw, ProduceMana

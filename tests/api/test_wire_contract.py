@@ -26,8 +26,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 from fastapi.testclient import TestClient
-from helpers_api import server
 
+from helpers_api import server
 from wire import decoded, named, rows
 
 if TYPE_CHECKING:
@@ -40,17 +40,17 @@ WIRE_TS = Path(__file__).resolve().parents[2] / "apps" / "mobile" / "src" / "wir
 #: declare. Everything else in the payload is a field with a type.
 DYNAMIC_KEYS = frozenset({"you", "them"})
 
-#: Declared by the app for a route this fixture does not exercise.
-CLIENT_ONLY = frozenset({"session_id"})
-
 #: The status the server returns when an event was accepted.
 HTTP_OK = 200
 
 #: Enough advances to walk a whole turn and into the next player's.
 STEPS_IN_A_TURN = 26
 
-#: `readonly name: ...` in a TypeScript interface.
-FIELD = re.compile(r"^\s*readonly\s+(\w+)\??:", re.MULTILINE)
+#: Any field in a TypeScript interface, `readonly` or not. Matching only
+#: `readonly` ones let a field added without the modifier escape the check in
+#: both directions -- and the check exists precisely for the fields nobody
+#: thought about carefully.
+FIELD = re.compile(r"^\s*(?:readonly\s+)?(\w+)\??:\s", re.MULTILINE)
 
 
 @pytest.fixture(scope="module")
@@ -132,7 +132,7 @@ def test_the_app_knows_every_field_the_server_sends(sent: frozenset[str]) -> Non
 
 def test_the_server_sends_every_field_the_app_declares(sent: frozenset[str]) -> None:
     """A field the app expects and no longer gets is the same bug, mirrored."""
-    assert _declared() - sent - CLIENT_ONLY == set()
+    assert _declared() - sent == set()
 
 
 def test_the_turn_actually_covers_the_payload(sent: frozenset[str]) -> None:

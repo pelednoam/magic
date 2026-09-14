@@ -42,6 +42,12 @@ class Playable:
 
     instance_id: InstanceId
     name: str
+    #: Whether playing this is a land drop. The client needs it because the two
+    #: actions are different events, and because only one of them exists yet:
+    #: the engine has no way to record *casting* a spell, so a client that
+    #: treats every playable card as a land drop sends an illegal event for
+    #: every spell the coach has just told the player they can afford.
+    is_land: bool = False
     #: Empty when you can play it. Otherwise every reason you cannot, in the
     #: engine's own words -- "you need 1 more untapped source", not False.
     reasons: tuple[str, ...] = ()
@@ -122,7 +128,7 @@ def _verdict(
         )
     if facts.is_land:
         reasons = why_not_play_land(state, player_id, facts)
-        return Playable(card.instance_id, facts.name, reasons=reasons)
+        return Playable(card.instance_id, facts.name, is_land=True, reasons=reasons)
     reasons = why_not_cast(state, player_id, facts, sources)
     best = payments(facts.cost, sources) if not reasons else ()
     return Playable(
@@ -134,11 +140,24 @@ def _verdict(
 
 
 def _unknown(state: GameState, player_id: PlayerId, lookup: CardLookup) -> tuple[str, ...]:
-    """Every card in this player's view the fixture cannot speak for."""
+    """Every card in this player's view the engine cannot speak for.
+
+    Two different failures, and the second one used to be invisible. A card with
+    no *facts* cannot be identified at all. A card with facts but no complete
+    *model* can be identified and priced, and the engine still does not know
+    what it does -- which is 59 of the Beginner Box's 124 cards. Reporting only
+    the first meant the coach gave confident advice about half the box while
+    ``unknown`` stayed empty, which is the one thing this field exists to stop.
+    """
     player = state.player(player_id)
     seen = [c.oracle_id for c in player.hand]
     seen += [p.card.oracle_id for p in player.battlefield]
-    return tuple(sorted({str(o) for o in seen if lookup.facts(o) is None}))
+    return tuple(sorted({_name(lookup, o) for o in seen if not _spoken_for(lookup, o)}))
+
+
+def _spoken_for(lookup: CardLookup, oracle_id: OracleId) -> bool:
+    """Whether the engine can answer for this card at all."""
+    return lookup.facts(oracle_id) is not None and lookup.modelled(oracle_id)
 
 
 def _name(lookup: CardLookup, oracle_id: OracleId) -> str:

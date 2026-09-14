@@ -5,9 +5,8 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from helpers_coach import Book, game, land
-
 from helpers import ME, YOU, deck, facts
+from helpers_coach import Book, game, land
 from mtgcoach.api import views
 from mtgcoach.coach.report import advise
 from mtgcoach.core.abilities import Trigger, TriggeredAbility
@@ -21,7 +20,10 @@ if TYPE_CHECKING:
 
 FOREST, FOREST_RULES = land("Forest", "{G}")
 BEAR = facts("Grizzly Bears", "{1}{G}", power=2, toughness=2, creature=True)
-BOOK = Book(cards={"Forest": FOREST, "Bear": BEAR}, rules={"Forest": FOREST_RULES})
+BOOK = Book(
+    cards={"Forest": FOREST, "Bear": BEAR},
+    rules={"Forest": FOREST_RULES, "Bear": ()},
+)
 
 
 def _names(oracle_id: OracleId) -> str:

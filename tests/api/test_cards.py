@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
+from helpers import UNKNOWN_ABILITY
 from mtgcoach.api.cards import Catalogue, build
 from mtgcoach.carddata.scryfall import cards_in
 from mtgcoach.core.ids import OracleId
@@ -66,3 +67,30 @@ def test_an_empty_catalogue_is_usable() -> None:
     empty = Catalogue()
     assert empty.facts(FOREST) is None
     assert empty.abilities(FOREST) == ()
+
+
+def test_a_card_the_fixture_cannot_express_is_not_modelled() -> None:
+    """59 of the box's 124 cards are exactly this: identified, not understood."""
+    catalogue = build(cards_in(PLAYABLE), EFFECTS)
+    unexpressible = [
+        oracle_id
+        for oracle_id in catalogue.cards
+        if not catalogue.modelled(OracleId(oracle_id)) and catalogue.abilities(OracleId(oracle_id))
+    ]
+    assert catalogue.modelled(FOREST), "a land with a mana ability is understood"
+    assert unexpressible == [], "this small fixture was chosen to be fully modelled"
+
+
+def test_a_card_absent_from_the_fixture_is_not_modelled() -> None:
+    """An empty ability list means 'it does nothing', not 'I have not seen it'."""
+    catalogue = build(cards_in(PLAYABLE))
+    assert catalogue.abilities(FOREST) == ()
+    assert not catalogue.modelled(FOREST)
+
+
+def test_a_vanilla_card_in_the_fixture_is_modelled() -> None:
+    assert Catalogue(rules={"vanilla": ()}).modelled(OracleId("vanilla"))
+
+
+def test_a_card_with_an_unmodelled_ability_is_not() -> None:
+    assert not Catalogue(rules={"odd": (UNKNOWN_ABILITY,)}).modelled(OracleId("odd"))

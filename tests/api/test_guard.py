@@ -10,9 +10,9 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-from helpers_coach import Book
 
 from helpers import ME, YOU, deck, facts
+from helpers_coach import Book
 from mtgcoach.api.eventspec import BadEventError
 from mtgcoach.api.guard import check
 from mtgcoach.core.cards import CardInstance

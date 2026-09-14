@@ -9,7 +9,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from snapshot import STEPS_IN_TWO_TURNS, advice, send, start, zone
-
 from wire import decoded, number, obj, rows, text, words
 
 if TYPE_CHECKING:

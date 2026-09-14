@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from helpers_coach import taps_for
-
 from helpers import facts
+from helpers_coach import taps_for
 from mtgcoach.api.app import create_app
 from mtgcoach.api.cards import Catalogue
 from mtgcoach.core.abilities import Trigger, TriggeredAbility
@@ -29,7 +28,8 @@ RINGS = TriggeredAbility(Trigger(TriggerEvent.BEGINNING_OF_UPKEEP), ())
 #: A catalogue small enough to read, with one card of each kind that matters.
 CATALOGUE = Catalogue(
     cards={"Forest": FOREST, "Bear": BEAR, "Growth": GROWTH, "Bell": BELL},
-    rules={"Forest": (taps_for("{G}"),), "Bell": (RINGS,)},
+    # An entry, even an empty one, is the fixture saying "I know this card".
+    rules={"Forest": (taps_for("{G}"),), "Bell": (RINGS,), "Bear": (), "Growth": ()},
 )
 
 #: The opening seven are the first seven, so this is what a test will be

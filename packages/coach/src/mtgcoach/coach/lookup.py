@@ -34,3 +34,20 @@ class CardLookup(Protocol):
     def abilities(self, oracle_id: OracleId) -> Sequence[Ability]:
         """The card's modelled abilities, empty when there are none or it is unknown."""
         ...
+
+    def modelled(self, oracle_id: OracleId) -> bool:
+        """Whether the engine can speak for this card completely.
+
+        Not the same as ``abilities()`` being non-empty, and that difference is
+        the whole point: an empty list means *either* "a vanilla creature, fully
+        understood" *or* "this card is not in the fixture at all", and a coach
+        that cannot tell those apart will give confident advice about a card it
+        has never seen.
+
+        Nor is it the same as ``facts()`` being present. 59 of the Beginner
+        Box's 124 cards are in the fixture with an ``UnmodeledAbility`` in them
+        -- the extractor could name what the card does but not express it -- and
+        those have perfectly good facts. They are exactly the cards the player
+        has to read for themselves.
+        """
+        ...

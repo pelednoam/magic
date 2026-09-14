@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING
 
 from mtgcoach.carddata.enginefacts import UnmodellableCardError, facts_for
 from mtgcoach.carddata.sealed import load
+from mtgcoach.core.abilities import unmodelled_reasons
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
@@ -49,6 +50,19 @@ class Catalogue:
     def abilities(self, oracle_id: OracleId) -> Sequence[Ability]:
         """The card's reviewed abilities, empty when there are none."""
         return self.rules.get(str(oracle_id), ())
+
+    def modelled(self, oracle_id: OracleId) -> bool:
+        """Whether the sealed fixture covers this card, all the way down.
+
+        Absent from the fixture is not modelled. Present with an
+        ``UnmodeledAbility`` in it is not modelled either -- the extractor named
+        what the card does and could not express it, which is the honest half of
+        a 52% number and the half a player has to be told about.
+        """
+        abilities = self.rules.get(str(oracle_id))
+        if abilities is None:
+            return False
+        return not any(unmodelled_reasons(ability) for ability in abilities)
 
     def name(self, oracle_id: OracleId) -> str:
         """The printed name, falling back to the identifier when unknown.

@@ -6,9 +6,8 @@ comes back as a sentence, because an empty attack list reads as advice.
 
 from __future__ import annotations
 
-from helpers_coach import Book, game, land
-
 from helpers import ME, facts
+from helpers_coach import Book, game, land
 from mtgcoach.coach.report import advise
 from mtgcoach.core.steps import Step
 
@@ -19,7 +18,7 @@ OGRE = facts("Ogre", "{3}{R}", power=3, toughness=3, creature=True)
 
 BOOK = Book(
     cards={"Forest": FOREST, "Bear": BEAR, "Growth": GROWTH, "Ogre": OGRE},
-    rules={"Forest": FOREST_RULES},
+    rules={"Forest": FOREST_RULES, "Bear": (), "Growth": (), "Ogre": ()},
 )
 
 

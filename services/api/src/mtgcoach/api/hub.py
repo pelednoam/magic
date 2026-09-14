@@ -8,7 +8,12 @@ event loop that has to be started and stopped.
 A send that fails drops that watcher and carries on. One phone going to sleep
 mid-turn must not stop the laptop being told what happened, and the alternative
 -- an exception escaping the broadcast -- would fail the *event* rather than the
-connection, leaving the game in a state nobody could see.
+connection: the route returns 500 for a move the server already committed, the
+client retries it, and it is applied twice.
+
+"Fails" means *any* exception. The first version named two types and caught
+neither of the ones that actually occur, and its test passed because the fake
+watcher raised one of the two it did catch.
 """
 
 from __future__ import annotations
@@ -69,7 +74,16 @@ class Hub:
         for watcher in self.watchers(session_id):
             try:
                 await watcher.send_json(message)
-            except (OSError, RuntimeError):
+            except Exception:  # noqa: BLE001 - see below
+                # Every failure to send means that connection is gone, and the
+                # exception types are not ours to enumerate: Starlette raises
+                # `WebSocketDisconnect`, uvicorn's implementation raises
+                # `websockets.exceptions.ConnectionClosed`, and both are bare
+                # `Exception` subclasses. Catching (OSError, RuntimeError)
+                # caught neither, so one sleeping phone let the exception
+                # escape the broadcast, escape the route, and return 500 for an
+                # event the server had already committed -- exactly what this
+                # module's docstring says must not happen.
                 self.leave(session_id, watcher)
             else:
                 heard += 1

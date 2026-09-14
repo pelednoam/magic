@@ -17,8 +17,8 @@ client watching actually hears anything.
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
-from helpers_api import CATALOGUE, DECKS, server
 
+from helpers_api import CATALOGUE, DECKS, server
 from mtgcoach.api.app import create_app
 from wire import decoded, flag, named, number, obj, rows
 

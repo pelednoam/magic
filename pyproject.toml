@@ -61,6 +61,9 @@ src = [
     "services/api/src",
     "tools",
     "tests",
+    "tests/coach",
+    "tests/api",
+    "tests/e2e",
 ]
 
 [tool.ruff.lint]

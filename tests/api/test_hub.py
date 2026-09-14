@@ -6,6 +6,8 @@ import asyncio
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from starlette.websockets import WebSocketDisconnect
+
 from mtgcoach.api.hub import Hub
 
 if TYPE_CHECKING:
@@ -25,6 +27,17 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from mtgcoach.api.views import Json
+
+
+class DisconnectedError(Exception):
+    """What Starlette raises for a dead socket.
+
+    A bare ``Exception``, like uvicorn's ``ConnectionClosed`` -- neither is an
+    ``OSError`` and neither is a ``RuntimeError``. The first version of the hub
+    caught those two and so caught neither of the ones that happen, and this
+    file's fake raised ``OSError``: the one case that *was* caught. The test
+    passed and the code was broken.
+    """
 
 
 @dataclass(slots=True)
@@ -96,3 +109,34 @@ def test_leaving_twice_is_silent() -> None:
     hub.leave("g", client)
     hub.leave("g", client)
     hub.leave("never", client)
+
+
+@dataclass(slots=True)
+class Dropped:
+    """A watcher whose socket died the way Starlette reports it."""
+
+    async def send_json(self, data: Mapping[str, Json]) -> None:
+        """Fail the way a real disconnection fails."""
+        assert data is not None
+        raise DisconnectedError
+
+
+def test_a_disconnection_is_caught_whatever_type_it_is() -> None:
+    """The exception types are not ours to enumerate.
+
+    Starlette raises `WebSocketDisconnect`, uvicorn's implementation raises
+    `websockets.exceptions.ConnectionClosed`, and a future version may raise
+    something else again. All that matters is that the send failed.
+    """
+    hub = Hub()
+    gone, here = Dropped(), Client()
+    hub.join("g", gone)
+    hub.join("g", here)
+    assert run(hub.broadcast("g", {"turn": 1})) == 1
+    assert hub.watchers("g") == (here,)
+
+
+def test_the_real_disconnect_type_is_not_one_we_could_have_named() -> None:
+    """Pinned, because it is why the original catch was wrong."""
+    assert not issubclass(WebSocketDisconnect, OSError)
+    assert not issubclass(WebSocketDisconnect, RuntimeError)

@@ -37,7 +37,26 @@ export function Start({
   }
 
   if (problem !== "") {
-    return <Text style={styles.problem}>{problem}</Text>;
+    // Recoverable, not terminal. The commonest error here is the laptop not
+    // being up yet, and a dead-end screen means quitting the app to retry.
+    return (
+      <View style={styles.page}>
+        <Text style={styles.problem}>{problem}</Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            setProblem("");
+            setDecks(null);
+            coach
+              .decks()
+              .then(setDecks)
+              .catch((error: unknown) => { setProblem(messageOf(error)); });
+          }}
+        >
+          <Text style={styles.back}>try again</Text>
+        </Pressable>
+      </View>
+    );
   }
   if (decks === null) {
     return <ActivityIndicator color={colour.accent} style={styles.loading} />;

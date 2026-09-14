@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
 from mtgcoach.api import views
@@ -124,9 +124,17 @@ def _routes(app: FastAPI, server: Server) -> None:  # noqa: C901 - one route eac
         try:
             await websocket.send_json(_snapshot(server, session))
             while True:
-                await websocket.receive_text()
-        except WebSocketDisconnect:
-            pass
+                # The raw message, not `receive_text()`: that raised KeyError
+                # on a binary frame, taking the handler down rather than the
+                # connection. The socket is one-way by design, so whatever a
+                # client sends is only a keep-alive -- except a disconnect,
+                # which ends the loop. There is no `except WebSocketDisconnect`
+                # because there is nothing left for it to catch: the disconnect
+                # arrives as a message now, and `finally` does the cleanup
+                # either way.
+                message = await websocket.receive()
+                if message["type"] == "websocket.disconnect":
+                    break
         finally:
             server.hub.leave(session_id, websocket)
 

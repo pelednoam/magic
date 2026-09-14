@@ -61,6 +61,7 @@ def playable(card: Playable) -> dict[str, Json]:
     return {
         "instance_id": str(card.instance_id),
         "name": card.name,
+        "is_land": card.is_land,
         "playable": card.playable,
         "reasons": list(card.reasons),
         "payment": payment(card.payment) if card.payment is not None else None,
@@ -86,7 +87,12 @@ def attacks(options: Attacks) -> dict[str, Json]:
 def plan(option: Plan) -> dict[str, Json]:
     """One attack and what the opponent's best answer does to it."""
     return {
+        # Both: the names are what a player reads, the ids are what a client
+        # can key a list on. Names alone re-introduced at the wire the identity
+        # collapse ``core.Outcome`` documents as a bug -- two Grizzly Bears are
+        # two creatures, and a playset is the ordinary case.
         "attackers": list(option.names),
+        "attacker_ids": [str(c.instance_id) for c in option.attackers],
         "damage": option.outcome.damage_to_defender,
         "defender_life_after": option.defender_life_after,
         "lethal": option.is_lethal,

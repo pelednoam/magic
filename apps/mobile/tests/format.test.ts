@@ -30,6 +30,7 @@ const board: Player = {
 
 const plan: Plan = {
   attackers: ["Grizzly Bears"],
+  attacker_ids: ["b1"],
   damage: 2,
   defender_life_after: 18,
   lethal: false,
