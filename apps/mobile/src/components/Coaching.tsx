@@ -94,6 +94,12 @@ function Answer({
       {reply.explanation.because === "" ? null : (
         <Text style={styles.because}>{reply.explanation.because}</Text>
       )}
+      {reply.trusted ? (
+        <Text style={styles.caveat}>
+          The choice above was checked against the rules engine. The wording is
+          Claude&apos;s, and nothing checked that.
+        </Text>
+      ) : null}
       <Bullets style={styles.watch} items={reply.explanation.watch_out} />
       <Bullets style={styles.check} items={reply.explanation.check_yourself} />
     </View>
@@ -180,6 +186,7 @@ const styles = StyleSheet.create({
   choice: { marginTop: space.small },
   chosen: { color: colour.yes, fontSize: text.body, fontWeight: "600" },
   because: { color: colour.quiet, fontSize: text.body, marginTop: space.small },
+  caveat: { color: colour.quiet, fontSize: text.small, marginTop: space.small },
   bullet: { fontSize: text.small, marginTop: space.tight },
   watch: { color: colour.warn },
   check: { color: colour.quiet },

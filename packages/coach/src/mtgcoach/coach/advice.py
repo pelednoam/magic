@@ -77,7 +77,6 @@ def verify(explanation: Explanation, report: TurnReport) -> tuple[str, ...]:
         *checks.attack(explanation, report),
         *silence.honesty(explanation, report),
         *silence.triggers(explanation, report),
-        *checks.prose(explanation, report),
     )
 
 

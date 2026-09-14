@@ -20,10 +20,16 @@ retrieved rules are printed under every answer, and they are the part that is ce
 ## Running it
 
 ```bash
-uv run mtgcoach sets add FDN                     # import the cards (needs network)
-uv run python -m mtgcoach.api.serve --set FDN    # the server, on the laptop in the room
-cd apps/mobile && npm install && npm run web     # the app
+uv run mtgcoach sets fetch FDN                        # download the cards from Scryfall
+uv run mtgcoach sets add FDN --from data/scryfall/FDN.json
+uv run python -m mtgcoach.api.serve --set FDN         # the server, on the laptop in the room
+cd apps/mobile && npm install && npm run web          # the app
 ```
+
+`sets fetch` is the only command that touches the network. It asks Scryfall for one set —
+771 printings for Foundations, five requests — and writes them to a file, so re-importing
+and the effects workflow do not ask again. `mtgcoach decks verify FDN` then checks all ten
+Beginner Box decklists against what was imported.
 
 Rules questions need the Comprehensive Rules on disk. They are not vendored here — Wizards
 revise them with every set, and a stale copy is exactly the kind of confidently-wrong answer

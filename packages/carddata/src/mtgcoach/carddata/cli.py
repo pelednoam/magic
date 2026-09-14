@@ -17,6 +17,7 @@ from mtgcoach.carddata.claudecli import ClaudeCliExtractor
 from mtgcoach.carddata.jsondata import MalformedJsonError
 from mtgcoach.carddata.paths import validate_set_code
 from mtgcoach.carddata.schema import SchemaError
+from mtgcoach.carddata.scryfallapi import HttpPages
 from mtgcoach.carddata.store import CardStore
 from mtgcoach.core.ids import SetCode
 
@@ -47,6 +48,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     sets = top.add_parser("sets", help="Import and inspect sets.").add_subparsers(
         dest="action", required=True
+    )
+    fetch = sets.add_parser("fetch", help="Download a set's printings from Scryfall.")
+    fetch.add_argument("set_code", type=_set_code)
+    fetch.add_argument(
+        "--to",
+        dest="destination",
+        type=Path,
+        default=None,
+        help="Where to write them. Defaults to <data>/scryfall/<SET>.json.",
     )
     add = sets.add_parser("add", help="Import a set from a Scryfall export.")
     add.add_argument("set_code", type=_set_code)
@@ -90,6 +100,12 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _destination(args: argparse.Namespace, data_root: Path) -> Path:
+    """Where a fetched set goes. Beside the other per-set data by default."""
+    chosen: Path | None = args.destination
+    return chosen if chosen is not None else data_root / "scryfall" / f"{args.set_code}.json"
+
+
 def _dispatch(args: argparse.Namespace, store: CardStore, data_root: Path, out: TextIO) -> int:
     """Route a parsed command to its handler.
 
@@ -98,6 +114,9 @@ def _dispatch(args: argparse.Namespace, store: CardStore, data_root: Path, out: 
     the wrong thing. argparse has already rejected any pair not listed here.
     """
     handlers: dict[tuple[str, str], Callable[[], int]] = {
+        ("sets", "fetch"): lambda: commands.sets_fetch(
+            HttpPages(), args.set_code, _destination(args, data_root), out
+        ),
         ("sets", "add"): lambda: commands.sets_add(store, args.source, args.set_code, out),
         ("sets", "list"): lambda: commands.sets_list(store, out),
         ("sets", "audit"): lambda: commands.sets_audit(store, args.set_code, out),

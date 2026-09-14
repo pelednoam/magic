@@ -1,21 +1,27 @@
-"""Every way an explanation can disagree with the engine.
+"""Every way an explanation can disagree with the engine about a *choice*.
+
+The prose is not one of them, and there is a deliberate absence here where a
+check for it used to be. It refused any explanation whose words named a card in
+hand that could not be played -- which sounds right and is wrong, because on a
+turn-one hand six of seven cards cannot be played and "put down a Forest so you
+can cast the Elves next turn" is the most useful sentence a coach has. Refusing
+that to catch a hypothetical "cast the Dragon" traded the common good case for
+a rare bad one, and it was caught by playing one real hand.
+
+So the guarantee is exactly what it says: the *choice* agrees with the engine.
+The words beside it are the part a model is for, they are unchecked, and both
+the panel and the wire say so -- the checked choice is rendered above them, and
+the flag is called ``trusted`` for the choice rather than for the sentence.
 
 One function per way, each returning sentences rather than raising, because an
 explanation usually fails in more than one way at once and a player is better
-served by all of them than by the first.
-
-Three of these are about *silence*. A model that forgets to mention an
-unmodelled card, or a trigger that is firing right now, is indistinguishable
-from one that decided the card did not matter -- and a beginner reads silence
-as "counted". So the check is the same shape every time: work out what was
-owed, look for it in the words, and report what is missing by name.
+served by all of them than by the first. The checks about what an explanation
+does *not* say are in ``silence``.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-
-from mtgcoach.coach.silence import mentions
 
 if TYPE_CHECKING:
     from mtgcoach.coach.advice import Explanation
@@ -102,50 +108,3 @@ def _short(value: str) -> str:
     ``str`` in one produced a line of escaped quotes nobody could read.
     """
     return value if len(value) <= _READABLE else value[:_READABLE] + "..."
-
-
-def prose(explanation: Explanation, report: TurnReport) -> tuple[str, ...]:
-    """The words must not tell the player to do what the choice did not.
-
-    ``play`` and ``attack`` are checked exactly; the sentences beside them are
-    what a person actually reads, and nothing makes the two agree. A model that
-    leaves ``play`` empty and writes "cast the Dragon" is marked trusted and
-    shows "cast the Dragon".
-
-    Natural language cannot be checked in general and this does not try. It
-    checks the one case that is both common and unambiguous: prose naming a
-    card that is *in this hand* and that the engine says cannot be played. That
-    is a recommendation to do something illegal, said in words, and it is
-    exactly the shape of a model's most confident mistake.
-
-    ``check_yourself`` is not prose for this purpose -- ``honesty`` *requires*
-    it to name cards the engine could not read, which are usually unplayable
-    too. Reading it here made the two checks contradict each other: an
-    explanation had to name the card and was refused for naming it.
-    """
-    said = _advice(explanation)
-    forbidden = [
-        card.name
-        for card in report.hand
-        if not card.playable and card.name != _named_play(explanation, report)
-    ]
-    named = [name for name in forbidden if mentions(said, name)]
-    if not named:
-        return ()
-    return (f"its words name {len(named)} card(s) that cannot be played: {sorted(set(named))}",)
-
-
-def _named_play(explanation: Explanation, report: TurnReport) -> str:
-    """The name of the card it recommends playing, if it recommends one."""
-    if not explanation.play:
-        return ""
-    found = next((c for c in report.hand if str(c.instance_id) == explanation.play), None)
-    return found.name if found is not None else ""
-
-
-def _advice(explanation: Explanation) -> str:
-    """The words that tell the player what to do.
-
-    Not ``check_yourself``, which tells them what nobody worked out.
-    """
-    return " ".join((explanation.because, explanation.in_short, *explanation.watch_out))

@@ -89,35 +89,28 @@ def test_saying_nothing_about_combat_outside_combat_is_fine() -> None:
     assert trusted(Explanation(attack=()), _main())
 
 
-# --- the words must not recommend what the choice did not ---------------------
+# --- what is deliberately not checked ----------------------------------------
 
 
-def test_prose_recommending_an_unplayable_card_is_refused() -> None:
-    """The words a person reads are not the fields that were checked.
+def test_prose_may_name_a_card_it_is_not_recommending() -> None:
+    """Advice about a later turn has to survive, and it names later cards.
 
-    `play` and `attack` are checked exactly; the sentences beside them are what
-    somebody actually reads, and nothing made the two agree. A model that left
-    `play` empty and wrote "cast the Dragon" was marked trusted and showed
-    "cast the Dragon". Natural language cannot be checked in general, so this
-    checks the one case that is common and unambiguous: prose naming a card in
-    this hand that the engine says cannot be played.
+    A check for prose naming an unplayable card looked right and was wrong: on
+    a turn-one hand six of seven cards cannot be played, and what a beginner
+    most needs to hear is what they are building towards. It refused a real
+    hand the first time one was played through it.
+
+    So the prose is unchecked, on purpose. The guarantee is about the *choice*,
+    the panel renders the choice above the words, and the wire calls the flag
+    `trusted` for the choice rather than for the sentence.
     """
-    report = _main(hand=("Bear",))
-    (bear,) = report.hand
-    assert not bear.playable, "the fixture must have an uncastable card in hand"
-    said = Explanation(in_short="Cast the Grizzly Bears!", because="It is the best play.")
-    problems = verify(said, report)
-    assert problems
-    assert "cannot be played" in problems[-1]
-
-
-def test_prose_about_the_card_it_does_recommend_is_fine() -> None:
     report = _main(hand=("Forest", "Bear"))
     forest = next(card for card in report.hand if card.playable)
+    bear = next(card for card in report.hand if not card.playable)
     said = Explanation(
         play=str(forest.instance_id),
-        in_short="Put down a Forest.",
-        because="A land is free.",
+        in_short=f"Put down a Forest so you can cast {bear.name} next turn.",
+        because="A land now is a creature later.",
     )
     assert trusted(said, report)
 

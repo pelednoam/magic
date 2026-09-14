@@ -6,17 +6,20 @@ function with a store and a stream, rather than by driving a parser.
 
 from __future__ import annotations
 
+import json
 import re
 from typing import TYPE_CHECKING
 
 from mtgcoach.carddata import mechanics
 from mtgcoach.carddata.decks import load_set_decks, verify
 from mtgcoach.carddata.scryfall import read_printings
+from mtgcoach.carddata.scryfallapi import ScryfallError, printings_for
 
 if TYPE_CHECKING:
     from pathlib import Path
     from typing import TextIO
 
+    from mtgcoach.carddata.scryfallapi import Pages
     from mtgcoach.carddata.store import CardStore
     from mtgcoach.core.ids import SetCode
 
@@ -35,6 +38,35 @@ _ERRORS_SHOWN = 3
 def safe(text: str) -> str:
     """Render untrusted text for a terminal."""
     return _CONTROL.sub("?", text)
+
+
+def sets_fetch(pages: Pages, set_code: SetCode, destination: Path, out: TextIO) -> int:
+    """Download one set's printings from Scryfall and write them to a file.
+
+    A file rather than straight into the store, for three reasons. The effects
+    workflow reads the same cards again and re-downloading them is rude to a
+    free service; a failed import can be retried without another five requests;
+    and keeping the network in one command means every other command is one a
+    test can run.
+
+    Returns:
+        The process exit code -- ``OK``, or ``FAILED`` with a sentence saying
+        what Scryfall said.
+    """
+    try:
+        found = list(printings_for(set_code, pages))
+    except ScryfallError as refused:
+        print(f"could not fetch {set_code}: {safe(str(refused))}", file=out)
+        return FAILED
+    if not found:
+        print(f"Scryfall has no printings for {set_code}", file=out)
+        return FAILED
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with destination.open("w", encoding="utf-8") as file:
+        json.dump(found, file)
+    print(f"wrote {len(found)} {set_code} printings to {destination}", file=out)
+    print(f"now run: mtgcoach sets add {set_code} --from {destination}", file=out)
+    return OK
 
 
 def sets_add(store: CardStore, source: Path, set_code: SetCode, out: TextIO) -> int:

@@ -26,6 +26,10 @@ gate-output.txt
 data/cache/
 data/*.sqlite3
 
+# Downloaded card data. Four megabytes of Scryfall's JSON per set, and it is
+# theirs rather than ours -- `mtgcoach sets fetch` puts it back.
+data/scryfall/
+
 # Unreviewed extractor output. Only the sealed fixture and its manifest are
 # data; `mtgcoach effects seal` is the only way across that line.
 data/sets/*/proposals.json

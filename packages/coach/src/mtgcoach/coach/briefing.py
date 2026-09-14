@@ -32,6 +32,10 @@ Hard rules, in order of importance:
    be one marked PLAYABLE. If you name an attack, it must be one of the numbered
    attacks, and you must give exactly its creatures. Anything else is discarded
    unread, and the player sees nothing.
+   You may talk about a card you are *not* recommending -- "a land now means
+   the Elves next turn" is exactly the kind of thing worth saying -- but make
+   it unmistakable that it is about a later turn, not this one. Your words are
+   what the player reads, and nothing checks them.
 2. Never state a rule the options do not already state. If you want to explain
    why something works, explain it from what is here.
 3. Anything under CANNOT SPEAK FOR must appear in check_yourself. The engine
