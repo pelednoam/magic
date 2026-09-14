@@ -12,30 +12,26 @@ that fires every step -- which is why both are buttons.
 Nothing here decides anything about the game. It runs a subprocess and returns
 what it printed.
 
-**The subprocess gets no tools at all.** That is not caution, it is the only
-safe setting: a rules question is text a player typed, arriving over an
-unauthenticated route, and it ends up inside this prompt. A model with Read and
-WebFetch in that position is a file-read primitive and an egress primitive in
-one session, on a machine holding the operator's Claude Code credentials. It
-was verified rather than assumed -- with tools on, the same prompt read
-``/etc/hostname`` and returned its contents; with ``--tools ""`` it could not,
-and made something up instead, which is the failure mode we want.
+**The subprocess gets no tools at all**, runs in an empty directory of its own,
+and is killed as a group. Each of those has its reason written beside it below;
+together they are the answer to one fact -- a rules question is text a player
+typed, arriving over an unauthenticated route, and it ends up inside this
+prompt.
 """
 
 from __future__ import annotations
 
 import atexit
-import os
 import shutil
-import signal
 import subprocess
 import tempfile
-from contextlib import contextmanager, suppress
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from mtgcoach.api.processes import group_of, kill_group
 from mtgcoach.coach.advice import ExplainerError
 
 if TYPE_CHECKING:
@@ -45,9 +41,14 @@ if TYPE_CHECKING:
 #:
 #: An empty allow-list, not a deny-list. The deny-list this replaced named the
 #: five write tools and left Read, Glob, Grep, WebFetch, WebSearch and Task
-#: enabled -- so the comment above it ("not to touch the repository") was true
-#: about writing and false about everything else. An allow-list cannot rot that
-#: way: a tool added to the CLI next month is not on it either.
+#: enabled, which is a file-read primitive and an egress primitive in one
+#: session on a machine holding the operator's credentials. Verified rather
+#: than assumed: with tools on the same prompt read ``/etc/hostname`` and
+#: returned it; with this it could not, and made something up instead.
+#:
+#: An allow-list also cannot rot the way a deny-list does -- a tool added to
+#: the CLI next month is not on it either. ``tools/check_cli_flags.py`` checks
+#: the flag still exists and still means this.
 NO_TOOLS = ""
 
 
@@ -129,10 +130,16 @@ class Cli:
             cwd=self.working_directory,
             start_new_session=True,
         )
+        # Read *now*, while the child is certainly alive. `communicate` reaps
+        # it, and asking a dead leader for its group id raises ESRCH -- which
+        # was suppressed, so the group was never signalled in exactly the case
+        # the kill exists for: a parent that exited leaving descendants behind.
+        # It is also a pid-reuse race, since the number can be handed out again.
+        group = group_of(process)
         try:
             yield process
         finally:
-            _kill_group(process)
+            kill_group(group, process)
 
     def _argv(self) -> list[str]:
         """The command line. Fixed; nothing from a player reaches it."""
@@ -170,22 +177,3 @@ class Cli:
             msg = f"the coach exited {process.returncode}"
             raise ExplainerError(msg)
         return stdout, stderr
-
-
-def _kill_group(process: subprocess.Popen[str]) -> None:
-    """End the command and everything it started.
-
-    The group is signalled whether or not the direct process is still running.
-    Skipping it when the parent had exited was the original bug wearing a
-    different hat: ``claude`` is a Node process that spawns more, and a parent
-    that has returned says nothing about its children -- which would then sit
-    there holding the quota with nobody waiting on them.
-
-    Best effort otherwise: an ``ESRCH`` here means the group is already gone,
-    which is the ordinary case and not worth turning a finished answer into an
-    error over.
-    """
-    with suppress(OSError):
-        os.killpg(os.getpgid(process.pid), signal.SIGKILL)
-    with suppress(OSError, ValueError, subprocess.TimeoutExpired):
-        process.wait(timeout=5)

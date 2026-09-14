@@ -11,11 +11,8 @@ take a minute, and an async route would hold the event loop for all of it --
 freezing every other player's socket. FastAPI runs a plain ``def`` in a
 threadpool, which is exactly the behaviour wanted here.
 
-Both are also rationed. There is no auth on this server (§4: one LAN, one
-table), so anything unauthenticated that starts a minute-long Node process is a
-way to bring the laptop down by holding down a button. The semaphore below is
-not a security boundary -- nothing here is -- but it turns "unbounded processes"
-into "a queue", which is the difference between a slow tracker and a dead one.
+Both are also rationed -- see ``rationing``, which says why that is about a
+stuck finger rather than about an attacker.
 """
 
 from __future__ import annotations
@@ -53,26 +50,24 @@ MAX_SEAT = 40
 
 
 @contextmanager
-def _one_at_a_time(server: Server) -> Generator[None]:
+def _rationed(server: Server) -> Generator[None]:
     """Take one of this server's slots, or refuse.
 
     Acquired without waiting: a request that queued would just sit on a
     threadpool worker, which is the resource being rationed.
 
     Raises:
-        HTTPException: 503 when every slot is busy. Honest and actionable: the
-            engine's own advice is already on screen, and trying again in a
-            moment is exactly the right thing to do.
+        HTTPException: 503 when there is nothing to take. Honest and
+            actionable: the engine's own advice is already on screen, and
+            trying again in a moment is exactly the right thing to do.
     """
-    if not server.in_flight.acquire(blocking=False):
-        raise HTTPException(
-            HTTP_503_SERVICE_UNAVAILABLE,
-            "the coach is busy with another question; try again in a moment",
-        )
+    refused = server.rations.take()
+    if refused:
+        raise HTTPException(HTTP_503_SERVICE_UNAVAILABLE, refused)
     try:
         yield
     finally:
-        server.in_flight.release()
+        server.rations.release()
 
 
 def routes(app: FastAPI, server: Server) -> None:
@@ -86,7 +81,7 @@ def routes(app: FastAPI, server: Server) -> None:
             # The engine work is inside the limiter too. It is milliseconds
             # next to the subprocess, but it is not free, and a limit that only
             # covers the cheap half of a request is not a limit.
-            with _one_at_a_time(server):
+            with _rationed(server):
                 return coached(server.explainer, position(server, game, player))
         except ExplainerError as unavailable:
             # Not a server fault and not fatal: the deterministic panel is
@@ -114,7 +109,7 @@ def routes(app: FastAPI, server: Server) -> None:
                 "the Comprehensive Rules are not installed on this server",
             )
         try:
-            with _one_at_a_time(server):
+            with _rationed(server):
                 asked = position(server, game, player, board=True)
                 return answered(server.asker, server.rules, question, asked)
         except ExplainerError as unavailable:

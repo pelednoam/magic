@@ -106,11 +106,17 @@ def test_triggers_are_named() -> None:
         rules={**BOOK.rules, "Bell": (rings,)},
     )
     state = game(battlefield=("Bell",), step=Step.UPKEEP)
-    assert "TRIGGERS NOW: Bell" in brief(advise(state, ME, book))
+    text = _flat(brief(advise(state, ME, book)))
+    assert "TRIGGERS NOW (name every one of these in your answer): Bell" in text
+    # The instruction and the check were added a round apart, and the checker
+    # demanded this before the prompt ever asked for it -- which would have
+    # refused every turn with a trigger on the table.
+    assert "must be named somewhere in your answer" in text
 
 
 def test_a_turn_with_no_triggers_says_nothing_about_them() -> None:
-    assert "TRIGGERS NOW" not in brief(advise(game(), ME, BOOK))
+    """The section, not the word -- rule 4 names it whether or not any fired."""
+    assert "TRIGGERS NOW (name" not in brief(advise(game(), ME, BOOK))
 
 
 def test_a_fully_modelled_board_says_so_explicitly() -> None:

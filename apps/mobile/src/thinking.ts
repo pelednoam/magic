@@ -23,7 +23,7 @@
  * second is still using.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import type { Coach } from "./client";
 import { messageOf } from "./errors";
@@ -42,9 +42,10 @@ function useSlowAsk<T extends { readonly version: number }, A extends unknown[]>
   send: (...args: A) => Promise<T>,
   version: number,
 ): Thinking<T> & { readonly ask: (...args: A) => void } {
-  const [reply, setReply] = useState<T | null>(null);
-  const [asking, setAsking] = useState(false);
-  const [problem, setProblem] = useState("");
+  // One piece of state, not three. They only ever change together, and a
+  // panel that showed an answer and a spinner at once was possible while they
+  // did not.
+  const [held, setHeld] = useState<Thinking<T>>(NOTHING as Thinking<T>);
 
   // The board as it is *now*, which is not what the callback closed over: it
   // is made once per render and answers a minute later.
@@ -54,11 +55,24 @@ function useSlowAsk<T extends { readonly version: number }, A extends unknown[]>
   // "finished" — otherwise the spinner stopped while the second was running.
   const token = useRef(0);
 
-  useEffect(() => {
+  // Read during render, not in an effect. Clearing in an effect meant one
+  // committed render paired the new board with the previous answer — a frame
+  // of advice about a position nobody is in, which is the whole thing this
+  // exists to prevent. It also left the in-flight request holding the button
+  // disabled for up to its full minute, over a result nothing could use.
+  const moved = current.current !== version;
+  if (moved) {
     current.current = version;
-    setReply(null);
-    setProblem("");
-  }, [version]);
+    token.current += 1;
+    if (held.reply !== null || held.problem !== "" || held.asking) {
+      setHeld(NOTHING as Thinking<T>);
+    }
+  }
+  // Returned rather than only scheduled. `setHeld` queues a re-render; this
+  // render is still holding the old value, and returning it would put the
+  // previous answer next to the new board for one committed frame — which is
+  // the exact thing being prevented, briefly.
+  const shown = moved ? (NOTHING as Thinking<T>) : held;
 
   const ask = useCallback(
     (...args: A) => {
@@ -66,38 +80,39 @@ function useSlowAsk<T extends { readonly version: number }, A extends unknown[]>
       const mine = token.current;
       const asked = current.current;
       // Still the request the panel is showing, and still about the board it
-      // is showing. An error carries no revision of its own -- there is no
-      // reply -- so it falls back to the board we knew about when we asked,
+      // is showing. An error carries no revision of its own — there is no
+      // reply — so it falls back to the board we knew about when we asked,
       // which is what a reply uses the server's answer instead of.
       const stillWanted = () => mine === token.current && asked === current.current;
-      setAsking(true);
-      setProblem("");
-      setReply(null);
+      setHeld({ reply: null, problem: "", asking: true });
       send(...args)
         .then((answer: T) => {
           // The server's own answer to "which board is this about", compared
           // against the board on screen. Better than `asked`: that is what the
           // client believed when it asked, and this is what the server did.
           if (mine === token.current && answer.version === current.current) {
-            setReply(answer);
+            setHeld({ reply: answer, problem: "", asking: false });
           }
         })
         .catch((error: unknown) => {
           if (stillWanted()) {
-            setProblem(messageOf(error));
+            setHeld({ reply: null, problem: messageOf(error), asking: false });
           }
         })
         .finally(() => {
           if (mine === token.current) {
-            setAsking(false);
+            setHeld((shown) => (shown.asking ? { ...shown, asking: false } : shown));
           }
         });
     },
     [send],
   );
 
-  return { reply, asking, problem, ask };
+  return { ...shown, ask };
 }
+
+/** Nothing asked, nothing answered, nothing wrong. */
+const NOTHING = { reply: null, problem: "", asking: false } as const;
 
 /** Turn advice, dropped whenever the board moves. */
 export function useCoaching(

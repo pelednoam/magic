@@ -13,6 +13,7 @@ owed, look for it in the words, and report what is missing by name.
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -115,8 +116,8 @@ def honesty(explanation: Explanation, report: TurnReport) -> tuple[str, ...]:
     Equipment passed, and the player read the silence as "counted".
     """
     owed = (*report.unknown, *report.attacks.caveats)
-    said = " ".join(explanation.check_yourself).casefold()
-    missing = [item for item in owed if _named(item).casefold() not in said]
+    said = " ".join(explanation.check_yourself)
+    missing = [item for item in owed if not _mentions(said, _named(item))]
     if not missing:
         return ()
     return (f"says nothing about {len(missing)} of {len(owed)} not modelled: {missing[:3]}",)
@@ -134,11 +135,22 @@ def triggers(explanation: Explanation, report: TurnReport) -> tuple[str, ...]:
     """
     if not report.reminders:
         return ()
-    said = _everything(explanation).casefold()
-    silent = [r.name for r in report.reminders if r.name.casefold() not in said]
+    said = _everything(explanation)
+    silent = [r.name for r in report.reminders if not _mentions(said, r.name)]
     if not silent:
         return ()
     return (f"says nothing about {len(silent)} trigger(s) firing now: {silent[:3]}",)
+
+
+def _mentions(said: str, name: str) -> bool:
+    """Whether ``said`` names this card, as a word rather than as letters.
+
+    A plain substring search found "Rat" inside "strategy", so an explanation
+    that never mentioned the Rat was credited with mentioning it -- and the
+    checks that use this are the ones about *silence*, where a false positive
+    is the whole failure.
+    """
+    return re.search(rf"(?<!\w){re.escape(name)}(?!\w)", said, re.IGNORECASE) is not None
 
 
 def _everything(explanation: Explanation) -> str:

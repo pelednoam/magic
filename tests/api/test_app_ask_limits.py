@@ -16,13 +16,14 @@ they read better together than scattered among the tests about answers.
 from __future__ import annotations
 
 import threading
+import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from fastapi.testclient import TestClient
 
 from helpers_api import RULES, Answering, server
-from mtgcoach.api import context
+from mtgcoach.api import rationing
 from test_app_ask import GOOD, ask, new_game
 
 if TYPE_CHECKING:
@@ -107,7 +108,7 @@ def test_only_so_many_questions_run_at_once() -> None:
     subprocesses" into "a queue", which is the difference between a slow
     tracker and a laptop somebody has to reboot.
     """
-    started = threading.Barrier(context.MAX_IN_FLIGHT + 1, timeout=5)
+    started = threading.Barrier(rationing.MAX_IN_FLIGHT + 1, timeout=5)
     release = threading.Event()
 
     @dataclass(frozen=True, slots=True)
@@ -125,7 +126,7 @@ def test_only_so_many_questions_run_at_once() -> None:
         session_id = new_game(client)
         holding = [
             threading.Thread(target=lambda: ask(client, session_id))
-            for _ in range(context.MAX_IN_FLIGHT)
+            for _ in range(rationing.MAX_IN_FLIGHT)
         ]
         for worker in holding:
             worker.start()
@@ -141,3 +142,54 @@ def test_only_so_many_questions_run_at_once() -> None:
             release.set()
             for worker in holding:
                 worker.join(timeout=5)
+
+
+def test_only_so_many_questions_in_a_minute() -> None:
+    """The failure that needs no attacker: a stuck finger, or a reload loop.
+
+    Both routes start a `claude` process and spend the operator's
+    subscription, and the client calling them is a phone with a button on it.
+    The concurrency cap bounds how many run at once; this bounds how many run
+    at all.
+    """
+    with TestClient(server(asker=Answering(GOOD), rules=RULES)) as client:
+        session_id = new_game(client)
+        for _ in range(rationing.BURST):
+            ask(client, session_id)
+        refused = client.post(f"/games/{session_id}/ask", json={"question": "one more"})
+        assert refused.status_code == HTTP_UNAVAILABLE
+        assert "a lot of questions" in refused.json()["detail"]
+
+
+def test_a_refused_busy_request_does_not_spend_a_token() -> None:
+    """A refusal is not a request.
+
+    A player retrying two seconds later should not be paying for the attempt
+    that never started.
+    """
+    rations = rationing.Rationed()
+    held = [rations.take() for _ in range(rationing.MAX_IN_FLIGHT)]
+    assert held == [""] * rationing.MAX_IN_FLIGHT
+
+    assert "busy" in rations.take(), "the concurrency cap, not the rate limit"
+    for _ in held:
+        rations.release()
+
+    # Only the ones that actually ran were charged, so the rest of the minute's
+    # allowance is still there.
+    for _ in range(rationing.BURST - rationing.MAX_IN_FLIGHT):
+        assert rations.take() == ""
+        rations.release()
+    assert "a lot of questions" in rations.take()
+
+
+def test_tokens_come_back_over_time() -> None:
+    """Otherwise a long game would run out halfway through."""
+    rations = rationing.Rationed(burst=2, window=0.05)
+    assert rations.take() == ""
+    rations.release()
+    assert rations.take() == ""
+    rations.release()
+    assert "a lot of questions" in rations.take()
+    time.sleep(0.08)
+    assert rations.take() == ""

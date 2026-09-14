@@ -16,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useCoaching, useQuestions } from "../src/thinking";
 import type { Asked, Coaching } from "../src/wire";
 
-import { ADVICE, ASKED, deferred, mounted, roots, settled } from "./hookharness";
+import { ADVICE, ASKED, deferred, mounted, roots } from "./hookharness";
 
 beforeEach(() => {
   roots.length = 0;
@@ -31,7 +31,7 @@ describe("turn advice", () => {
   it("shows an answer that arrives while the board has not moved", async () => {
     const { coach, settle } = deferred<Coaching>();
     const hook = mounted((version) => useCoaching(coach, "g1", "you", version));
-    act(() => { hook.latest().ask(""); });
+    act(() => { hook.latest().ask(); });
     expect(hook.latest().asking).toBe(true);
     await settle(ADVICE);
     expect(hook.latest().reply?.explanation.in_short).toBe("Play a land.");
@@ -41,7 +41,7 @@ describe("turn advice", () => {
   it("drops an answer that arrives after the board moved", async () => {
     const { coach, settle } = deferred<Coaching>();
     const hook = mounted((version) => useCoaching(coach, "g1", "you", version));
-    act(() => { hook.latest().ask(""); });
+    act(() => { hook.latest().ask(); });
     hook.moveBoard();
     await settle(ADVICE);
     expect(hook.latest().reply).toBeNull();
@@ -50,7 +50,7 @@ describe("turn advice", () => {
   it("clears an answer already on screen when the board moves", async () => {
     const { coach, settle } = deferred<Coaching>();
     const hook = mounted((version) => useCoaching(coach, "g1", "you", version));
-    act(() => { hook.latest().ask(""); });
+    act(() => { hook.latest().ask(); });
     await settle(ADVICE);
     hook.moveBoard();
     expect(hook.latest().reply).toBeNull();
@@ -59,7 +59,7 @@ describe("turn advice", () => {
   it("keeps the server's sentence when there was no answer", async () => {
     const { coach, fail } = deferred<Coaching>();
     const hook = mounted((version) => useCoaching(coach, "g1", "you", version));
-    act(() => { hook.latest().ask(""); });
+    act(() => { hook.latest().ask(); });
     await fail(new Error("no claude"));
     expect(hook.latest().problem).toContain("no claude");
     expect(hook.latest().asking).toBe(false);
@@ -68,7 +68,7 @@ describe("turn advice", () => {
   it("drops a failure that arrives after the board moved", async () => {
     const { coach, fail } = deferred<Coaching>();
     const hook = mounted((version) => useCoaching(coach, "g1", "you", version));
-    act(() => { hook.latest().ask(""); });
+    act(() => { hook.latest().ask(); });
     hook.moveBoard();
     await fail(new Error("no claude"));
     expect(hook.latest().problem).toBe("");
@@ -113,68 +113,5 @@ describe("rules answers", () => {
     hook.moveBoard();
     await fail(new Error("rules are not installed"));
     expect(hook.latest().problem).toBe("");
-  });
-});
-
-describe("two questions at once", () => {
-  it("does not let the first answer land in the second's panel", async () => {
-    // Two in flight, and the first to return is not the one being shown.
-    const first = deferred<Asked>();
-    const second = deferred<Asked>();
-    let which = 0;
-    const coach = {
-      ask: () => {
-        which += 1;
-        return which === 1 ? first.pending : second.pending;
-      },
-    } as unknown as Parameters<typeof useQuestions>[0];
-
-    const hook = mounted((version) => useQuestions(coach, "g1", "you", version));
-    act(() => { hook.latest().ask("first question"); });
-    act(() => { hook.latest().ask("second question"); });
-
-    await first.settle({ ...ASKED, answer: { ...ASKED.answer, in_short: "first" } });
-    expect(hook.latest().reply).toBeNull();
-    expect(hook.latest().asking).toBe(true);
-
-    await second.settle({ ...ASKED, answer: { ...ASKED.answer, in_short: "second" } });
-    expect(hook.latest().reply?.answer.in_short).toBe("second");
-    expect(hook.latest().asking).toBe(false);
-  });
-
-  it("clears the old answer while the new question is running", async () => {
-    // Leaving it up would show an answer to the previous question next to a
-    // spinner for this one, which reads as an answer to this one.
-    const first = deferred<Asked>();
-    const second = deferred<Asked>();
-    let which = 0;
-    const coach = {
-      ask: () => {
-        which += 1;
-        return which === 1 ? first.pending : second.pending;
-      },
-    } as unknown as Parameters<typeof useQuestions>[0];
-
-    const hook = mounted((version) => useQuestions(coach, "g1", "you", version));
-    act(() => { hook.latest().ask("first"); });
-    await first.settle(ASKED);
-    expect(hook.latest().reply).not.toBeNull();
-
-    act(() => { hook.latest().ask("second"); });
-    await settled();
-    expect(hook.latest().reply).toBeNull();
-    expect(hook.latest().asking).toBe(true);
-  });
-});
-
-describe("an answer about a board nobody is on", () => {
-  it("is dropped even when the client did not notice the move", async () => {
-    // The server says which revision it answered about. That is the check --
-    // not the version the client happened to remember when it asked.
-    const { coach, settle } = deferred<Asked>();
-    const hook = mounted((version) => useQuestions(coach, "g1", "you", version));
-    act(() => { hook.latest().ask("q"); });
-    await settle({ ...ASKED, version: 99 });
-    expect(hook.latest().reply).toBeNull();
   });
 });

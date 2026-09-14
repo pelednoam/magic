@@ -73,14 +73,17 @@ export function deferred<T>(): {
 
 type Hook<T> = { reply: T | null; asking: boolean; problem: string };
 
+/** Whatever arguments this hook's `ask` takes: none, or a question. */
+type Asks<A extends unknown[]> = { readonly ask: (...args: A) => void };
+
 /** Render a hook, and let the test change the board version under it. */
-export function mounted<T>(
-  use: (version: number) => Hook<T> & { readonly ask: (q: string) => void },
+export function mounted<T, A extends unknown[]>(
+  use: (version: number) => Hook<T> & Asks<A>,
 ): {
-  readonly latest: () => Hook<T> & { readonly ask: (q: string) => void };
+  readonly latest: () => Hook<T> & Asks<A>;
   readonly moveBoard: () => void;
 } {
-  let seen: (Hook<T> & { readonly ask: (q: string) => void }) | null = null;
+  let seen: (Hook<T> & Asks<A>) | null = null;
   let setVersion: (n: number) => void = () => undefined;
 
   function Probe() {

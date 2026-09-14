@@ -37,7 +37,11 @@ Hard rules, in order of importance:
 3. Anything under CANNOT SPEAK FOR must appear in check_yourself. The engine
    does not understand those cards; saying nothing about them would let the
    player think they were counted.
-4. "in_short" is for the child. Short sentences, no jargon, no numbers they
+4. Anything under TRIGGERS NOW must be named somewhere in your answer, by the
+   card's name. Those abilities are happening whether or not anybody notices,
+   and a beginner who is not told will miss them. An answer that does not
+   mention them is discarded, like one that invents a card.
+5. "in_short" is for the child. Short sentences, no jargon, no numbers they
    would have to hold in their head. "Their creature is bigger, so yours would
    just die" -- not "unfavourable trade at parity".
 
@@ -111,11 +115,18 @@ def _attacks(report: TurnReport) -> str:
 
 
 def _reminders(report: TurnReport) -> str:
-    """Triggers about to be missed."""
+    """Triggers about to be missed.
+
+    The instruction that goes with this is rule 4 above, and the two were added
+    a round apart: the checker demanded that every one of these be named before
+    the prompt ever asked for it, which would have refused every turn with a
+    trigger on it. A requirement nobody was told about is not a requirement, it
+    is a trap.
+    """
     if not report.reminders:
         return ""
     names = ", ".join(r.name for r in report.reminders)
-    return f"\nTRIGGERS NOW: {names}"
+    return f"\nTRIGGERS NOW (name every one of these in your answer): {names}"
 
 
 def _gaps(report: TurnReport) -> str:

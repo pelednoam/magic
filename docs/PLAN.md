@@ -69,7 +69,21 @@ advice a beginner hears most often, and nothing checked it), a slow answer was n
 the revision it described, and a card with rules text was described to the model as though it
 were vanilla.
 
-Three rounds, twenty-three findings fixed by hand; the critical count went 8, 5, 1.
+A fourth round caught the other half of that same fix, and it would have broken the feature
+outright: `checks.triggers` demanded that every firing trigger be named, and the prompt never
+asked for it. A requirement nobody is told about is not a requirement, it is a trap — every
+turn with a trigger on the table would have come back as a refusal. Alongside it: the
+no-decision shortcut said "pass the turn" at an *upkeep*, which for a beginner means skipping
+their main phase; the silence checks matched card names as substrings, so a card called "Rat"
+counted as mentioned by the word "strategy"; and the process-group kill asked a reaped child
+for its group id, which is both too late and a pid-reuse race.
+
+The two Claude routes are also rationed now — twelve a minute, three at once. Not a security
+boundary: §4 puts this on one LAN with no auth and that is still a known gap. It is about the
+failure that needs no attacker, which is a stuck finger on a button that starts a Node process
+and spends a subscription.
+
+Four rounds, forty-odd findings fixed by hand; the critical count went 8, 5, 1, 5.
 
 ---
 

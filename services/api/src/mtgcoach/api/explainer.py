@@ -57,8 +57,15 @@ def _nothing_to_say(report: TurnReport) -> Explanation | None:
     if decisions or report.reminders or report.unknown or report.attacks.caveats:
         return None
     return Explanation(
-        because="Nothing here can be played or attacked with, so the turn just moves on.",
-        in_short="Nothing to do right now -- pass the turn.",
+        because=(
+            "Nothing here can be played or attacked with, so this step has no "
+            "decision in it. Move on to the next one."
+        ),
+        # Not "pass the turn". Most of the steps this fires on are an upkeep or
+        # a draw, where passing the *turn* means skipping the main phase -- so
+        # the shortcut for "there is nothing to decide here" was telling a
+        # beginner to give up their whole turn.
+        in_short="Nothing to do in this step. Go to the next one.",
     )
 
 

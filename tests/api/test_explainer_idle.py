@@ -26,8 +26,13 @@ RINGS = TriggeredAbility(Trigger(TriggerEvent.BEGINNING_OF_UPKEEP), ())
 def test_an_empty_turn_is_answered_without_asking() -> None:
     """Most of a game is steps with no choice. Those cost nothing."""
     got = explain(Never(), advise(game(), ME, BOOK))
-    assert "pass the turn" in got.in_short
     assert got.play == ""
+    # "This step", not "the turn". Most of the steps this fires on are an
+    # upkeep or a draw, where passing the turn means skipping the main phase --
+    # so the shortcut for "nothing to decide here" was telling a beginner to
+    # give up their whole turn.
+    assert "next one" in got.in_short
+    assert "turn" not in got.in_short
 
 
 def test_a_turn_with_an_unmodelled_card_is_still_asked_about() -> None:
