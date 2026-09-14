@@ -55,6 +55,30 @@ def test_the_same_question_in_a_childs_words_finds_it_too(index: RuleIndex) -> N
     assert "302.6" in found, found
 
 
+def test_a_keyword_word_used_as_english_does_not_take_over(index: RuleIndex) -> None:
+    """Found live.
+
+    "Reach" is the keyword *and* the verb, and it is rare in the document --
+    seventeen uses, nearly all the ability -- so bm25 weighted it heavily and
+    the four passages titled Reach took the whole result. The rule the question
+    wanted, that a player at 0 life loses, was nowhere.
+    """
+    found = _references(index, "what happens when my hit points reach zero?")
+    assert "119.6" in found, found
+    assert not any(reference.startswith("702.17") for reference in found), found
+
+
+def test_a_question_that_is_about_the_keyword_still_finds_it(index: RuleIndex) -> None:
+    """The other half, and the one that matters more.
+
+    A question about a keyword is far commoner than one that merely contains
+    one, so the keyword reading is the default and only positive evidence of a
+    verb sets it aside.
+    """
+    found = _references(index, "what does reach do?")
+    assert any(reference.startswith(("702.17", "Reach")) for reference in found), found
+
+
 def test_a_childs_word_for_a_life_total_finds_the_life_rules(index: RuleIndex) -> None:
     """The rules never say "hit points".
 

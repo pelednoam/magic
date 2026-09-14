@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 
+from mtgcoach.rules.keywords import ordinary
 from mtgcoach.rules.phrasing import also
 
 #: A word worth searching for. Apostrophes are kept inside a word ("player's")
@@ -75,7 +76,7 @@ _NOISE = frozenset(
 )
 
 
-def query(question: str) -> str:
+def query(question: str, keywords: frozenset[str] = frozenset()) -> str:
     """A question, as an FTS5 query.
 
     Built from extracted words rather than escaped, which is the difference
@@ -95,9 +96,19 @@ def query(question: str) -> str:
     either. ``search`` depends on that: an empty query means "the rules cannot
     be looked up for this", and a query built only from a guess would be a
     guess with nothing to check it.
+
+    Minus anything ``keywords`` says is a Magic keyword being used as ordinary
+    English. Those are dropped rather than down-weighted: a keyword name is
+    rare in the document and so scores heavily, and the document has no other
+    use for the word, so keeping it can only pull the wrong passages up. The
+    names come from the index, which read them off the rules -- see
+    ``keywords.names_in``. Empty by default, which is no change at all.
     """
     words = [word.lower() for word in _WORD.findall(question)]
-    wanted = [word for word in words if word not in _NOISE and len(word) > 1]
+    english = ordinary(question, keywords)
+    wanted = [
+        word for word in words if word not in _NOISE and len(word) > 1 and word not in english
+    ]
     return " OR ".join(f'"{term}"' for term in (*wanted, *also(question)))
 
 

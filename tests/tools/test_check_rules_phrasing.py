@@ -29,6 +29,9 @@ informally called the "summoning sickness" rule.
 it entered the battlefield.
 
 119.1. Each player begins the game with a starting life total of 20.
+
+119.6. If a player has 0 or less life, that player loses the game as a
+state-based action.
 """
 
 

@@ -18,7 +18,13 @@ from __future__ import annotations
 import pytest
 
 from helpers_rules import PASSAGES
-from mtgcoach.rules.phrasing import LIFE_TOTAL, SUMMONING_SICKNESS, TARGETS, also
+from mtgcoach.rules.phrasing import (
+    LIFE_TOTAL,
+    OUT_OF_LIFE,
+    SUMMONING_SICKNESS,
+    TARGETS,
+    also,
+)
 from mtgcoach.rules.terms import query
 
 
@@ -82,7 +88,46 @@ def test_the_old_wording_also_asks_about_entering() -> None:
 
 
 def test_a_child_says_hit_points_and_the_rules_never_do() -> None:
-    assert also("what happens when my hit points reach zero?") == (LIFE_TOTAL,)
+    assert LIFE_TOTAL in also("how many hit points do we start with?")
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "what happens when my hit points reach zero?",
+        "what happens when my life total reaches zero?",
+        "what happens if I reach zero life?",
+        "what if my life gets to 0?",
+        "what happens when life drops to zero",
+        "what if I run out of life?",
+        "what happens when there is no life left?",
+        "what if I lose all my life?",
+    ],
+)
+def test_the_ways_somebody_asks_about_running_out_of_life(question: str) -> None:
+    """The commonest question in a first game.
+
+    The rules answer it in digits -- "0 or less life", in 119.6 and 704.5a --
+    so a question saying "zero" matched neither. Adding the bare digit was
+    worse: it pulled in every rule mentioning the {0} mana symbol. The whole
+    phrase is specific enough to rank.
+    """
+    assert OUT_OF_LIFE in also(question), question
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "how do I gain life?",
+        "does damage reduce my life total?",
+        "what is my starting life?",
+    ],
+)
+def test_a_question_about_life_that_is_not_about_running_out_is_left_alone(
+    question: str,
+) -> None:
+    """The phrase is specific; a question about life in general is not."""
+    assert OUT_OF_LIFE not in also(question), question
 
 
 def test_a_phrase_is_added_once_however_many_entries_match() -> None:
@@ -96,7 +141,8 @@ def test_every_phrase_this_can_add_is_really_in_the_rules() -> None:
 
     Here against the excerpt, which carries a real passage for each of them --
     302.6 and the glossary entry for summoning sickness, 110.2 for entering,
-    119.1 for a life total. And against the *installed* Comprehensive Rules by
+    119.1 for a life total, 119.6 for running out of it. And against the
+    *installed* Comprehensive Rules by
     `tools/check_rules_phrasing.py`, because the excerpt is only what these
     tests needed and the document is what a question is actually searched in.
     """

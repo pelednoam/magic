@@ -1,0 +1,53 @@
+{
+  "_comment": [
+    "Questions a person at a kitchen table would actually type, and the rules",
+    "that answer them. Read by tools/check_retrieval.py.",
+    "",
+    "`any` lists acceptable references: retrieval is approximate, several rules",
+    "often answer one question, and the question counts as found when any of",
+    "them is in the top eight. Every reference here was read in the real",
+    "document before being listed.",
+    "",
+    "`gap` marks a question retrieval does not answer yet. Those do not fail",
+    "the check -- they are written down so the list stays honest about what is",
+    "still broken, and the check says so when one starts passing."
+  ],
+  "questions": [
+    {"ask": "what happens when my hit points reach zero?", "any": ["104.3b", "704.5a", "119.6"],
+     "why": "the keyword collision: reach is an ability and a verb"},
+    {"ask": "what happens when my life total reaches zero?", "any": ["104.3b", "704.5a", "119.6"],
+     "why": "the rules write 0, a person writes zero"},
+    {"ask": "what happens if I reach zero life?", "any": ["104.3b", "704.5a", "119.6"],
+     "why": "both at once"},
+    {"ask": "how many creatures can the defender block with?", "any": ["509.1a", "509.2", "Block"],
+     "why": "defender is a keyword and also the person blocking"},
+    {"ask": "does the attacker or the defender choose blockers?", "any": ["509.1a", "Block"]},
+
+    {"ask": "what does reach do?", "any": ["702.17a", "702.17b", "Reach"],
+     "why": "the keyword sense must survive the fix above"},
+    {"ask": "can a creature with reach block a flyer?", "any": ["702.17b", "702.9b", "Reach"]},
+    {"ask": "what does deathtouch do?", "any": ["702.2a", "702.2b", "Deathtouch"]},
+    {"ask": "how does trample work when blocked?", "any": ["702.19b", "702.19d", "Trample"]},
+    {"ask": "what does flying do?", "any": ["702.9b", "Flying"]},
+    {"ask": "what is first strike?", "any": ["702.7a", "702.7b", "First Strike"]},
+    {"ask": "does defender mean it cannot attack?", "any": ["702.3a", "702.3b", "Defender"]},
+    {"ask": "what does haste do?", "any": ["702.10a", "702.10b", "Haste"]},
+    {"ask": "what does vigilance do?", "any": ["702.20a", "702.20b", "Vigilance"]},
+    {"ask": "what does menace do?", "any": ["702.111a", "702.111b", "Menace"]},
+
+    {"ask": "can a creature that came into play this turn block?",
+     "any": ["302.6", "Summoning Sickness Rule"],
+     "why": "the paraphrase map: 302.6 shares no words with the question"},
+    {"ask": "can I attack with a creature I just played?",
+     "any": ["302.6", "Summoning Sickness Rule"]},
+    {"ask": "how many hit points do we start with?", "any": ["103.4", "Starting Life Total"]},
+
+    {"ask": "when do I untap my creatures?", "any": ["502.1", "503.1", "Untap Step"]},
+    {"ask": "can two creatures block the same attacker?", "any": ["509.2", "509.1a", "Block"]},
+    {"ask": "what happens to damage at the end of the turn?",
+     "any": ["514.2", "120.3", "Cleanup Step"]},
+
+    {"ask": "can a tapped creature block?", "any": ["509.1a"],
+     "gap": "509.1a says blockers must be *untapped*, which stems to `untap` and not to `tapped`. The question and the rule state the same fact in opposite polarity, and no bag of words bridges that."}
+  ]
+}

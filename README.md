@@ -76,6 +76,15 @@ given don't talk about how new a creature is". `rules/phrasing.py` maps a few su
 onto the rules' own wording; it is short on purpose, and a gate check keeps every phrase in it
 one the current document actually uses.
 
+The mirror problem: Magic names its abilities with ordinary words, so a question can contain one
+without being about it. *"What happens when my hit points reach zero?"* used to return the rules
+for **reach**, the keyword. `rules/keywords.py` sets such a word aside only on positive evidence
+that it is a verb — a number after it, a subject pronoun before it — because a question *about* a
+keyword is far commoner, and it reads the keyword list off the document rather than hardcoding it.
+
+`tools/check_retrieval.py` keeps both honest: it asks the installed rules 22 questions a person
+would actually type and fails the gate if an answering rule stops coming back.
+
 Without it everything else works, the server says so at startup, and the app shows the
 question box as switched off rather than letting you type into it.
 

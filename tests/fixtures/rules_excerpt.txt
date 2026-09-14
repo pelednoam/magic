@@ -40,6 +40,8 @@ It may still use any of the options in section 8.
 
 119.1. Each player begins the game with a starting life total of 20. Some variant games have different starting life totals.
 
+119.6. If a player has 0 or less life, that player loses the game as a state-based action. See rule 704.
+
 302. Creatures
 
 302.6. A creature’s activated ability with the tap symbol or the untap symbol in its activation cost can’t be activated unless the creature has been under its controller’s control continuously since their most recent turn began. A creature can’t attack unless it has been under its controller’s control continuously since their most recent turn began. This rule is informally called the “summoning sickness” rule.
@@ -57,6 +59,14 @@ It may still use any of the options in section 8.
 702.2a Deathtouch is a static ability.
 
 702.2b Any nonzero amount of combat damage assigned to a creature by a source with deathtouch is deemed to be lethal damage.
+
+702.17. Reach
+
+702.17a Reach is a static ability.
+
+702.17b A creature with flying can’t be blocked except by creatures with flying and/or reach. (See rule 509, “Declare Blockers Step,” and rule 702.9, “Flying.”)
+
+702.17c Multiple instances of reach on the same creature are redundant.
 
 702.19. Trample
 
@@ -76,6 +86,9 @@ Glossary
 
 Deathtouch
 A keyword ability that makes damage dealt by an object lethal. See rule 702.2, "Deathtouch."
+
+Reach
+A keyword ability that allows a creature to block an attacking creature with flying. See rule 702.17, “Reach.” See also Flying.
 
 Summoning Sickness Rule
 Informal term for a player’s inability to attack with a creature or to activate its abilities that include the tap symbol or the untap symbol unless the creature has been under that player’s control since the beginning of that player’s most recent turn. See rule 302.6. See also Haste.

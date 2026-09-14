@@ -17,6 +17,7 @@ import threading
 from typing import TYPE_CHECKING, Self
 
 from mtgcoach.rules.corpus import Kind, Passage
+from mtgcoach.rules.keywords import names_in
 from mtgcoach.rules.terms import query, references_in
 
 if TYPE_CHECKING:
@@ -41,9 +42,18 @@ DEFAULT_LIMIT = 8
 class RuleIndex:
     """A searchable copy of the Comprehensive Rules."""
 
-    def __init__(self, connection: sqlite3.Connection) -> None:
-        """Wrap an open connection. Prefer ``RuleIndex.build``."""
+    def __init__(
+        self, connection: sqlite3.Connection, keywords: frozenset[str] = frozenset()
+    ) -> None:
+        """Wrap an open connection. Prefer ``RuleIndex.build``.
+
+        ``keywords`` is every one-word keyword ability this document defines,
+        which ``query`` needs in order to tell "reach zero" from the ability.
+        Read off the passages by ``build``; empty here means no question ever
+        has a word set aside, which is how this behaved before.
+        """
         self._connection = connection
+        self._keywords = keywords
         # The index is built once and then only read, but it is read from
         # FastAPI's threadpool -- the rules route is a plain `def` because
         # asking Claude blocks for a minute, and a plain `def` runs in a
@@ -60,14 +70,17 @@ class RuleIndex:
 
         Usable from any thread once built; see ``__init__``.
         """
+        # Listed once: `passages` may be a generator, and it is read twice --
+        # for the keyword names and for the rows.
+        indexed = list(passages)
         connection = sqlite3.connect(path, check_same_thread=False)
         connection.executescript(_SCHEMA)
         connection.executemany(
             "INSERT INTO passages (reference, title, body, kind) VALUES (?, ?, ?, ?)",
-            [(p.reference, p.title, p.text, p.kind.value) for p in passages],
+            [(p.reference, p.title, p.text, p.kind.value) for p in indexed],
         )
         connection.commit()
-        return cls(connection)
+        return cls(connection, names_in(indexed))
 
     def __enter__(self) -> Self:
         """Enter a context manager that closes the index on exit."""
@@ -107,7 +120,7 @@ class RuleIndex:
         than returning none.
         """
         named = self.cited(references_in(question))[:limit]
-        wanted = query(question)
+        wanted = query(question, self._keywords)
         if not wanted:
             return named
         found = [p for p in self._matching(wanted, limit) if p not in named]

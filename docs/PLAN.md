@@ -1005,12 +1005,40 @@ symptom is the answer quietly going back to "I can't say".
 Now: *"Yes! A creature that just showed up can still block. It only has to wait a turn before it
 can attack"* — cited to 302.6.
 
-*Known gap from the same investigation, not fixed.* An added phrase competes on bm25 like any
-other term and can lose. "What happens when my hit points reach zero?" still retrieves the rules
-for **reach**, the keyword ability, because the question contains the word and a keyword's
-heading is weighted above a body match. The collision between ordinary English and Magic's
-keyword vocabulary — reach, flying, haste, trample, defender — is a separate weakness and wants
-its own fix.
+**Magic names its abilities with ordinary words, and a question can contain one without being
+about it.** From the same investigation: *"what happens when my hit points reach zero?"* returned
+the four passages titled **Reach**. "Reach" appears seventeen times in the whole document, nearly
+all of them the ability — which makes it *rare*, so bm25 weighted it heavily — and the rule the
+question wanted was nowhere. There are 160 one-word keywords: haste, flying, trample, menace,
+shadow, fear, defender, storm, ward.
+
+Which way to be wrong decides the design. A question *about* a keyword is far commoner than one
+that merely contains one, and dropping the wrong word is much worse than keeping it — "what about
+deathtouch?" with the word dropped retrieves nothing at all. So the keyword reading stays the
+default, and `rules/keywords.py` sets a word aside only on positive evidence that it is a verb:
+something countable straight after it ("reach zero", "reach 20"), or a subject pronoun straight
+before it ("I reach"). Measured, that fires on exactly the questions it should and no others.
+
+The list of keywords is read off the document's own 702.x headings, never written out here.
+There are 160 of them, Wizards add several a year, and this has to work on sets nobody has
+printed.
+
+Two questions later, the same investigation found the *other* half of that one: the rules say a
+player at **"0 or less life"** loses, in digits, and a question says "zero". Adding the bare digit
+made things worse — it pulls in every rule mentioning the `{0}` mana symbol — so the phrasebook
+maps the paraphrase onto the whole phrase instead.
+
+**Retrieval is now measured rather than asserted.** `tools/check_retrieval.py` asks the installed
+rules 22 questions a person would actually type and checks an answering rule comes back in the top
+eight; the questions and their acceptable references are data, in `tools/retrieval_questions.json`.
+It went 18/22 → 21/22 across these two fixes with no regressions, and it is in the gate, so a
+change that drops a question fails the build instead of quietly making the coach worse.
+
+The 22nd is written down rather than deleted: *"can a tapped creature block?"* The rule says
+blockers must be **untapped**, which stems to `untap` and not to `tapped` — the question and the
+rule state the same fact in opposite polarity, and no bag of words bridges that. A question marked
+as a known gap does not fail the check, and the check says so when one starts passing, so the note
+cannot outlive the problem.
 
 ### Cost, and how to keep it near zero
 

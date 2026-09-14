@@ -60,6 +60,13 @@ LIFE_TOTAL = "life total"
 #: event, which is usually what is being asked about.
 ENTERED = "entered the battlefield"
 
+#: The rules' phrase for a player running out of life, which is the one thing
+#: a beginner most wants to know and the rules describe in digits: "0 or less
+#: life", in 119.6 and 704.5a. A question saying "zero" matched neither, and
+#: adding the bare digit was worse -- it pulled in every rule that mentions the
+#: {0} mana symbol. The whole phrase is specific enough to rank.
+OUT_OF_LIFE = "0 or less life"
+
 #: Each entry: something a beginner types, and the rules' words for it. Matched
 #: case-insensitively against the whole question, and the original words are
 #: kept as well -- this adds to a query, it does not replace it.
@@ -91,6 +98,24 @@ PHRASES: tuple[tuple[re.Pattern[str], tuple[str, ...]], ...] = (
     (
         re.compile(r"\bhit points\b", re.IGNORECASE),
         (LIFE_TOTAL,),
+    ),
+    # Running out of life, in the words a person uses for it. The rules say
+    # "0 or less life" and a question says "reaches zero", "runs out", "hits
+    # nothing left" -- and the digit is why none of them matched.
+    (
+        re.compile(
+            r"\b(?:"
+            r"(?:life|life total|hit points|hp)\s+"
+            r"(?:reach(?:es)?|hits?|gets?\s+to|drops?\s+to|goes?\s+to|is|are)\s*"
+            r"(?:zero|0|nothing|none)|"
+            r"reach(?:es|ed)?\s+(?:zero|0)\s+life|"
+            r"run(?:s|ning)?\s+out\s+of\s+life|"
+            r"no\s+life\s+left|"
+            r"lose\s+all\s+(?:my\s+|your\s+|their\s+)?life"
+            r")\b",
+            re.IGNORECASE,
+        ),
+        (OUT_OF_LIFE,),
     ),
 )
 
