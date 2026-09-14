@@ -35,6 +35,25 @@ if TYPE_CHECKING:
     from mtgcoach.rules.search import RuleIndex
 
 
+@dataclass(frozen=True, slots=True)
+class Claude:
+    """What this server can ask a model, and what it can ask about.
+
+    Together because they are one decision -- whether this server has a Claude
+    layer at all -- and because ``create_app`` had six arguments, three of them
+    these.
+
+    All three default to absent and are filled in by ``create_app``: the two
+    models with the local CLI, and ``rules`` with nothing, because the
+    Comprehensive Rules are an optional install and everything else works
+    without them.
+    """
+
+    explainer: Explainer | None = None
+    asker: Asker | None = None
+    rules: RuleIndex | None = None
+
+
 @dataclass(slots=True)
 class Server:
     """Everything the routes need, in one place they can be given in a test."""

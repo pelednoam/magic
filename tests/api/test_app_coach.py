@@ -15,15 +15,19 @@ refusal, and no answer at all is a 503 rather than a broken page.
 
 from __future__ import annotations
 
-from fastapi.testclient import TestClient
+from typing import TYPE_CHECKING
 
 from helpers import facts
-from helpers_api import BEAR, FOREST, Canned, server
+from helpers_api import BEAR, FOREST, TOKEN, Canned, NoAnswers, server, talking
 from helpers_coach import taps_for
 from mtgcoach.api.app import create_app
 from mtgcoach.api.cards import Catalogue
+from mtgcoach.api.context import Claude
 from mtgcoach.coach.advice import Explanation
 from wire import flag, named, obj, rows, text, words
+
+if TYPE_CHECKING:
+    from fastapi.testclient import TestClient
 
 HTTP_OK = 200
 HTTP_BAD_REQUEST = 400
@@ -64,7 +68,7 @@ def _land_in_hand(client: TestClient, session_id: str) -> str:
 
 
 def test_an_answer_the_engine_agrees_with_is_passed_on() -> None:
-    with TestClient(server(explainer=Canned(SENSIBLE))) as client:
+    with talking(server(explainer=Canned(SENSIBLE))) as client:
         session_id = _game(client)
         response = client.post(f"/games/{session_id}/coach", json={"player": "you"})
         assert response.status_code == HTTP_OK
@@ -76,7 +80,7 @@ def test_an_answer_the_engine_agrees_with_is_passed_on() -> None:
 def test_a_recommendation_is_returned_as_the_instance_id_it_was_given() -> None:
     """The client keys its own list on these, so they have to survive intact."""
     coach = Canned(SENSIBLE)
-    with TestClient(server(explainer=coach)) as client:
+    with talking(server(explainer=coach)) as client:
         session_id = _game(client)
         wanted = _land_in_hand(client, session_id)
         coach.said = Explanation(play=wanted, because="Play the land.", in_short="Land.")
@@ -88,7 +92,7 @@ def test_a_recommendation_is_returned_as_the_instance_id_it_was_given() -> None:
 def test_an_invented_card_is_refused_rather_than_shown() -> None:
     """The whole point of the layer, exercised through the route."""
     said = Explanation(play="not-a-card", because="Cast the dragon.", in_short="Dragon!")
-    with TestClient(server(explainer=Canned(said))) as client:
+    with talking(server(explainer=Canned(said))) as client:
         session_id = _game(client)
         response = client.post(f"/games/{session_id}/coach", json={"player": "you"})
         assert response.status_code == HTTP_OK
@@ -102,7 +106,7 @@ def test_an_invented_card_is_refused_rather_than_shown() -> None:
 
 def test_an_invented_attack_is_refused() -> None:
     said = Explanation(attack=("ghost",), because="Swing.", in_short="Attack!")
-    with TestClient(server(explainer=Canned(said))) as client:
+    with talking(server(explainer=Canned(said))) as client:
         session_id = _game(client)
         body = client.post(f"/games/{session_id}/coach", json={"player": "you"}).json()
         assert not flag(body, "trusted")
@@ -110,7 +114,7 @@ def test_an_invented_attack_is_refused() -> None:
 
 def test_no_coach_is_a_503_and_not_a_broken_page() -> None:
     """The engine's panel is still on screen; this only says the words failed."""
-    with TestClient(server()) as client:
+    with talking(server()) as client:
         session_id = _game(client)
         response = client.post(f"/games/{session_id}/coach", json={"player": "you"})
         assert response.status_code == HTTP_UNAVAILABLE
@@ -118,13 +122,13 @@ def test_no_coach_is_a_503_and_not_a_broken_page() -> None:
 
 
 def test_coaching_a_game_that_is_not_there() -> None:
-    with TestClient(server(explainer=Canned(SENSIBLE))) as client:
+    with talking(server(explainer=Canned(SENSIBLE))) as client:
         response = client.post("/games/nope/coach", json={"player": "you"})
         assert response.status_code == HTTP_NOT_FOUND
 
 
 def test_coaching_a_player_who_is_not_in_the_game() -> None:
-    with TestClient(server(explainer=Canned(SENSIBLE))) as client:
+    with talking(server(explainer=Canned(SENSIBLE))) as client:
         session_id = _game(client)
         response = client.post(f"/games/{session_id}/coach", json={"player": "nobody"})
         assert response.status_code == HTTP_BAD_REQUEST
@@ -132,7 +136,7 @@ def test_coaching_a_player_who_is_not_in_the_game() -> None:
 
 def test_the_player_defaults_to_you() -> None:
     """The app's own seat, which is what a phone with one player will send."""
-    with TestClient(server(explainer=Canned(SENSIBLE))) as client:
+    with talking(server(explainer=Canned(SENSIBLE))) as client:
         session_id = _game(client)
         response = client.post(f"/games/{session_id}/coach", json={})
         assert response.status_code == HTTP_OK
@@ -140,7 +144,7 @@ def test_the_player_defaults_to_you() -> None:
 
 def test_coaching_does_not_change_the_game() -> None:
     """Asking for advice is not a move, so nothing may move."""
-    with TestClient(server(explainer=Canned(SENSIBLE))) as client:
+    with talking(server(explainer=Canned(SENSIBLE))) as client:
         session_id = _game(client)
         before = client.get(f"/games/{session_id}").json()
         client.post(f"/games/{session_id}/coach", json={"player": "you"})
@@ -163,8 +167,10 @@ def test_saying_nothing_about_an_unmodelled_card_is_refused() -> None:
         rules={"Forest": (taps_for("{G}"),), "Bear": ()},
     )
     deck = ("Forest",) * 6 + ("Strange",) * 4
-    app = create_app(catalogue, {"green": deck, "other": deck}, Canned(SENSIBLE))
-    with TestClient(app) as client:
+    app = create_app(
+        catalogue, {"green": deck, "other": deck}, TOKEN, Claude(Canned(SENSIBLE), NoAnswers())
+    )
+    with talking(app) as client:
         session_id = _game(client)
         card = named(
             rows(client.get(f"/games/{session_id}").json(), "state", "players", "you", "hand"),

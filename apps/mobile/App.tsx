@@ -22,8 +22,19 @@ import { YOU } from "./src/wire";
  */
 const SERVER = process.env["EXPO_PUBLIC_COACH_URL"] ?? "http://localhost:8000";
 
+/**
+ * The server's token, if this build was given one.
+ *
+ * The server prints it at startup; `npm run web` on the same laptop picks it up
+ * from the environment. A phone will not have it, which is why `Start` asks
+ * for it when the server refuses -- see its `onToken`.
+ */
+const TOKEN = process.env["EXPO_PUBLIC_COACH_TOKEN"] ?? "";
+
 export default function App() {
-  const [coach] = useState(() => new Coach(SERVER));
+  // Held in state rather than derived, because a token typed into `Start`
+  // replaces it and everything below needs the new one.
+  const [coach, setCoach] = useState(() => new Coach(SERVER, TOKEN));
   const [game, setGame] = useState<NewGame | null>(null);
   // Which side of the table this device is. The first device takes "you"; a
   // device that joins an existing game takes the other seat.
@@ -39,6 +50,7 @@ export default function App() {
             setSeat(taken);
             setGame(started);
           }}
+          onToken={(token) => { setCoach(coach.withToken(token)); }}
         />
       ) : (
         <Game coach={coach} game={game} seat={seat} />

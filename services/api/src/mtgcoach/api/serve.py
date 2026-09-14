@@ -19,8 +19,10 @@ from typing import TYPE_CHECKING
 
 import uvicorn
 
+from mtgcoach.api.access import token_at
 from mtgcoach.api.app import create_app
 from mtgcoach.api.cards import build
+from mtgcoach.api.context import Claude
 from mtgcoach.carddata.decks import load_set_decks
 from mtgcoach.carddata.paths import effects_path
 from mtgcoach.carddata.store import CardStore
@@ -40,6 +42,12 @@ if TYPE_CHECKING:
 DEFAULT_PORT = 8000
 
 
+#: Where the server's token lives, relative to the data directory. Beside the
+#: card database, because it belongs to this installation rather than to a run.
+#: A filename, not a secret -- the secret is what `access.token_at` puts in it.
+TOKEN_PATH = Path("token")
+
+
 def assemble(db: Path, data_root: Path, set_code: SetCode) -> FastAPI:
     """Build the app from the card database and a set's sealed data.
 
@@ -57,7 +65,8 @@ def assemble(db: Path, data_root: Path, set_code: SetCode) -> FastAPI:
         names = {card.name: card.oracle_id for card in cards}
 
     decks = {deck.key: _library(deck, names) for deck in load_set_decks(data_root, set_code)}
-    return create_app(catalogue, decks, rules=_rules(data_root))
+    token = token_at(data_root / TOKEN_PATH)
+    return create_app(catalogue, decks, token, Claude(rules=_rules(data_root)))
 
 
 def _rules(data_root: Path) -> RuleIndex | None:
@@ -112,8 +121,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     app = assemble(args.db, args.data, SetCode(args.set_code))
+    _announce(args.data, args.host, args.port)
     uvicorn.run(app, host=args.host, port=args.port)
     return 0
+
+
+def _announce(data_root: Path, host: str, port: int) -> None:
+    """Print the address and the token, because nothing else will.
+
+    The token is the whole of the server's access control and the app needs it.
+    Printing it at startup is how it gets from the laptop to the phone -- there
+    is nobody to email it to.
+    """
+    where = "localhost" if host in {"0.0.0.0", "::"} else host  # noqa: S104 - the LAN is the point
+    token = token_at(data_root / TOKEN_PATH)
+    print(f"Magic Coach on http://{where}:{port}")  # noqa: T201 - a console script
+    print(f"  token: {token}")  # noqa: T201
+    print(  # noqa: T201
+        "  give it to the app as EXPO_PUBLIC_COACH_TOKEN, or paste it in when asked"
+    )
 
 
 if __name__ == "__main__":

@@ -7,26 +7,28 @@
  * not "400").
  */
 
+import { ServerError, detailOf } from "./failures";
+
 import type { Asked, Coaching, NewGame, Snapshot } from "./wire";
 import { isAsked, isCoaching } from "./wire";
 
-/** The server refused, and said why. */
-export class ServerError extends Error {
-  readonly status: number;
-
-  constructor(status: number, detail: string) {
-    super(detail);
-    this.name = "ServerError";
-    this.status = status;
-  }
-}
+// Re-exported: every caller already imports it from here, and where the class
+// happens to live is not their business.
+export { ServerError } from "./failures";
 
 /** How to reach the server, and how to ask it things. */
 export class Coach {
   private readonly base: string;
+  private readonly token: string;
 
-  constructor(base: string) {
+  constructor(base: string, token: string) {
     this.base = base.replace(/\/+$/, "");
+    this.token = token;
+  }
+
+  /** The same server, with a different token. Used when one is typed in. */
+  withToken(token: string): Coach {
+    return new Coach(this.base, token);
   }
 
   /** The decks this server can deal. */
@@ -110,11 +112,27 @@ export class Coach {
    */
   watchUrl(sessionId: string): string {
     const socketBase = this.base.replace(/^https:/i, "wss:").replace(/^http:/i, "ws:");
-    return `${socketBase}/games/${segment(sessionId)}/watch`;
+    // The token goes in the query string because a page cannot set headers on
+    // a WebSocket handshake. That is a real if small cost -- a query string
+    // reaches logs and browser history in a way a header does not -- and the
+    // alternative is a socket nobody can open from a browser.
+    const token = encodeURIComponent(this.token);
+    return `${socketBase}/games/${segment(sessionId)}/watch?token=${token}`;
   }
 
   private async get<T>(path: string): Promise<T> {
-    return this.unwrap<T>(await fetch(`${this.base}${path}`));
+    return this.unwrap<T>(await fetch(`${this.base}${path}`, { headers: this.headers() }));
+  }
+
+  /**
+   * What every request carries.
+   *
+   * The server has no other access control, so a request without this gets a
+   * 401 whoever sent it -- including a page the household happened to visit,
+   * which is the thing the token is actually for.
+   */
+  private headers(): Record<string, string> {
+    return { Authorization: `Bearer ${this.token}` };
   }
 
   private async send<T>(
@@ -124,7 +142,7 @@ export class Coach {
   ): Promise<T> {
     const response = await fetch(`${this.base}${path}`, {
       method,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...this.headers(), "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     return this.unwrap<T>(response);
@@ -136,27 +154,6 @@ export class Coach {
     }
     throw new ServerError(response.status, await detailOf(response));
   }
-}
-
-/**
- * The server's explanation, or a plain one if it did not give the usual shape.
- *
- * Never throws: this runs while handling an error, and an exception here would
- * replace a useful message with a confusing one.
- */
-async function detailOf(response: Response): Promise<string> {
-  try {
-    const body: unknown = await response.json();
-    if (typeof body === "object" && body !== null && "detail" in body) {
-      const detail = (body as { detail: unknown }).detail;
-      if (typeof detail === "string" && detail.length > 0) {
-        return detail;
-      }
-    }
-  } catch {
-    // Not JSON, or the connection went away mid-read. Fall through.
-  }
-  return `the server said ${response.status}`;
 }
 
 /** One path segment, escaped. A session id comes from the server, but a URL

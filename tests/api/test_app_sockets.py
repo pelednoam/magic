@@ -15,11 +15,15 @@ actually hears about an event it did not send.
 
 from __future__ import annotations
 
-from fastapi.testclient import TestClient
+from typing import TYPE_CHECKING
 
-from helpers_api import CATALOGUE, DECKS, server
+from helpers_api import CATALOGUE, DECKS, TOKEN, NoAnswers, NoCoach, server, talking
 from mtgcoach.api.app import create_app
+from mtgcoach.api.context import Claude
 from wire import decoded, number
+
+if TYPE_CHECKING:
+    from fastapi.testclient import TestClient
 
 HTTP_OK = 200
 HTTP_BAD_REQUEST = 400
@@ -37,7 +41,7 @@ def _new_game(client: TestClient) -> str:
 
 
 def test_a_watcher_is_sent_the_board_on_connecting() -> None:
-    with TestClient(server()) as client:
+    with talking(server()) as client:
         session_id = _new_game(client)
         with client.websocket_connect(f"/games/{session_id}/watch") as socket:
             first = decoded(socket.receive_json())
@@ -46,7 +50,7 @@ def test_a_watcher_is_sent_the_board_on_connecting() -> None:
 
 def test_a_watcher_hears_about_an_event_someone_else_sent() -> None:
     """The whole point of the server: one game, two views."""
-    with TestClient(server()) as client:
+    with talking(server()) as client:
         session_id = _new_game(client)
         with client.websocket_connect(f"/games/{session_id}/watch") as socket:
             socket.receive_json()
@@ -59,7 +63,7 @@ def test_a_watcher_hears_about_an_event_someone_else_sent() -> None:
 
 
 def test_a_watcher_hears_about_an_undo_too() -> None:
-    with TestClient(server()) as client:
+    with talking(server()) as client:
         session_id = _new_game(client)
         client.post(
             f"/games/{session_id}/events",
@@ -74,7 +78,7 @@ def test_a_watcher_hears_about_an_undo_too() -> None:
 
 def test_watching_a_game_that_does_not_exist_closes_the_socket() -> None:
     """With a code the client can act on, rather than an empty stream."""
-    with TestClient(server()) as client, client.websocket_connect("/games/nope/watch") as socket:
+    with talking(server()) as client, client.websocket_connect("/games/nope/watch") as socket:
         message = socket.receive()
         assert message["type"] == "websocket.close"
         assert message["code"] == WS_NO_SUCH_GAME
@@ -82,7 +86,7 @@ def test_watching_a_game_that_does_not_exist_closes_the_socket() -> None:
 
 def test_a_client_that_sends_a_message_is_simply_kept_alive() -> None:
     """The socket is one-way by design; a client ping should not kill it."""
-    with TestClient(server()) as client:
+    with talking(server()) as client:
         session_id = _new_game(client)
         with client.websocket_connect(f"/games/{session_id}/watch") as socket:
             socket.receive_json()
@@ -96,6 +100,6 @@ def test_a_client_that_sends_a_message_is_simply_kept_alive() -> None:
 
 
 def test_a_server_with_no_decks_still_starts() -> None:
-    with TestClient(create_app(CATALOGUE, {})) as client:
+    with talking(create_app(CATALOGUE, {}, TOKEN, Claude(NoCoach(), NoAnswers()))) as client:
         assert client.get("/decks").json() == {"decks": []}
         assert DECKS

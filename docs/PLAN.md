@@ -78,10 +78,9 @@ their main phase; the silence checks matched card names as substrings, so a card
 counted as mentioned by the word "strategy"; and the process-group kill asked a reaped child
 for its group id, which is both too late and a pid-reuse race.
 
-The two Claude routes are also rationed now — twelve a minute, three at once. Not a security
-boundary: §4 puts this on one LAN with no auth and that is still a known gap. It is about the
-failure that needs no attacker, which is a stuck finger on a button that starts a Node process
-and spends a subscription.
+The two Claude routes are also rationed — twelve a minute, three at once. Not a security
+boundary even now that there is a token: it is about the failure that needs no attacker, which
+is a stuck finger on a button that starts a Node process and spends a subscription.
 
 A fifth round found the one that could have taken the server down. `os.getpgid` was asked for
 the child's process group immediately after `Popen` returned — but `setsid` runs *in the
@@ -1112,12 +1111,20 @@ the wire for exactly this reason: the app only offers to play what the engine ca
 says so on the cards it cannot. Casting arrives with the stack, alongside `counters` and
 attachments.
 
-The other is identity. There is no notion of *who* is asking: the API is unauthenticated, every
-snapshot carries both players' hands, and `move_card` will move any card from any zone. At a
-kitchen table with one screen that is the intended shape, but it means the server must not be
-exposed beyond the LAN, and §3's "can't see your opponent's hand" is currently enforced by the
-room rather than the code. Both close together, when a session knows which player a connection
-belongs to.
+The other is identity, and it is now half closed. The API is **not** unauthenticated: the
+server makes a token on first run, prints it at startup, and `api/gatekeeper.py` refuses every
+request and every socket without it — as ASGI middleware rather than a per-route dependency, so
+a route added later is behind it whether or not anybody remembered. The threat that closes is
+not a guest's phone but a web page the household visits, which could reach
+`http://<laptop>:8000` cross-origin and needed to know nothing to drive the game or spend the
+subscription.
+
+What is still open is *which player* is asking. One shared secret does not say, so every
+snapshot still carries both players' hands and `move_card` will still move any card from any
+zone — §3's "can't see your opponent's hand" is enforced by the room, not the code. A token per
+*seat* closes that, issued when a game starts, and is the obvious next step from here: the
+gatekeeper already knows how to read a token off a request, and would then put a `PlayerId` on
+the scope instead of a boolean.
 
 **The server may not contradict its own coach.** `guard.py` asks `legality.why_not_play_land`
 rather than re-deciding. It used to check only that the card was a land, and the reducer checks

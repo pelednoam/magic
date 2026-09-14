@@ -18,17 +18,19 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
-from fastapi.testclient import TestClient
 
-from helpers_api import NoCoach
+from helpers_api import TOKEN, NoCoach, talking
 from mtgcoach.api.app import create_app
 from mtgcoach.api.cards import build
+from mtgcoach.api.context import Claude
 from mtgcoach.carddata.scryfall import cards_in
 from mtgcoach.carddata.store import CardStore
 from mtgcoach.core.ids import SetCode
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from fastapi.testclient import TestClient
 
     from mtgcoach.api.cards import Catalogue
 
@@ -70,6 +72,6 @@ def client(catalogue: Catalogue) -> Iterator[TestClient]:
     quota, and would pass or fail for reasons this repository does not control.
     ``test_coaching`` supplies its own.
     """
-    app = create_app(catalogue, {"green": GREEN, "white": WHITE}, NoCoach())
-    with TestClient(app) as connected:
+    app = create_app(catalogue, {"green": GREEN, "white": WHITE}, TOKEN, Claude(NoCoach()))
+    with talking(app) as connected:
         yield connected

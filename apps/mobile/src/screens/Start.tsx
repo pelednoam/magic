@@ -12,7 +12,9 @@ import {
 } from "react-native";
 
 import type { Coach } from "../client";
+import { ServerError } from "../client";
 import { messageOf } from "../errors";
+import { Trouble } from "../components/Trouble";
 import { colour, space, text } from "../theme";
 import type { NewGame } from "../wire";
 import { THEM, YOU } from "../wire";
@@ -20,20 +22,38 @@ import { THEM, YOU } from "../wire";
 export function Start({
   coach,
   onStarted,
+  onToken,
 }: {
   readonly coach: Coach;
   readonly onStarted: (game: NewGame, seat: string) => void;
+  /** Called with a token typed in by hand; see `needsToken` below. */
+  readonly onToken: (token: string) => void;
 }) {
   const [decks, setDecks] = useState<readonly string[] | null>(null);
   const [yours, setYours] = useState<string | null>(null);
   const [joining, setJoining] = useState("");
   const [problem, setProblem] = useState("");
+  /**
+   * Whether the server said "you have the wrong token".
+   *
+   * A build on the same laptop picks the token up from the environment; a
+   * phone cannot, so it has to be typed once. Showing the field only when the
+   * server has actually refused keeps it out of the way in the common case.
+   */
+  const [needsToken, setNeedsToken] = useState(false);
+  const [typed, setTyped] = useState("");
+
+  const refused = (error: unknown) => {
+    setNeedsToken(error instanceof ServerError && error.needsToken);
+    setProblem(messageOf(error));
+  };
 
   useEffect(() => {
-    coach
-      .decks()
-      .then(setDecks)
-      .catch((error: unknown) => { setProblem(messageOf(error)); });
+    setNeedsToken(false);
+    setProblem("");
+    coach.decks().then(setDecks).catch(refused);
+    // `refused` is made fresh each render and only ever sets state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coach]);
 
   async function begin(theirs: string): Promise<void> {
@@ -43,7 +63,7 @@ export function Start({
     try {
       onStarted(await coach.start(yours, theirs), YOU);
     } catch (error: unknown) {
-      setProblem(messageOf(error));
+      refused(error);
     }
   }
 
@@ -60,30 +80,29 @@ export function Start({
       const existing = await coach.look(joining.trim());
       onStarted({ ...existing, session_id: joining.trim() }, THEM);
     } catch (error: unknown) {
-      setProblem(messageOf(error));
+      refused(error);
     }
   }
 
   if (problem !== "") {
-    // Recoverable, not terminal. The commonest error here is the laptop not
-    // being up yet, and a dead-end screen means quitting the app to retry.
     return (
-      <View style={styles.page}>
-        <Text style={styles.problem}>{problem}</Text>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => {
-            setProblem("");
-            setDecks(null);
-            coach
-              .decks()
-              .then(setDecks)
-              .catch((error: unknown) => { setProblem(messageOf(error)); });
-          }}
-        >
-          <Text style={styles.back}>try again</Text>
-        </Pressable>
-      </View>
+      <Trouble
+        problem={problem}
+        needsToken={needsToken}
+        typed={typed}
+        onTyped={setTyped}
+        onRetry={() => {
+          setProblem("");
+          setDecks(null);
+          if (needsToken) {
+            // `onToken` hands this screen a new `Coach`, whose arrival the
+            // effect above sees and retries with.
+            onToken(typed.trim());
+            return;
+          }
+          coach.decks().then(setDecks).catch(refused);
+        }}
+      />
     );
   }
   if (decks === null) {

@@ -6,10 +6,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from fastapi.testclient import TestClient
+
 from helpers import facts
 from helpers_coach import taps_for
 from mtgcoach.api.app import create_app
 from mtgcoach.api.cards import Catalogue
+from mtgcoach.api.context import Claude
 from mtgcoach.coach.advice import ExplainerError, Explanation
 from mtgcoach.core.abilities import Trigger, TriggeredAbility
 from mtgcoach.core.vocabulary import TriggerEvent
@@ -135,6 +138,11 @@ RULES = RuleIndex.build(
 )
 
 
+#: The token every test server uses. A fixed one rather than a fresh one so a
+#: failure message shows the same string every time.
+TOKEN = "token-for-tests"  # noqa: S105 - a test fixture, not a credential
+
+
 def server(
     decks: Mapping[str, tuple[str, ...]] | None = None,
     explainer: Explainer | None = None,
@@ -151,7 +159,27 @@ def server(
     return create_app(
         CATALOGUE,
         DECKS if decks is None else decks,
-        explainer if explainer is not None else NoCoach(),
-        asker if asker is not None else NoAnswers(),
-        rules,
+        TOKEN,
+        Claude(
+            explainer=explainer if explainer is not None else NoCoach(),
+            asker=asker if asker is not None else NoAnswers(),
+            rules=rules,
+        ),
+    )
+
+
+def talking(app: FastAPI | None = None, token: str = TOKEN) -> TestClient:
+    """A test client that carries the token on every request.
+
+    One place, because there are nearly fifty constructions of this across the
+    suite and a test that forgot the header would fail with a 401 saying
+    nothing about the thing it was testing. Named so it does not collide with
+    the ``as client`` every caller binds it to.
+
+    ``token`` is only passed by the tests that build a *real* server: that one
+    makes its own and keeps it in a file, so the test has to read it back.
+    """
+    return TestClient(
+        app if app is not None else server(),
+        headers={"Authorization": f"Bearer {token}"},
     )

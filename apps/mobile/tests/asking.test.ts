@@ -13,6 +13,9 @@ import { Coach, ServerError } from "../src/client";
 import type { Asked } from "../src/wire";
 import { isAsked } from "../src/wire";
 
+/** Any token: these assert on what is sent, not on what the token is. */
+const TOKEN = "t";
+
 const ASKED: Asked = {
   answer: {
     answer: "Lethal damage goes to the blocker first; the rest tramples over.",
@@ -46,7 +49,7 @@ describe("asking a rules question", () => {
   it("sends the question and the seat", async () => {
     const stub = replying(200, ASKED);
     vi.stubGlobal("fetch", stub);
-    const reply = await new Coach("http://x").ask("g1", "how does trample work?", "them");
+    const reply = await new Coach("http://x", TOKEN).ask("g1", "how does trample work?", "them");
     expect(reply.answer.citations).toEqual(["702.19b"]);
     expect(stub).toHaveBeenCalledWith(
       "http://x/games/g1/ask",
@@ -59,7 +62,7 @@ describe("asking a rules question", () => {
 
   it("keeps the retrieved rules even when the answer was refused", async () => {
     vi.stubGlobal("fetch", replying(200, { ...ASKED, cited: false }));
-    const reply = await new Coach("http://x").ask("g1", "q", "you");
+    const reply = await new Coach("http://x", TOKEN).ask("g1", "q", "you");
     expect(reply.cited).toBe(false);
     expect(reply.rules).toHaveLength(1);
   });
@@ -69,7 +72,7 @@ describe("asking a rules question", () => {
       "fetch",
       replying(503, { detail: "the Comprehensive Rules are not installed on this server" }),
     );
-    await expect(new Coach("http://x").ask("g1", "q", "you")).rejects.toThrow(/not installed/);
+    await expect(new Coach("http://x", TOKEN).ask("g1", "q", "you")).rejects.toThrow(/not installed/);
   });
 
   it("refuses a reply it cannot read rather than rendering undefined", async () => {
@@ -77,7 +80,7 @@ describe("asking a rules question", () => {
       "fetch",
       replying(200, { cited: true, matched: true, rules: [], answer: { answer: 7 } }),
     );
-    await expect(new Coach("http://x").ask("g1", "q", "you")).rejects.toBeInstanceOf(ServerError);
+    await expect(new Coach("http://x", TOKEN).ask("g1", "q", "you")).rejects.toBeInstanceOf(ServerError);
   });
 });
 

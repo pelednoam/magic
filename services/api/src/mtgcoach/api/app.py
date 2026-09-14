@@ -14,16 +14,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fastapi import FastAPI, HTTPException, WebSocket
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import HTTPException, WebSocket
 from starlette.status import HTTP_400_BAD_REQUEST
 
 from mtgcoach.api import thinking
+from mtgcoach.api.access import MissingTokenError
 from mtgcoach.api.asker import ClaudeCliAsker
-from mtgcoach.api.context import Server, session, snapshot
+from mtgcoach.api.context import Claude, Server, session, snapshot
 from mtgcoach.api.dealing import library
 from mtgcoach.api.eventspec import BadEventError, parse
 from mtgcoach.api.explainer import ClaudeCliExplainer
+from mtgcoach.api.gatekeeper import guarded
 from mtgcoach.api.guard import check
 from mtgcoach.api.hub import Hub
 from mtgcoach.api.sessions import SessionStore, UnknownSessionError
@@ -33,19 +34,17 @@ from mtgcoach.core.ids import PlayerId
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from fastapi import FastAPI
+
     from mtgcoach.api.cards import Catalogue
     from mtgcoach.api.views import Json
-    from mtgcoach.coach.advice import Explainer
-    from mtgcoach.rules.answer import Asker
-    from mtgcoach.rules.search import RuleIndex
 
 
 def create_app(
     catalogue: Catalogue,
     decks: Mapping[str, tuple[str, ...]],
-    explainer: Explainer | None = None,
-    asker: Asker | None = None,
-    rules: RuleIndex | None = None,
+    token: str,
+    claude: Claude | None = None,
 ) -> FastAPI:
     """Build the application around a set of cards and the decks it can deal.
 
@@ -53,36 +52,29 @@ def create_app(
     rather than read from disk so a test can deal a three-card deck and a real
     run can deal the Beginner Box's ten.
 
-    ``explainer`` and ``asker`` default to the local ``claude`` command.
-    Injected so that a test can run the whole route without a subprocess -- and
-    so that the day this moves to the API, or to a different model, is a change
-    to one caller.
+    ``claude`` carries the two models and the rules index; see ``context.Claude``.
 
-    ``rules`` is the Comprehensive Rules index, or None when the document is
-    not installed. Everything except the rules question route works without it.
+    ``token`` is required and may not be empty. There is deliberately no open
+    mode: an argument that can be left out is an argument that gets left out,
+    and this one is the whole of the server's access control.
+
+    Raises:
+        MissingTokenError: If ``token`` is empty.
     """
+    if not token:
+        msg = "a server needs a token; there is no open mode. See api.access."
+        raise MissingTokenError(msg)
+    asked = claude if claude is not None else Claude()
     server = Server(
         catalogue=catalogue,
         store=SessionStore(),
         hub=Hub(),
         decks=decks,
-        explainer=explainer if explainer is not None else ClaudeCliExplainer(),
-        asker=asker if asker is not None else ClaudeCliAsker(),
-        rules=rules,
+        explainer=asked.explainer if asked.explainer is not None else ClaudeCliExplainer(),
+        asker=asked.asker if asked.asker is not None else ClaudeCliAsker(),
+        rules=asked.rules,
     )
-    app = FastAPI(title="Magic Coach", version="0.1.0")
-    # The web build is served by Metro on a different port, so every request
-    # from it is cross-origin and the browser blocks it before the route is
-    # ever reached -- a preflight returned 405 with no allow-origin header.
-    # Open, because this is a LAN server with no credentials and no auth: there
-    # is nothing here an origin check would protect, and pretending otherwise
-    # would be security theatre. See PLAN.md on identity for what that costs.
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    app = guarded(token)
     _routes(app, server)
     return app
 

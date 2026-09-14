@@ -16,11 +16,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
-from fastapi.testclient import TestClient
 
 from conftest import GREEN, WHITE
-from helpers_api import RULES, Answering, Canned
+from helpers_api import RULES, TOKEN, Answering, Canned, talking
 from mtgcoach.api.app import create_app
+from mtgcoach.api.context import Claude
 from mtgcoach.coach.advice import Explanation
 from mtgcoach.rules.answer import Answer
 from snapshot import ask, look, no_coach, send, start, verdicts
@@ -28,6 +28,8 @@ from wire import flag, obj, rows, text, words
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from fastapi.testclient import TestClient
 
     from mtgcoach.api.cards import Catalogue
 
@@ -55,8 +57,13 @@ def answerer() -> Answering:
 @pytest.fixture
 def client(catalogue: Catalogue, coach: Canned, answerer: Answering) -> Iterator[TestClient]:
     """The real server, with those answers standing in for the model."""
-    app = create_app(catalogue, {"green": GREEN, "white": WHITE}, coach, answerer, RULES)
-    with TestClient(app) as connected:
+    app = create_app(
+        catalogue,
+        {"green": GREEN, "white": WHITE},
+        TOKEN,
+        Claude(coach, answerer, RULES),
+    )
+    with talking(app) as connected:
         yield connected
 
 
@@ -109,8 +116,8 @@ def test_no_coach_at_all_is_a_503(catalogue: Catalogue) -> None:
     """The engine's own advice is still in every snapshot; only the words fail."""
     from helpers_api import NoCoach  # noqa: PLC0415 - the point is this one app
 
-    app = create_app(catalogue, {"green": GREEN, "white": WHITE}, NoCoach())
-    with TestClient(app) as client:
+    app = create_app(catalogue, {"green": GREEN, "white": WHITE}, TOKEN, Claude(NoCoach()))
+    with talking(app) as client:
         session_id = start(client)
         no_coach(client, session_id)
         # And the engine's own advice is still there, which is the point.

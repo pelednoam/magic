@@ -16,15 +16,20 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
-from fastapi.testclient import TestClient
 
-from mtgcoach.api.serve import assemble, main
+from helpers_api import talking
+from mtgcoach.api.access import token_at
+from mtgcoach.api.serve import TOKEN_PATH, assemble, main
 from mtgcoach.carddata.scryfall import cards_in
 from mtgcoach.carddata.store import CardStore
 from mtgcoach.core.ids import SetCode
 from wire import decoded, rows, words
+
+if TYPE_CHECKING:
+    from fastapi.testclient import TestClient
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
 PLAYABLE = FIXTURES / "scryfall_fdn_playable.json"
@@ -43,7 +48,7 @@ def _stocked(tmp_path: Path) -> Path:
 
 def test_a_server_built_from_disk_deals_the_sets_decks(tmp_path: Path) -> None:
     app = assemble(_stocked(tmp_path), DATA, FDN)
-    with TestClient(app) as client:
+    with talking(app, token=token_at(DATA / TOKEN_PATH)) as client:
         listed = decoded(client.get("/decks").json())
         assert "cats" in words(listed, "decks"), "the box decklists are on disk"
 
@@ -51,7 +56,7 @@ def test_a_server_built_from_disk_deals_the_sets_decks(tmp_path: Path) -> None:
 def test_a_deck_is_dealt_from_the_cards_the_store_actually_has(tmp_path: Path) -> None:
     """A partial import gives a short deck, not a refusal or a blank card."""
     app = assemble(_stocked(tmp_path), DATA, FDN)
-    with TestClient(app) as client:
+    with talking(app, token=token_at(DATA / TOKEN_PATH)) as client:
         response = client.post("/games", json={"you": "elves", "them": "elves"})
         assert response.status_code == HTTP_OK, response.text
         hand = rows(decoded(response.json()), "state", "players", "you", "hand")
@@ -81,8 +86,13 @@ def test_the_command_line_serves(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 
 
 def _dealt(tmp_path: Path, data_root: Path) -> TestClient:
-    """A server assembled from a stocked database and this data root."""
-    return TestClient(assemble(_stocked(tmp_path), data_root, FDN))
+    """A server assembled from a stocked database and this data root.
+
+    It made its own token when it was assembled -- see `access.token_at` -- so
+    the client is given the one it wrote rather than the tests' fixed one.
+    """
+    app = assemble(_stocked(tmp_path), data_root, FDN)
+    return talking(app, token=token_at(data_root / TOKEN_PATH))
 
 
 def test_the_rules_are_loaded_when_they_are_installed(

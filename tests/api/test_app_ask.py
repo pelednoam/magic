@@ -16,11 +16,14 @@ true, and a player can read them whatever the model said.
 
 from __future__ import annotations
 
-from fastapi.testclient import TestClient
+from typing import TYPE_CHECKING
 
-from helpers_api import RULES, Answering, server
+from helpers_api import RULES, Answering, server, talking
 from mtgcoach.rules.answer import Answer
 from wire import flag, obj, rows, text, words
+
+if TYPE_CHECKING:
+    from fastapi.testclient import TestClient
 
 HTTP_OK = 200
 
@@ -48,7 +51,7 @@ def ask(client: TestClient, session_id: str, **body: object) -> dict[str, object
 
 
 def test_an_answer_citing_a_retrieved_rule_is_passed_on() -> None:
-    with TestClient(server(asker=Answering(GOOD), rules=RULES)) as client:
+    with talking(server(asker=Answering(GOOD), rules=RULES)) as client:
         body = ask(client, new_game(client))
         assert flag(body, "cited")
         assert text(obj(body, "answer"), "in_short") == "The extra damage still gets through."
@@ -57,7 +60,7 @@ def test_an_answer_citing_a_retrieved_rule_is_passed_on() -> None:
 
 def test_the_rules_it_was_given_come_back_too() -> None:
     """The certainly-true half. A player can read these whatever was said."""
-    with TestClient(server(asker=Answering(GOOD), rules=RULES)) as client:
+    with talking(server(asker=Answering(GOOD), rules=RULES)) as client:
         found = rows(ask(client, new_game(client)), "rules")
         assert "702.19b" in [text(rule, "reference") for rule in found]
         assert all(text(rule, "text") for rule in found)
@@ -70,7 +73,7 @@ def test_an_answer_citing_a_rule_it_was_not_given_is_refused() -> None:
         in_short="It does double damage!",
         citations=("999.9z",),
     )
-    with TestClient(server(asker=Answering(invented), rules=RULES)) as client:
+    with talking(server(asker=Answering(invented), rules=RULES)) as client:
         body = ask(client, new_game(client))
         assert not flag(body, "cited")
         answer = obj(body, "answer")
@@ -83,7 +86,7 @@ def test_an_answer_citing_a_rule_it_was_not_given_is_refused() -> None:
 def test_an_uncited_answer_is_refused() -> None:
     """Fluent, plausible, and impossible to look up -- the shape of a guess."""
     guessed = Answer(answer="It just works.", in_short="It works.")
-    with TestClient(server(asker=Answering(guessed), rules=RULES)) as client:
+    with talking(server(asker=Answering(guessed), rules=RULES)) as client:
         assert not flag(ask(client, new_game(client)), "cited")
 
 
@@ -99,14 +102,14 @@ def test_saying_it_is_unsure_does_not_excuse_citing_nothing() -> None:
         in_short="It does double damage!",
         unsure="one minor detail",
     )
-    with TestClient(server(asker=Answering(unsure), rules=RULES)) as client:
+    with talking(server(asker=Answering(unsure), rules=RULES)) as client:
         body = ask(client, new_game(client))
         assert not flag(body, "cited")
         assert "double" not in text(obj(body, "answer"), "in_short")
 
 
 def test_the_player_defaults_to_you() -> None:
-    with TestClient(server(asker=Answering(GOOD), rules=RULES)) as client:
+    with talking(server(asker=Answering(GOOD), rules=RULES)) as client:
         assert flag(ask(client, new_game(client)), "cited")
 
 
@@ -119,7 +122,7 @@ def test_a_question_matching_nothing_is_answered_without_asking() -> None:
     instantly and for nothing.
     """
     never = Answering(Answer(answer="should not be asked", in_short="x"))
-    with TestClient(server(asker=never, rules=RULES)) as client:
+    with talking(server(asker=never, rules=RULES)) as client:
         body = ask(client, new_game(client), question="what is a zzzyzzx?")
         assert not flag(body, "cited")
         assert rows(body, "rules") == []

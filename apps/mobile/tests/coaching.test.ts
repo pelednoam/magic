@@ -13,6 +13,9 @@ import { planFor } from "../src/format";
 import type { Coaching, Plan } from "../src/wire";
 import { isCoaching } from "../src/wire";
 
+/** Any token: these assert on what is sent, not on what the token is. */
+const TOKEN = "t";
+
 const ANSWER: Coaching = {
   explanation: {
     play: "land-1",
@@ -44,7 +47,7 @@ describe("asking for advice", () => {
   it("sends the seat and returns the answer", async () => {
     const stub = replying(200, ANSWER);
     vi.stubGlobal("fetch", stub);
-    const reply = await new Coach("http://x").explain("g1", "them");
+    const reply = await new Coach("http://x", TOKEN).explain("g1", "them");
     expect(reply.explanation.in_short).toBe("Yours is bigger.");
     expect(stub).toHaveBeenCalledWith(
       "http://x/games/g1/coach",
@@ -54,20 +57,20 @@ describe("asking for advice", () => {
 
   it("keeps the untrusted flag rather than dropping the answer", async () => {
     vi.stubGlobal("fetch", replying(200, { ...ANSWER, trusted: false }));
-    const reply = await new Coach("http://x").explain("g1", "you");
+    const reply = await new Coach("http://x", TOKEN).explain("g1", "you");
     expect(reply.trusted).toBe(false);
   });
 
   it("passes on the server's sentence when there is no coach", async () => {
     vi.stubGlobal("fetch", replying(503, { detail: "could not ask the coach: no claude" }));
-    await expect(new Coach("http://x").explain("g1", "you")).rejects.toThrow(
+    await expect(new Coach("http://x", TOKEN).explain("g1", "you")).rejects.toThrow(
       /no claude/,
     );
   });
 
   it("refuses a reply it cannot read rather than rendering undefined", async () => {
     vi.stubGlobal("fetch", replying(200, { explanation: { play: 7 }, trusted: true }));
-    await expect(new Coach("http://x").explain("g1", "you")).rejects.toBeInstanceOf(
+    await expect(new Coach("http://x", TOKEN).explain("g1", "you")).rejects.toBeInstanceOf(
       ServerError,
     );
   });

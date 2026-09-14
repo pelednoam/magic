@@ -21,9 +21,8 @@ longer sends. Either is a bug; neither raises anything at runtime.
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
 
-from helpers_api import RULES, Answering, Canned, server
+from helpers_api import RULES, Answering, Canned, server, talking
 from mtgcoach.coach.advice import Explanation
 from mtgcoach.rules.answer import Answer
 from wire import decoded, named, rows, text
@@ -63,7 +62,7 @@ def sent() -> frozenset[str]:
         citations=("702.19b",),
         unsure="not everything",
     )
-    with TestClient(server(explainer=Canned(said), asker=Answering(answer), rules=RULES)) as client:
+    with talking(server(explainer=Canned(said), asker=Answering(answer), rules=RULES)) as client:
         created = decoded(client.post("/games", json={"you": "green", "them": "other"}).json())
         session_id = created["session_id"]
         assert isinstance(session_id, str)

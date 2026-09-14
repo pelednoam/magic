@@ -26,6 +26,17 @@ uv run python -m mtgcoach.api.serve --set FDN         # the server, on the lapto
 cd apps/mobile && npm install && npm run web          # the app
 ```
 
+The server prints its address and a token when it starts. The token is its only access
+control, so every request needs it — `Authorization: Bearer <token>`, and `?token=` on the
+WebSocket, which a browser will not let a page put a header on. A build on the same laptop
+picks it up from `EXPO_PUBLIC_COACH_TOKEN`; a phone asks for it once and you paste it in.
+
+What that closes is not a guest's phone. It is a web page the household visits, which could
+make cross-origin requests to `http://<laptop>:8000` and previously needed to know nothing at
+all to drive the game or spend the Claude subscription. What it does not close is *which
+player* is asking: every snapshot still carries both hands, so "you cannot see your opponent's
+hand" is still enforced by the room. A token per seat would fix that, and is the next step.
+
 `sets fetch` is the only command that touches the network. It asks Scryfall for one set —
 771 printings for Foundations, five requests — and writes them to a file, so re-importing
 and the effects workflow do not ask again. `mtgcoach decks verify FDN` then checks all ten
