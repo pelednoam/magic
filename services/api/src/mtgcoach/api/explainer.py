@@ -11,7 +11,8 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from mtgcoach.api.claude import Cli
-from mtgcoach.api.replies import exactly, object_in, one, prose, words
+from mtgcoach.api.fields import exactly, one, prose, words
+from mtgcoach.api.replies import object_in
 from mtgcoach.coach.advice import ExplainerError, Explanation
 
 if TYPE_CHECKING:

@@ -7,6 +7,7 @@ thing to guess the meaning of.
 
 Shared by the turn coach and the rules answerer. Neither decides anything with
 what comes out; the checkers in ``coach.advice`` and ``rules.answer`` do that.
+Reading the individual fields out of the object is ``fields``.
 """
 
 from __future__ import annotations
@@ -45,9 +46,14 @@ def _decode(body: str) -> object:
     """The JSON value in ``body``, whole if it is all JSON, else the object in it.
 
     The second attempt is what survives a model that wraps its answer in prose
-    or a code fence. It is a fallback rather than the first move so that a reply
-    which is valid JSON but the *wrong* JSON -- an array of options, say -- is
-    reported as the wrong shape instead of being quietly reinterpreted.
+    or a code fence. It is a fallback rather than the first move so that a
+    reply which is valid JSON but the *wrong* JSON -- an array of options, say
+    -- is reported as the wrong shape instead of being quietly reinterpreted.
+
+    Scanned rather than sliced. Taking the first ``{`` to the last ``}`` broke
+    on anything with another brace in it -- a sentence mentioning ``{T}``, or
+    the CLI printing a second object after the reply -- which is not an exotic
+    case when the subject is Magic and mana symbols are written in braces.
 
     Raises:
         ExplainerError: If neither attempt finds JSON.
@@ -56,20 +62,42 @@ def _decode(body: str) -> object:
         return json.loads(body)
     except (json.JSONDecodeError, ValueError):
         pass
-    start, end = body.find("{"), body.rfind("}")
-    if start < 0 or end <= start:
+    found = _objects_in(body)
+    if not found:
         # Deliberately without the body. This message reaches the client and
         # the CORS policy is `*`; `body` is the CLI's raw stdout when the
         # envelope could not be read, and a CLI that prints a usage or auth
         # error there carries absolute paths and config locations with it.
-        # Quoting 160 bytes of it undid the stderr scrubbing in `claude.py`.
         msg = "the coach did not answer with an object"
         raise ExplainerError(msg)
-    try:
-        return json.loads(body[start : end + 1])
-    except (json.JSONDecodeError, ValueError) as exc:
-        msg = f"the coach's answer was not readable: {exc}"
-        raise ExplainerError(msg) from exc
+    # The largest, which is the reply rather than a fragment quoted beside it.
+    return max(found, key=_span)[1]
+
+
+def _span(found: tuple[int, object]) -> int:
+    """How many characters an object took up. ``len`` measured the pair."""
+    return found[0]
+
+
+def _objects_in(body: str) -> list[tuple[int, object]]:
+    """Every complete JSON object in ``body``, as (length, value).
+
+    ``raw_decode`` from each ``{`` in turn: it stops at the end of the value it
+    read, so a brace that opens nothing costs one failed parse rather than
+    swallowing the rest of the text.
+    """
+    decoder = json.JSONDecoder()
+    found: list[tuple[int, object]] = []
+    at = body.find("{")
+    while at >= 0:
+        try:
+            value, end = decoder.raw_decode(body, at)
+        except (json.JSONDecodeError, ValueError):
+            at = body.find("{", at + 1)
+            continue
+        found.append((end - at, value))
+        at = body.find("{", end)
+    return found
 
 
 def _unwrap(stdout: str) -> str:
@@ -93,90 +121,3 @@ def _unwrap(stdout: str) -> str:
         raise ExplainerError(msg)
     result = fields.get("result")
     return result if isinstance(result, str) else stdout
-
-
-def prose(payload: Mapping[str, object], field: str) -> str:
-    """A string of prose, empty when it is missing, the wrong type, or blank.
-
-    For fields nothing is checked against: ``because``, ``in_short``,
-    ``answer``, ``unsure``. Use ``one`` for anything a checker will compare
-    against the engine.
-
-    Stripped, so that a field holding a space is empty rather than substantive.
-    The "did it say anything at all" checks downstream are truthiness tests,
-    and ``" "`` passed them while putting a blank line on the screen.
-    """
-    value = payload.get(field)
-    return value.strip() if isinstance(value, str) else ""
-
-
-def one(payload: Mapping[str, object], field: str) -> str:
-    """A single identifier, or empty when the field is absent.
-
-    ``play`` is the only one, and it needs the same treatment as ``attack``:
-    empty means "play nothing", which is a real recommendation, so quietly
-    turning a malformed value into empty does not lose information -- it
-    substitutes a different recommendation, and one that always passes.
-
-    Raises:
-        MalformedFieldError: If the field is present and is not a string.
-    """
-    value = payload.get(field)
-    if value is None:
-        return ""
-    if not isinstance(value, str):
-        raise MalformedFieldError(field, value)
-    return value
-
-
-def words(payload: Mapping[str, object], field: str) -> tuple[str, ...]:
-    """A list of prose, keeping only the strings.
-
-    For fields nothing is checked against: ``watch_out``, ``check_yourself``. A
-    missing or malformed one is empty rather than an error, because a dropped
-    sentence costs a sentence. Use ``exactly`` for anything a checker will then
-    compare against the engine.
-    """
-    value = payload.get(field)
-    if not isinstance(value, list):
-        return ()
-    items = cast("list[object]", value)
-    return tuple(item for item in items if isinstance(item, str) and item)
-
-
-def exactly(payload: Mapping[str, object], field: str) -> tuple[str, ...]:
-    """A list of identifiers, all of them or none.
-
-    For the fields a checker compares against the engine: ``attack``,
-    ``citations``. Dropping a bad element from one of those does not lose a
-    sentence, it changes the claim -- and changes it towards passing. An
-    ``attack`` of ``["bear-1", 7]`` trimmed to ``["bear-1"]`` becomes a
-    *different attack*, one the engine did cost, and the checker then agrees
-    with a recommendation nobody made. Citations behave the same way in
-    reverse: drop the invented one and what is left is all real.
-
-    So a malformed element fails the whole field. The caller turns that into an
-    ``ExplainerError`` and the player gets the engine's own panel, which is
-    what they would have got from a refused answer anyway.
-
-    Raises:
-        MalformedFieldError: If the field is present and is not a list of
-            non-empty strings.
-    """
-    value = payload.get(field)
-    if value is None:
-        return ()
-    if not isinstance(value, list):
-        raise MalformedFieldError(field, value)
-    items = cast("list[object]", value)
-    if not all(isinstance(item, str) and item for item in items):
-        raise MalformedFieldError(field, items)
-    return tuple(cast("list[str]", items))
-
-
-class MalformedFieldError(ExplainerError):
-    """A field a checker would have compared against the engine is not usable."""
-
-    def __init__(self, field: str, value: object) -> None:
-        """Name the field and what arrived instead."""
-        super().__init__(f"the coach's {field!r} was not a list of identifiers: {value!r:.80}")

@@ -62,6 +62,7 @@ export function Question({
       <TextInput
         accessibilityLabel="Your rules question"
         editable={!asking}
+        maxLength={MAX_QUESTION}
         multiline
         onChangeText={setTyped}
         onSubmitEditing={() => { if (ready) { onAsk(asked); } }}

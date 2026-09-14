@@ -117,14 +117,24 @@ def test_empty_output_is_an_error() -> None:
 
 
 def test_a_broken_object_is_an_error() -> None:
-    with pytest.raises(ExplainerError, match="not readable"):
+    with pytest.raises(ExplainerError, match="did not answer with an object"):
         parse(envelope('{"play": "abc", }'))
 
 
-def test_two_objects_side_by_side_are_an_error() -> None:
-    """The brace slice spans both, which is not readable -- and must not be."""
-    with pytest.raises(ExplainerError, match="not readable"):
-        parse(envelope('{"play": "abc"} {"play": "xyz"}'))
+def test_a_brace_in_the_prose_does_not_break_the_parse() -> None:
+    """Not exotic when the subject is Magic: mana symbols are written {G}.
+
+    Taking the first `{` to the last `}` made every answer that mentioned one
+    unreadable, which is most answers about paying for anything.
+    """
+    said = json.dumps({**ANSWER, "because": "Tap the Forest for {G}."})
+    assert parse(envelope(f"Here you go:\n{said}\nHope that helps.")).play == "abc"
+
+
+def test_the_answer_is_the_largest_object_not_the_first() -> None:
+    """A model quoting a fragment before its answer used to win the race."""
+    said = json.dumps(ANSWER)
+    assert parse(envelope(f'{{"note": "x"}} {said}')).play == "abc"
 
 
 def test_a_json_value_that_is_not_an_object_is_an_error() -> None:

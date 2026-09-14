@@ -22,9 +22,10 @@ import threading
 import time
 from dataclasses import dataclass, field
 
-#: How many may be in flight at once. The threadpool has ten workers by default
-#: and the tracker's own routes need some of them, so the slow ones get a
-#: minority of it.
+#: How many may be in flight at once. Not sized against the threadpool -- anyio
+#: gives it forty workers, which is plenty -- but against the machine: three
+#: Node processes thinking at once is what a laptop in a kitchen can carry
+#: while still answering the tracker's own routes instantly.
 MAX_IN_FLIGHT = 3
 
 #: How many may be started in a window, and how long that window is. Generous

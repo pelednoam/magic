@@ -15,7 +15,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from mtgcoach.api.claude import Cli
-from mtgcoach.api.replies import exactly, object_in, prose
+from mtgcoach.api.fields import exactly, prose
+from mtgcoach.api.replies import object_in
 from mtgcoach.coach.advice import ExplainerError
 from mtgcoach.rules.answer import Answer
 

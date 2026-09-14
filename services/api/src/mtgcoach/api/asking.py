@@ -11,22 +11,24 @@ cannot be gone round. The order is the whole design:
    ones supplied, compared exactly. That is a check on the *citations*, not on
    the prose, which is why what goes on the wire is called ``cited``.
 
-A question that matches nothing is still asked, and still answered -- with a
-prompt that says there is nothing to cite, which is a thing the model is told
-to say out loud rather than a reason to hide the box.
+A question that matches nothing is not asked at all. It used to be, with a
+prompt saying "there is nothing to cite, say so" -- and then the checker
+refused the answer for having no citations, because it could not have any. The
+player got a refusal where the truthful answer was "nothing in the rules
+matched that", which the server can say itself, instantly and for nothing.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from mtgcoach.rules.answer import refusal, settle
+from mtgcoach.rules.answer import Answer, refusal, settle
 from mtgcoach.rules.question import brief
 
 if TYPE_CHECKING:
     from mtgcoach.api.context import Position
     from mtgcoach.api.views import Json
-    from mtgcoach.rules.answer import Answer, Asker
+    from mtgcoach.rules.answer import Asker
     from mtgcoach.rules.search import RuleIndex
 
 
@@ -42,6 +44,8 @@ def answered(
         ExplainerError: If no answer could be got at all.
     """
     passages = index.search(question)
+    if not passages:
+        return _nothing_matched()
     briefing = brief(question, passages, position.report, position.board)
     said, problems = settle(asker.ask(question, briefing), passages)
     return {
@@ -59,6 +63,29 @@ def answered(
         # can then read the rule themselves, which is the point of retrieving
         # it -- and is the part of the answer that is certainly true.
         "rules": [{"reference": p.reference, "title": p.title, "text": p.text} for p in passages],
+    }
+
+
+def _nothing_matched() -> dict[str, Json]:
+    """What to say when the search found nothing.
+
+    Not a refusal, and not a model call. There is nothing to cite, so anything
+    a model said would be refused for having no citations -- and "I searched
+    and found nothing" is both true and the most useful thing available.
+    """
+    return {
+        "answer": _answer(
+            Answer(
+                answer=(
+                    "Nothing in the Comprehensive Rules matched that question. Try naming "
+                    "a card, a keyword, or a step of the turn."
+                ),
+                in_short="I could not find a rule about that. Let us read the card together.",
+            )
+        ),
+        "cited": False,
+        "version": 0,
+        "rules": [],
     }
 
 

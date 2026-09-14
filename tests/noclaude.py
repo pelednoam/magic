@@ -60,7 +60,9 @@ def guarding[**P, R](start: Callable[P, R]) -> Callable[P, R]:
         Raises:
             AssertionError: If it would be the real ``claude``.
         """
-        if args and _is_claude(args[0]):
+        # Positional or by keyword: `subprocess.run(args=[...])` is legal and
+        # went straight past a check that only looked at `args[0]`.
+        if _is_claude(args[0] if args else kwargs.get("args")):
             raise AssertionError(ADVICE)
         return start(*args, **kwargs)
 

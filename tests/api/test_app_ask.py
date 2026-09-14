@@ -105,21 +105,23 @@ def test_saying_it_is_unsure_does_not_excuse_citing_nothing() -> None:
         assert "double" not in text(obj(body, "answer"), "in_short")
 
 
-def test_a_question_matching_no_rule_is_still_asked_and_still_refused() -> None:
-    """The box is not hidden, and the answer is not passed off as checked.
-
-    Nothing was retrieved, so nothing can be cited, so nothing the model says
-    about the rules has anything behind it. The player is told that rather than
-    shown a confident paragraph.
-    """
-    unsure = Answer(in_short="Nothing in the rules covers that.", unsure="no match")
-    with TestClient(server(asker=Answering(unsure), rules=RULES)) as client:
-        body = ask(client, new_game(client), question="what is a zzzyzzx?")
-        assert not flag(body, "cited")
-        assert rows(body, "rules") == []
-        assert "not shown" in text(obj(body, "answer"), "answer")
-
-
 def test_the_player_defaults_to_you() -> None:
     with TestClient(server(asker=Answering(GOOD), rules=RULES)) as client:
         assert flag(ask(client, new_game(client)), "cited")
+
+
+def test_a_question_matching_nothing_is_answered_without_asking() -> None:
+    """No rules retrieved means nothing can be cited, so no model is asked.
+
+    The prompt used to tell the model to answer anyway and the checker then
+    refused it for having no citations -- so the player got a refusal where the
+    truthful answer was "nothing matched", which the server can say itself,
+    instantly and for nothing.
+    """
+    never = Answering(Answer(answer="should not be asked", in_short="x"))
+    with TestClient(server(asker=never, rules=RULES)) as client:
+        body = ask(client, new_game(client), question="what is a zzzyzzx?")
+        assert not flag(body, "cited")
+        assert rows(body, "rules") == []
+        assert "Nothing in the Comprehensive Rules matched" in text(obj(body, "answer"), "answer")
+        assert "should not be asked" not in text(obj(body, "answer"), "answer")
