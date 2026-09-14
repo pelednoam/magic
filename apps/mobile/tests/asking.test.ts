@@ -21,6 +21,7 @@ const ASKED: Asked = {
     unsure: "",
   },
   cited: true,
+  matched: true,
   version: 0,
   rules: [
     { reference: "702.19b", title: "Trample", text: "The controller of an attacking creature…" },
@@ -72,7 +73,10 @@ describe("asking a rules question", () => {
   });
 
   it("refuses a reply it cannot read rather than rendering undefined", async () => {
-    vi.stubGlobal("fetch", replying(200, { cited: true, rules: [], answer: { answer: 7 } }));
+    vi.stubGlobal(
+      "fetch",
+      replying(200, { cited: true, matched: true, rules: [], answer: { answer: 7 } }),
+    );
     await expect(new Coach("http://x").ask("g1", "q", "you")).rejects.toBeInstanceOf(ServerError);
   });
 });
@@ -89,9 +93,10 @@ describe("recognising a rules answer", () => {
   it.each([
     ["null", null],
     ["an array", [ASKED]],
-    ["no answer", { cited: true, rules: [] }],
-    ["no verdict", { answer: ASKED.answer, rules: [] }],
-    ["no rules list", { answer: ASKED.answer, cited: true }],
+    ["no answer", { cited: true, matched: true, rules: [] }],
+    ["no verdict", { answer: ASKED.answer, rules: [], matched: true }],
+    ["no match flag", { answer: ASKED.answer, cited: true, rules: [], version: 0 }],
+    ["no rules list", { answer: ASKED.answer, cited: true, matched: true }],
     ["rules that are not a list", { ...ASKED, rules: { a: 1 } }],
     ["a rule with no text", { ...ASKED, rules: [{ reference: "1", title: "x" }] }],
     ["a rule that is not an object", { ...ASKED, rules: ["702.19b"] }],

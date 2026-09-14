@@ -84,10 +84,13 @@ function Answer({
           the lists above — those are checked.
         </Text>
       )}
+      {/* The checked choice first, then the words about it. These are named
+          from the engine's own lists; everything below them is prose a model
+          wrote, and nothing checked it. */}
+      {reply.trusted ? <Recommendation reply={reply} hand={hand} plans={plans} /> : null}
       {reply.explanation.in_short === "" ? null : (
         <Text style={styles.short}>{reply.explanation.in_short}</Text>
       )}
-      {reply.trusted ? <Recommendation reply={reply} hand={hand} plans={plans} /> : null}
       {reply.explanation.because === "" ? null : (
         <Text style={styles.because}>{reply.explanation.because}</Text>
       )}

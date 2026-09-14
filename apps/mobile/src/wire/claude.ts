@@ -104,6 +104,14 @@ export interface Asked {
    * the player reads the rule instead of the answer.
    */
   readonly cited: boolean;
+  /**
+   * Whether the search found any rules at all.
+   *
+   * False with `cited` false is not a failure: nothing matched, so nothing
+   * could be cited, and the answer says so. Without this the app showed "the
+   * answer did not stay inside the rules" over an answer that never left them.
+   */
+  readonly matched: boolean;
   readonly rules: readonly RuleText[];
   /** Which board this was asked over; see `Coaching.version`. */
   readonly version: number;
@@ -145,6 +153,7 @@ export function isAsked(value: unknown): value is Asked {
   if (
     body === null ||
     typeof body["cited"] !== "boolean" ||
+    typeof body["matched"] !== "boolean" ||
     typeof body["version"] !== "number" ||
     !Array.isArray(body["rules"])
   ) {

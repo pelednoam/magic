@@ -1,4 +1,12 @@
-"""One rule for the whole suite: no test may run the real ``claude``.
+"""Two things no test in this suite may do.
+
+Start the real ``claude``, and signal a process group.
+
+The second is the sharper of the two. The stand-in processes carry pid 4242,
+which on this machine is very likely a real process belonging to somebody --
+so a test that exercises the kill path without patching ``os.killpg`` would
+``SIGKILL`` their process tree. Nothing has, but "nothing has" is not a
+property, and the failure would be silent and unrelated.
 
 Registered as a pytest plugin in ``pyproject.toml`` (``-p noclaude``) rather
 than written as ``tests/conftest.py``, because ``tests/e2e`` already has a
@@ -19,6 +27,7 @@ that reaches an actual ``claude`` fails, and fails saying what to pass instead.
 
 from __future__ import annotations
 
+import os
 import subprocess
 from collections.abc import Sequence
 from pathlib import PurePath
@@ -69,10 +78,25 @@ def guarding[**P, R](start: Callable[P, R]) -> Callable[P, R]:
     return guarded
 
 
+def _no_signalling(group: int, signal_number: int) -> None:
+    """Never signal a process group.
+
+    Raises:
+        AssertionError: Always. A test that wants to watch the kill happen
+            patches ``os.killpg`` itself, which replaces this.
+    """
+    msg = (
+        f"a test tried to send signal {signal_number} to process group {group}. "
+        "That is a real group on this machine. Patch os.killpg in the test."
+    )
+    raise AssertionError(msg)
+
+
 @pytest.fixture(autouse=True, scope="session")
 def _no_real_claude() -> Iterator[None]:
     """Wrap the process boundary for the whole session."""
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(subprocess, "run", guarding(subprocess.run))
         patch.setattr(subprocess, "Popen", guarding(subprocess.Popen))
+        patch.setattr(os, "killpg", _no_signalling)
         yield

@@ -47,12 +47,17 @@ def one(payload: Mapping[str, object], field: str) -> str:
     turning a malformed value into empty does not lose information -- it
     substitutes a different recommendation, and one that always passes.
 
+    A *missing* key is "no recommendation" and is fine. An explicit ``null`` is
+    not: the schema asks for a string, and a model that answered ``null``
+    answered off-schema. The two were indistinguishable through ``.get``, which
+    turned a malformed reply into a do-nothing recommendation that passes.
+
     Raises:
         MalformedFieldError: If the field is present and is not a string.
     """
-    value = payload.get(field)
-    if value is None:
+    if field not in payload:
         return ""
+    value = payload[field]
     if not isinstance(value, str):
         raise MalformedFieldError(field, value, "an identifier")
     return value
@@ -88,13 +93,16 @@ def exactly(payload: Mapping[str, object], field: str) -> tuple[str, ...]:
     ``ExplainerError`` and the player gets the engine's own panel, which is
     what they would have got from a refused answer anyway.
 
+    A missing key is "no attack", which is a real recommendation. An explicit
+    ``null`` is off-schema, for the same reason as ``one``.
+
     Raises:
         MalformedFieldError: If the field is present and is not a list of
             non-empty strings.
     """
-    value = payload.get(field)
-    if value is None:
+    if field not in payload:
         return ()
+    value = payload[field]
     if not isinstance(value, list):
         raise MalformedFieldError(field, value, "a list of identifiers")
     items = cast("list[object]", value)

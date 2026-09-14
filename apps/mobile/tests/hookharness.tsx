@@ -33,7 +33,7 @@ const ANSWER = {
   unsure: "",
 } satisfies Asked["answer"];
 
-export const ASKED = { answer: ANSWER, cited: true, rules: [], version: 0 } satisfies Asked;
+export const ASKED = { answer: ANSWER, cited: true, matched: true, rules: [], version: 0 } satisfies Asked;
 
 /** A `Coach` whose one slow call the test resolves by hand. */
 export function deferred<T>(): {

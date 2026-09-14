@@ -97,9 +97,20 @@ download that happened to carry the four markers was indexed and advertised as t
 Comprehensive Rules; and the client's staleness was keyed on a version number that restarts at
 zero for every game.
 
-Five rounds, sixty-odd findings fixed by hand. The critical count went 8, 5, 1, 5, 5 — not
-monotonic, because each round's fixes were the next round's subject, which is what an ensemble
-review is for.
+A sixth round found a bug introduced by the fifth round's own fix — two reviewers
+independently — and that is the clearest argument for running the loop at all. The no-match
+answer was labelled `version: 0`, so the client compared it against the real board version and
+silently dropped it; the app also rendered it as *"the answer did not stay inside the rules"*
+over an answer that had never left them. The wire carries `matched` now.
+
+Two more from that round were about not doing harm on the way out: a reaped process group must
+never be signalled, because its pid is free to belong to somebody else by then, and no test may
+signal a group at all — the stand-in processes carry pid 4242, which on any real machine is
+very likely somebody's.
+
+Six rounds, seventy-odd findings fixed by hand. The critical count went 8, 5, 1, 5, 5, 8 — not
+monotonic, because each round's fixes are the next round's subject. What changed is the kind:
+round one found a live file-read exploit, and round six found a field labelled zero.
 
 ---
 

@@ -14,25 +14,40 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 from fakeprocess import Fake
-from mtgcoach.api.processes import group_of, kill_group
+from mtgcoach.api.processes import close, group_of, kill_group
 
 if TYPE_CHECKING:
     import subprocess
 
 
-def _a_process() -> subprocess.Popen[str]:
-    """A stand-in process with a known pid.
+def _a_process(*, running: bool = True) -> subprocess.Popen[str]:
+    """A stand-in process with a known pid, running unless said otherwise.
 
-    Cast because the stand-in is what this module actually needs -- a ``pid``
-    and a ``wait`` -- rather than the whole of ``Popen``, which cannot be built
-    without starting something.
+    Cast because the stand-in is what this module actually needs -- a ``pid``,
+    a ``poll`` and a ``wait`` -- rather than the whole of ``Popen``, which
+    cannot be built without starting something.
     """
-    return cast("subprocess.Popen[str]", Fake().process)
+    process = Fake().process
+    if running:
+        process.hang()
+    return cast("subprocess.Popen[str]", process)
 
 
 def test_the_group_is_the_pid() -> None:
     """By definition, for a child that called `setsid`."""
     assert group_of(_a_process()) == 4242
+
+
+def test_a_reaped_process_group_is_never_signalled() -> None:
+    """Its pid is free to be handed to something else by then.
+
+    The group id *is* that pid, so signalling it afterwards is a chance to
+    SIGKILL a stranger's process tree -- a worse bug than the orphans it would
+    have cleaned up, and indistinguishable after the fact.
+    """
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(os, "killpg", _never)
+        kill_group(4242, _a_process(running=False))
 
 
 def test_the_group_is_signalled() -> None:
@@ -82,3 +97,38 @@ def _gone(_group: int, _signal: int) -> None:
         ProcessLookupError: Always, as the real one would.
     """
     raise ProcessLookupError
+
+
+def test_a_pipe_that_is_already_gone_is_skipped() -> None:
+    """`Popen` leaves a pipe as None when it was not asked for one.
+
+    It never is here, but `close` runs in a `finally` on every path and must
+    not be the thing that raises on the way out of a failure.
+    """
+    process = Fake().process
+    process.stdout = None  # type: ignore[assignment]
+    close(cast("subprocess.Popen[str]", process))
+    assert process.stdin.closed
+    assert process.stderr.closed
+
+
+def test_a_pipe_that_refuses_to_close_is_not_an_error() -> None:
+    """Same reason: this is cleanup, not the request."""
+    process = Fake().process
+    process.stdin = _Stubborn()  # type: ignore[assignment]
+    close(cast("subprocess.Popen[str]", process))
+    assert process.stdout.closed
+
+
+class _Stubborn:
+    """A pipe whose `close` fails, as a closed file descriptor's would."""
+
+    closed = False
+
+    def close(self) -> None:
+        """Refuse.
+
+        Raises:
+            OSError: Always.
+        """
+        raise OSError

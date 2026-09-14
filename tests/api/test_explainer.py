@@ -94,9 +94,9 @@ def test_an_empty_recommendation_survives() -> None:
 # --- fields of the wrong shape ------------------------------------------------
 
 
-def test_a_null_play_is_simply_no_card() -> None:
+def test_a_missing_play_is_simply_no_card() -> None:
     """Absent and malformed are different: absent is the common case."""
-    assert parse(said(play=None)).play == ""
+    assert parse(said()).play == ""
 
 
 def test_an_empty_string_in_a_prose_list_is_dropped() -> None:

@@ -13,6 +13,7 @@ Run it on the laptop in the same room (§4):
 from __future__ import annotations
 
 import argparse
+import sqlite3
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -74,11 +75,12 @@ def _rules(data_root: Path) -> RuleIndex | None:
     except RulesNotInstalledError as missing:
         print(f"rules questions are off: {missing}")  # noqa: T201 - this is a console script
         return None
-    except (CorpusError, OSError, UnicodeDecodeError) as unreadable:
+    except (CorpusError, OSError, UnicodeDecodeError, sqlite3.Error) as unreadable:
         # A file that is there but is not the rules: a truncated download, the
-        # HTML of an error page, a PDF. Catching only "not installed" turned
-        # that into a stack trace at startup, so a bad download stopped the
-        # tracker working at all -- over a feature the tracker does not need.
+        # HTML of an error page, a PDF. Or a Python built without FTS5, which
+        # is rare and is still not a reason the tracker cannot start. Catching
+        # only "not installed" turned any of these into a stack trace at
+        # startup -- over a feature the tracker does not need.
         print(f"rules questions are off: {unreadable}")  # noqa: T201 - console script
         return None
 

@@ -17,11 +17,11 @@ export function Answer({ reply }: { readonly reply: Asked }) {
   const cited = new Set(reply.answer.citations);
   return (
     <View>
-      {reply.cited ? null : (
+      {reply.cited || !reply.matched ? null : (
         <Text style={styles.refused}>
           The answer did not stay inside the rules the server found — it used one
-          that was not there, or gave none at all — so it is not shown. Any rules
-          listed below are the real ones; read those.
+          that was not there, or gave none at all — so it is not shown. The rules
+          below are the real ones; read those.
         </Text>
       )}
       {reply.answer.in_short === "" ? null : (
@@ -32,13 +32,13 @@ export function Answer({ reply }: { readonly reply: Asked }) {
       )}
       {reply.answer.unsure === "" ? null : (
         <Text style={styles.unsure}>
-          {reply.cited ? "Not settled by these rules: " : "Why it was not shown: "}
+          {reply.cited || !reply.matched
+            ? "Not settled by these rules: "
+            : "Why it was not shown: "}
           {reply.answer.unsure}
         </Text>
       )}
-      {reply.rules.length === 0 ? (
-        <Text style={styles.none}>Nothing in the Comprehensive Rules matched that.</Text>
-      ) : (
+      {reply.rules.length === 0 ? null : (
         <View style={styles.rules}>
           <Text style={styles.rulesTitle}>
             From the rules — these are the source; the wording above is Claude&apos;s

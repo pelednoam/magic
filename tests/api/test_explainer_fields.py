@@ -43,8 +43,16 @@ def test_a_missing_attack_is_simply_no_attack() -> None:
     assert parse(said()).attack == ()
 
 
-def test_a_null_attack_is_simply_no_attack() -> None:
-    assert parse(said(attack=None)).attack == ()
+@pytest.mark.parametrize("field", ["play", "attack"])
+def test_an_explicit_null_is_malformed_rather_than_none(field: str) -> None:
+    """The schema asks for a string and a list; `null` is neither.
+
+    Through `.get` the two were indistinguishable, so a model answering
+    off-schema got a do-nothing recommendation -- which is a real choice, and
+    one that passes.
+    """
+    with pytest.raises(ExplainerError, match=f"'{field}' was not"):
+        parse(said(**{field: None}))
 
 
 def test_prose_lists_are_still_trimmed_rather_than_refused() -> None:

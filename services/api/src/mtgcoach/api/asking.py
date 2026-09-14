@@ -45,7 +45,7 @@ def answered(
     """
     passages = index.search(question)
     if not passages:
-        return _nothing_matched()
+        return _nothing_matched(position.revision)
     briefing = brief(question, passages, position.report, position.board)
     said, problems = settle(asker.ask(question, briefing), passages)
     return {
@@ -55,6 +55,9 @@ def answered(
         # answer is right about what those rules say. The turn coach's
         # `trusted` is a stronger claim and keeps its stronger word.
         "cited": not problems,
+        #: Whether the search found anything at all. Always true here; see
+        #: `_nothing_matched` for the case where it is not.
+        "matched": True,
         # Which board this was asked over; see `coaching.coached`. A rules
         # question carries the battlefield in its prompt, so its answer goes
         # stale the same way turn advice does.
@@ -66,7 +69,7 @@ def answered(
     }
 
 
-def _nothing_matched() -> dict[str, Json]:
+def _nothing_matched(revision: int) -> dict[str, Json]:
     """What to say when the search found nothing.
 
     Not a refusal, and not a model call. There is nothing to cite, so anything
@@ -83,8 +86,13 @@ def _nothing_matched() -> dict[str, Json]:
                 in_short="I could not find a rule about that. Let us read the card together.",
             )
         ),
+        # Not cited, because nothing was retrieved to cite -- but `matched`
+        # tells the client which of the two this is. Without it the app showed
+        # "the answer did not stay inside the rules" over an answer that never
+        # left them, which is both wrong and alarming.
         "cited": False,
-        "version": 0,
+        "matched": False,
+        "version": revision,
         "rules": [],
     }
 

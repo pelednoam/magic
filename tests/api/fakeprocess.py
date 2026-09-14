@@ -13,6 +13,18 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
+class Pipe:
+    """One of a process's three pipes, as something that can be closed."""
+
+    def __init__(self) -> None:
+        """Open."""
+        self.closed = False
+
+    def close(self) -> None:
+        """Shut. Twice is fine, as it is for a real one."""
+        self.closed = True
+
+
 class Process:
     """A stand-in for the ``claude`` process that answers from memory."""
 
@@ -20,9 +32,20 @@ class Process:
         """Reply with this, or fail with that."""
         self._stdout, self._stderr, self._error = stdout, stderr, error
         self.returncode = code
-        self.stdin = ""
+        self.sent = ""
         self.killed = False
         self.pid = 4242
+        # The three pipes, as things that can be closed and remember it. The
+        # module shuts them on the timeout path, where `communicate` does not.
+        self.stdin, self.stdout, self.stderr = Pipe(), Pipe(), Pipe()
+        # A timed-out command is still running when it is killed; one that
+        # exited has been reaped by `communicate` and must not be.
+        self._running = error is not None
+
+    @property
+    def closed(self) -> bool:
+        """Whether all three pipes were shut."""
+        return all(pipe.closed for pipe in (self.stdin, self.stdout, self.stderr))
 
     def communicate(self, prompt: str, timeout: float | None = None) -> tuple[str, str]:
         """Take the prompt and answer.
@@ -31,14 +54,18 @@ class Process:
             Exception: Whatever this stand-in was built with.
         """
         del timeout
-        self.stdin = prompt
+        self.sent = prompt
         if self._error is not None:
             raise self._error
         return self._stdout, self._stderr
 
     def poll(self) -> int | None:
-        """Whether it has exited. Exited unless it was told to hang."""
-        return None if self._error is not None and not self.killed else self.returncode
+        """Whether it has exited: None while running, else the exit code."""
+        return None if self._running else self.returncode
+
+    def hang(self) -> None:
+        """Still running, as a timed-out process is."""
+        self._running = True
 
     def wait(self, timeout: float | None = None) -> int:
         """Reap it."""
@@ -65,7 +92,7 @@ class Fake:
     @property
     def stdin(self) -> str:
         """What was sent to the process."""
-        return self.process.stdin
+        return self.process.sent
 
     def after(self, flag: str) -> str:
         """The argument following ``flag``."""
@@ -79,6 +106,8 @@ class Raises:
         """Fail with this error, when starting or when talking."""
         self.error = error
         self.on_start = on_start
+        #: The process it started, so a test can check what became of it.
+        self.started: Process | None = None
 
     def __call__(self, _argv: Sequence[str], **_kwargs: object) -> Process:
         """Start, or fail to.
@@ -88,7 +117,8 @@ class Raises:
         """
         if self.on_start:
             raise self.error
-        return Process("", "", 0, self.error)
+        self.started = Process("", "", 0, self.error)
+        return self.started
 
 
 class Never:
