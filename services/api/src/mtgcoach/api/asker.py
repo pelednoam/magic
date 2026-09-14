@@ -14,7 +14,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from mtgcoach.api.claude import Cli, object_in, text, words
+from mtgcoach.api.claude import Cli
+from mtgcoach.api.replies import object_in, text, words
 from mtgcoach.coach.advice import ExplainerError
 from mtgcoach.rules.answer import Answer
 

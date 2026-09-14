@@ -145,9 +145,19 @@ def test_a_json_value_that_is_not_an_object_is_an_error() -> None:
 
 
 def test_an_answer_with_no_words_in_it_is_an_error() -> None:
-    """The CLI's own error envelope decodes to exactly this."""
     with pytest.raises(ExplainerError, match="no explanation in it"):
-        parse(json.dumps({"type": "result", "is_error": True, "result": None}))
+        parse(json.dumps({"type": "result", "result": None}))
+
+
+def test_an_envelope_that_says_it_failed_is_an_error() -> None:
+    """Its `result` is an error message, and error messages contain braces.
+
+    Without this the object scanner mined the message for something
+    brace-shaped and returned it as the model's reply.
+    """
+    failed = {"type": "result", "is_error": True, "result": 'failed at {"x": 1}'}
+    with pytest.raises(ExplainerError, match="reported an error"):
+        parse(json.dumps(failed))
 
 
 def test_an_answer_that_is_only_a_choice_is_an_error() -> None:

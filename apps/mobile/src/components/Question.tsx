@@ -20,6 +20,7 @@ export function Question({
   reply,
   asking,
   problem,
+  available,
   onAsk,
 }: {
   /** Null until something has been asked. */
@@ -27,10 +28,25 @@ export function Question({
   readonly asking: boolean;
   /** The server's own sentence when there was no answer at all. */
   readonly problem: string;
+  /** Whether this server has the Comprehensive Rules installed at all. */
+  readonly available: boolean;
   readonly onAsk: (question: string) => void;
 }) {
   const [typed, setTyped] = useState("");
   const ready = typed.trim().length > 0 && !asking;
+  if (!available) {
+    // Said before anybody types, not after they wait for a 503. The rules are
+    // an optional install and everything else on this screen works without
+    // them, so this is a missing feature rather than a broken one.
+    return (
+      <Panel title="Ask about the rules">
+        <Text style={styles.off}>
+          This server does not have the Comprehensive Rules installed, so rules
+          questions are switched off. Everything else on this screen still works.
+        </Text>
+      </Panel>
+    );
+  }
   return (
     <Panel title="Ask about the rules" note={asking ? "looking it up…" : undefined}>
       <TextInput
@@ -66,7 +82,7 @@ function Answer({ reply }: { readonly reply: Asked }) {
   const cited = new Set(reply.answer.citations);
   return (
     <View>
-      {reply.trusted ? null : (
+      {reply.cited ? null : (
         <Text style={styles.refused}>
           The answer used a rule the server did not find, so it is not shown. The
           rules below are the real ones — read those.
@@ -79,15 +95,24 @@ function Answer({ reply }: { readonly reply: Asked }) {
         <Text style={styles.full}>{reply.answer.answer}</Text>
       )}
       {reply.answer.unsure === "" ? null : (
-        <Text style={styles.unsure}>Not settled by these rules: {reply.answer.unsure}</Text>
+        <Text style={styles.unsure}>
+          {reply.cited ? "Not settled by these rules: " : "Why it was not shown: "}
+          {reply.answer.unsure}
+        </Text>
       )}
       {reply.rules.length === 0 ? (
         <Text style={styles.none}>Nothing in the Comprehensive Rules matched that.</Text>
       ) : (
         <View style={styles.rules}>
-          <Text style={styles.rulesTitle}>From the rules</Text>
-          {reply.rules.map((rule) => (
-            <Rule key={rule.reference} rule={rule} cited={cited.has(rule.reference)} />
+          <Text style={styles.rulesTitle}>
+            From the rules — these are the source; the wording above is Claude&apos;s
+          </Text>
+          {reply.rules.map((rule, at) => (
+            <Rule
+              key={`${at}-${rule.reference}`}
+              rule={rule}
+              cited={cited.has(rule.reference)}
+            />
           ))}
         </View>
       )}
@@ -146,6 +171,7 @@ const styles = StyleSheet.create({
   full: { color: colour.text, fontSize: text.body, marginTop: space.small },
   unsure: { color: colour.warn, fontSize: text.small, marginTop: space.small },
   none: { color: colour.quiet, fontSize: text.small, marginTop: space.small },
+  off: { color: colour.quiet, fontSize: text.body },
   rules: { marginTop: space.medium },
   rulesTitle: {
     color: colour.quiet,

@@ -109,19 +109,22 @@ function Recommendation({
 }) {
   const play = hand.find((card) => card.instance_id === reply.explanation.play);
   const attack = planFor(plans, reply.explanation.attack);
-  if (play === undefined && attack === undefined) {
+  // "Attack with nobody" is a recommendation, and a common one. It arrives as
+  // an empty `attack`, which matches no plan — so keying the line on a matched
+  // plan meant the advice to hold back was silently never shown. Shown only
+  // when there was an attack to consider: with no plans, "do not attack" is
+  // not advice, it is the rules.
+  const holdBack = reply.explanation.attack.length === 0 && plans.length > 0;
+  if (play === undefined && attack === undefined && !holdBack) {
     return null;
   }
   return (
     <View style={styles.choice}>
       {play === undefined ? null : <Text style={styles.chosen}>Play {play.name}</Text>}
       {attack === undefined ? null : (
-        <Text style={styles.chosen}>
-          {attack.attackers.length === 0
-            ? "Do not attack"
-            : `Attack with ${attack.attackers.join(", ")}`}
-        </Text>
+        <Text style={styles.chosen}>Attack with {attack.attackers.join(", ")}</Text>
       )}
+      {holdBack ? <Text style={styles.chosen}>Do not attack this turn</Text> : null}
     </View>
   );
 }
@@ -135,8 +138,11 @@ function Bullets({
 }) {
   return (
     <>
-      {items.map((item) => (
-        <Text key={item} style={[styles.bullet, style]}>
+      {/* Keyed by position. The text comes from a model and repeats often
+          enough to matter -- two identical "check the Pacifism" lines silently
+          collapsed into one. */}
+      {items.map((item, at) => (
+        <Text key={`${at}-${item}`} style={[styles.bullet, style]}>
           • {item}
         </Text>
       ))}

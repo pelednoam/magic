@@ -9,14 +9,24 @@ it is missing rather than answering without it.
 Install it with:
 
     mkdir -p data/rules
-    curl -L -o data/rules/comprehensive.txt
-      "https://media.wizards.com/2025/downloads/MagicCompRules%2020250207.txt"
+    curl -L -o data/rules/comprehensive.txt "$URL"
+
+where ``$URL`` is the plain-text link on https://magic.wizards.com/en/rules --
+the current one at the time of writing is
+
+    https://media.wizards.com/2025/downloads/MagicCompRules%2020250207.txt
+
+but that address carries its own date, and Wizards publish a new one with every
+set. Pointing an operator at the page rather than at one file is deliberate: a
+rules document eighteen months old answers questions about cards that have been
+errataed, and does it confidently.
 
 The file is UTF-8 with a byte-order mark, which ``utf-8-sig`` handles.
 """
 
 from __future__ import annotations
 
+import shlex
 from typing import TYPE_CHECKING
 
 from mtgcoach.rules.corpus import passages_in
@@ -48,10 +58,10 @@ def index_at(path: Path) -> RuleIndex:
     """
     if not path.is_file():
         msg = (
-            f"the Comprehensive Rules are not at {path}. Install them with:\n"
-            f"  mkdir -p {path.parent}\n"
-            f'  curl -L -o {path} "https://media.wizards.com/2025/downloads/'
-            'MagicCompRules%2020250207.txt"'
+            f"the Comprehensive Rules are not at {path}. Download the plain-text "
+            f"rules from https://magic.wizards.com/en/rules and save them there:\n"
+            f"  mkdir -p {shlex.quote(str(path.parent))}\n"
+            f'  curl -L -o {shlex.quote(str(path))} "$URL"'
         )
         raise RulesNotInstalledError(msg)
     return RuleIndex.build(passages_in(path.read_text(encoding="utf-8-sig")))

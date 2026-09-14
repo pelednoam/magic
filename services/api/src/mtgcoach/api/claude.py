@@ -1,34 +1,43 @@
-"""Running the local ``claude`` command, and reading JSON back out of it.
+"""Running the local ``claude`` command.
 
 Shared by the turn coach and the rules answerer, which ask different questions
-of the same process in the same way. Same choice as the effect extractor: the
+of the same process in the same way. Reading an object back out of what it
+printed is ``replies``. Same choice as the effect extractor: the
 command draws on the Claude Code subscription, so neither costs API credits.
 §8's cost section prices a turn against the API at about $0.03; the CLI makes
 that zero at the price of process startup, which is a second or two. That is
 the right trade for a button somebody taps, and the wrong one for something
 that fires every step -- which is why both are buttons.
 
-Nothing here decides anything about the game. It runs a subprocess and produces
-an object; what may be done with that object is decided by the checkers in
-``coach.advice`` and ``rules.answer``.
+Nothing here decides anything about the game. It runs a subprocess and returns
+what it printed.
+
+**The subprocess gets no tools at all.** That is not caution, it is the only
+safe setting: a rules question is text a player typed, arriving over an
+unauthenticated route, and it ends up inside this prompt. A model with Read and
+WebFetch in that position is a file-read primitive and an egress primitive in
+one session, on a machine holding the operator's Claude Code credentials. It
+was verified rather than assumed -- with tools on, the same prompt read
+``/etc/hostname`` and returned its contents; with ``--tools ""`` it could not,
+and made something up instead, which is the failure mode we want.
 """
 
 from __future__ import annotations
 
-import json
 import subprocess
+import tempfile
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
 
 from mtgcoach.coach.advice import ExplainerError
 
-if TYPE_CHECKING:
-    from collections.abc import Mapping
-
-#: Tools the command may not use. It is being asked to think about a board, not
-#: to touch the repository. The difference between "read the question" and
-#: "edit the source" is this line.
-FORBIDDEN = "Edit Write MultiEdit NotebookEdit Bash"
+#: The tools the command may use: none.
+#:
+#: An empty allow-list, not a deny-list. The deny-list this replaced named the
+#: five write tools and left Read, Glob, Grep, WebFetch, WebSearch and Task
+#: enabled -- so the comment above it ("not to touch the repository") was true
+#: about writing and false about everything else. An allow-list cannot rot that
+#: way: a tool added to the CLI next month is not on it either.
+NO_TOOLS = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +49,8 @@ class Cli:
     #: button again rather than wondering whether it is broken.
     timeout_seconds: int = 90
     executable: str = "claude"
+    #: Where the subprocess runs. Defaults to a directory that holds nothing.
+    working_directory: str = tempfile.gettempdir()
 
     def run(self, prompt: str) -> str:
         """The command's stdout.
@@ -48,7 +59,7 @@ class Cli:
             ExplainerError: If the command cannot be run, times out, or fails.
         """
         try:
-            completed = subprocess.run(  # noqa: S603 - fixed argv, prompt via stdin
+            completed = subprocess.run(  # noqa: S603 - fixed argv, prompt via stdin, no shell
                 [
                     self.executable,
                     "-p",
@@ -56,99 +67,47 @@ class Cli:
                     "json",
                     "--model",
                     self.model,
-                    "--disallowedTools",
-                    FORBIDDEN,
+                    "--tools",
+                    NO_TOOLS,
+                    # And no MCP servers either. `--tools ""` empties the
+                    # built-in set; a project or user MCP config would put a
+                    # fresh set back, and this process inherits the operator's.
+                    "--strict-mcp-config",
                 ],
                 input=prompt,
                 capture_output=True,
                 text=True,
+                # Pinned, not inherited. `text=True` alone encodes stdin with
+                # the ambient locale codec, so a card name or a question with a
+                # non-ASCII character in it raised UnicodeEncodeError on a
+                # POSIX-locale server -- and Magic prints em-dashes.
+                encoding="utf-8",
+                errors="replace",
                 timeout=self.timeout_seconds,
                 check=False,
+                # Its own process group, so the timeout kills the whole tree.
+                # `claude` is a Node process that spawns more; killing only the
+                # direct child left them running, still holding the quota and
+                # still writing, after the request had already failed.
+                start_new_session=True,
+                # Somewhere with nothing in it. The file tools are gone, but a
+                # working directory is also what the CLI puts in its own system
+                # prompt, and the server's tree is not the model's business.
+                cwd=self.working_directory,
             )
+        except subprocess.TimeoutExpired as timed_out:
+            msg = f"the coach took longer than {self.timeout_seconds}s"
+            raise ExplainerError(msg) from timed_out
         except (OSError, subprocess.SubprocessError) as exc:
-            msg = f"could not ask the coach: {exc}"
+            # The exception's text, not the command's: `FileNotFoundError` says
+            # what is missing without quoting anything the model produced.
+            msg = f"could not ask the coach: {type(exc).__name__}"
             raise ExplainerError(msg) from exc
         if completed.returncode != 0:
-            msg = f"the coach exited {completed.returncode}: {completed.stderr[:200]}"
+            # Deliberately without stderr. This message reaches the client, and
+            # the CORS policy is `*` -- a CLI's stderr carries absolute paths,
+            # config locations and sometimes an account, none of which is any
+            # origin's business. The exit code is what a player can act on.
+            msg = f"the coach exited {completed.returncode}"
             raise ExplainerError(msg)
         return completed.stdout
-
-
-def object_in(stdout: str) -> Mapping[str, object]:
-    """The JSON object in the command's output.
-
-    Two envelopes deep: the CLI wraps the model's reply in its own JSON, and the
-    reply is itself JSON. Both are unwrapped defensively, because the failure
-    mode that matters is a model answering in prose -- which is a thing to
-    report, not a thing to guess the meaning of.
-
-    Raises:
-        ExplainerError: If there is no object in there.
-    """
-    payload = _decode(_unwrap(stdout))
-    if not isinstance(payload, dict):
-        msg = "the coach answered with something that is not an object"
-        raise ExplainerError(msg)
-    # `json.loads` gives back an unparameterised dict, and strict pyright will
-    # not let one through untyped. The cast states what the isinstance above
-    # has already established; every field is then checked one at a time.
-    return cast("Mapping[str, object]", payload)
-
-
-def _decode(body: str) -> object:
-    """The JSON value in ``body``, whole if it is all JSON, else the object in it.
-
-    The second attempt is what survives a model that wraps its answer in prose
-    or a code fence. It is a fallback rather than the first move so that a reply
-    which is valid JSON but the *wrong* JSON -- an array of options, say -- is
-    reported as the wrong shape instead of being quietly reinterpreted.
-
-    Raises:
-        ExplainerError: If neither attempt finds JSON.
-    """
-    try:
-        return json.loads(body)
-    except (json.JSONDecodeError, ValueError):
-        pass
-    start, end = body.find("{"), body.rfind("}")
-    if start < 0 or end <= start:
-        msg = f"the coach did not answer with an object: {body[:160]!r}"
-        raise ExplainerError(msg)
-    try:
-        return json.loads(body[start : end + 1])
-    except (json.JSONDecodeError, ValueError) as exc:
-        msg = f"the coach's answer was not readable: {exc}"
-        raise ExplainerError(msg) from exc
-
-
-def _unwrap(stdout: str) -> str:
-    """The model's reply, out of the CLI's envelope."""
-    try:
-        envelope = json.loads(stdout)
-    except (json.JSONDecodeError, ValueError):
-        return stdout
-    if not isinstance(envelope, dict):
-        return stdout
-    result = cast("Mapping[str, object]", envelope).get("result")
-    return result if isinstance(result, str) else stdout
-
-
-def text(payload: Mapping[str, object], field: str) -> str:
-    """A string field, empty when it is missing or the wrong type."""
-    value = payload.get(field)
-    return value if isinstance(value, str) else ""
-
-
-def words(payload: Mapping[str, object], field: str) -> tuple[str, ...]:
-    """A list-of-strings field, keeping only the strings.
-
-    A missing or malformed field is an empty one rather than an error. Nothing
-    here is load-bearing for correctness -- the checkers decide whether any of
-    it may be shown -- so a bad field is dropped rather than made into a message
-    the player would see instead of an answer.
-    """
-    value = payload.get(field)
-    if not isinstance(value, list):
-        return ()
-    items = cast("list[object]", value)
-    return tuple(item for item in items if isinstance(item, str) and item)

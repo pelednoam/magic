@@ -34,13 +34,13 @@ GOOD = Answer(
 )
 
 
-def _game(client: TestClient) -> str:
+def new_game(client: TestClient) -> str:
     body = client.post("/games", json={"you": "green", "them": "other"}).json()
     session_id: str = body["session_id"]
     return session_id
 
 
-def _ask(client: TestClient, session_id: str, **body: object) -> dict[str, object]:
+def ask(client: TestClient, session_id: str, **body: object) -> dict[str, object]:
     response = client.post(
         f"/games/{session_id}/ask",
         json={"question": "how does trample work?", **body},
@@ -52,8 +52,8 @@ def _ask(client: TestClient, session_id: str, **body: object) -> dict[str, objec
 
 def test_an_answer_citing_a_retrieved_rule_is_passed_on() -> None:
     with TestClient(server(asker=Answering(GOOD), rules=RULES)) as client:
-        body = _ask(client, _game(client))
-        assert flag(body, "trusted")
+        body = ask(client, new_game(client))
+        assert flag(body, "cited")
         assert text(obj(body, "answer"), "in_short") == "The extra damage still gets through."
         assert words(obj(body, "answer"), "citations") == ["702.19b"]
 
@@ -61,7 +61,7 @@ def test_an_answer_citing_a_retrieved_rule_is_passed_on() -> None:
 def test_the_rules_it_was_given_come_back_too() -> None:
     """The certainly-true half. A player can read these whatever was said."""
     with TestClient(server(asker=Answering(GOOD), rules=RULES)) as client:
-        found = rows(_ask(client, _game(client)), "rules")
+        found = rows(ask(client, new_game(client)), "rules")
         assert "702.19b" in [text(rule, "reference") for rule in found]
         assert all(text(rule, "text") for rule in found)
 
@@ -74,8 +74,8 @@ def test_an_answer_citing_a_rule_it_was_not_given_is_refused() -> None:
         citations=("999.9z",),
     )
     with TestClient(server(asker=Answering(invented), rules=RULES)) as client:
-        body = _ask(client, _game(client))
-        assert not flag(body, "trusted")
+        body = ask(client, new_game(client))
+        assert not flag(body, "cited")
         answer = obj(body, "answer")
         assert "double" not in text(answer, "in_short")
         assert "999.9z" in text(answer, "unsure")
@@ -87,80 +87,42 @@ def test_an_uncited_answer_is_refused() -> None:
     """Fluent, plausible, and impossible to look up -- the shape of a guess."""
     guessed = Answer(answer="It just works.", in_short="It works.")
     with TestClient(server(asker=Answering(guessed), rules=RULES)) as client:
-        assert not flag(_ask(client, _game(client)), "trusted")
+        assert not flag(ask(client, new_game(client)), "cited")
 
 
-def test_an_answer_that_says_it_is_unsure_may_cite_nothing() -> None:
+def test_saying_it_is_unsure_does_not_excuse_citing_nothing() -> None:
+    """The hole this closed: a claim with a disclaimer stapled to it.
+
+    `unsure` used to exempt an answer from citing anything at all, so a
+    confident uncited paragraph passed as long as it also admitted to some
+    unrelated doubt.
+    """
     unsure = Answer(
-        answer="These rules do not cover that.",
-        in_short="I am not sure — let us read the card.",
-        unsure="Nothing retrieved covers this.",
+        answer="Trample doubles all damage.",
+        in_short="It does double damage!",
+        unsure="one minor detail",
     )
     with TestClient(server(asker=Answering(unsure), rules=RULES)) as client:
-        assert flag(_ask(client, _game(client)), "trusted")
+        body = ask(client, new_game(client))
+        assert not flag(body, "cited")
+        assert "double" not in text(obj(body, "answer"), "in_short")
 
 
-def test_a_question_matching_no_rule_is_still_answered() -> None:
-    """With a prompt that says there is nothing to cite, not a hidden box."""
+def test_a_question_matching_no_rule_is_still_asked_and_still_refused() -> None:
+    """The box is not hidden, and the answer is not passed off as checked.
+
+    Nothing was retrieved, so nothing can be cited, so nothing the model says
+    about the rules has anything behind it. The player is told that rather than
+    shown a confident paragraph.
+    """
     unsure = Answer(in_short="Nothing in the rules covers that.", unsure="no match")
     with TestClient(server(asker=Answering(unsure), rules=RULES)) as client:
-        body = _ask(client, _game(client), question="what is a zzzyzzx?")
-        assert flag(body, "trusted")
+        body = ask(client, new_game(client), question="what is a zzzyzzx?")
+        assert not flag(body, "cited")
         assert rows(body, "rules") == []
-
-
-def test_an_empty_question_is_a_bad_request() -> None:
-    with TestClient(server(asker=Answering(GOOD), rules=RULES)) as client:
-        response = client.post(f"/games/{_game(client)}/ask", json={"question": "   "})
-        assert response.status_code == HTTP_BAD_REQUEST
-        assert "ask a question" in response.json()["detail"]
-
-
-def test_a_missing_question_is_a_bad_request() -> None:
-    with TestClient(server(asker=Answering(GOOD), rules=RULES)) as client:
-        response = client.post(f"/games/{_game(client)}/ask", json={})
-        assert response.status_code == HTTP_BAD_REQUEST
-
-
-def test_a_game_that_is_not_there_is_a_404_before_anything_else() -> None:
-    """Even with no question and no rules installed: the game comes first."""
-    with TestClient(server()) as client:
-        response = client.post("/games/nope/ask", json={})
-        assert response.status_code == HTTP_NOT_FOUND
-
-
-def test_a_player_who_is_not_in_the_game_is_a_bad_request() -> None:
-    with TestClient(server(asker=Answering(GOOD), rules=RULES)) as client:
-        response = client.post(
-            f"/games/{_game(client)}/ask",
-            json={"question": "anything", "player": "nobody"},
-        )
-        assert response.status_code == HTTP_BAD_REQUEST
+        assert "not shown" in text(obj(body, "answer"), "answer")
 
 
 def test_the_player_defaults_to_you() -> None:
     with TestClient(server(asker=Answering(GOOD), rules=RULES)) as client:
-        assert flag(_ask(client, _game(client)), "trusted")
-
-
-def test_a_server_without_the_rules_installed_says_so() -> None:
-    """A legitimate way to run this. The tracker and the turn coach still work."""
-    with TestClient(server(asker=Answering(GOOD))) as client:
-        response = client.post(f"/games/{_game(client)}/ask", json={"question": "trample?"})
-        assert response.status_code == HTTP_UNAVAILABLE
-        assert "Comprehensive Rules are not installed" in response.json()["detail"]
-
-
-def test_no_answerer_is_a_503() -> None:
-    with TestClient(server(rules=RULES)) as client:
-        response = client.post(f"/games/{_game(client)}/ask", json={"question": "trample?"})
-        assert response.status_code == HTTP_UNAVAILABLE
-        assert "no answerer in this test" in response.json()["detail"]
-
-
-def test_asking_does_not_change_the_game() -> None:
-    with TestClient(server(asker=Answering(GOOD), rules=RULES)) as client:
-        session_id = _game(client)
-        before = client.get(f"/games/{session_id}").json()
-        _ask(client, session_id)
-        assert client.get(f"/games/{session_id}").json() == before
+        assert flag(ask(client, new_game(client)), "cited")

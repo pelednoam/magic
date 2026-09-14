@@ -24,6 +24,7 @@ from mtgcoach.carddata.decks import load_set_decks
 from mtgcoach.carddata.paths import effects_path
 from mtgcoach.carddata.store import CardStore
 from mtgcoach.core.ids import SetCode
+from mtgcoach.rules.corpus import CorpusError
 from mtgcoach.rules.library import RulesNotInstalledError, index_at, rules_path
 
 if TYPE_CHECKING:
@@ -72,6 +73,13 @@ def _rules(data_root: Path) -> RuleIndex | None:
         return index_at(rules_path(data_root))
     except RulesNotInstalledError as missing:
         print(f"rules questions are off: {missing}")  # noqa: T201 - this is a console script
+        return None
+    except (CorpusError, OSError, UnicodeDecodeError) as unreadable:
+        # A file that is there but is not the rules: a truncated download, the
+        # HTML of an error page, a PDF. Catching only "not installed" turned
+        # that into a stack trace at startup, so a bad download stopped the
+        # tracker working at all -- over a feature the tracker does not need.
+        print(f"rules questions are off: {unreadable}")  # noqa: T201 - console script
         return None
 
 

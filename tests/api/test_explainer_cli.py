@@ -14,12 +14,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from helpers import ME, UNKNOWN_ABILITY, facts
-from helpers_coach import Book, game
 from mtgcoach.api.explainer import ClaudeCliExplainer
 from mtgcoach.coach.advice import ExplainerError
-from mtgcoach.coach.report import advise
-from test_explainer import ANSWER, BOOK, FOREST, FOREST_RULES, REPORT, envelope
+from mtgcoach.core.abilities import Trigger, TriggeredAbility
+from mtgcoach.core.vocabulary import TriggerEvent
+from test_explainer import ANSWER, REPORT, envelope
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -28,6 +27,9 @@ if TYPE_CHECKING:
     from mtgcoach.coach.report import TurnReport
 
 type Run = subprocess.CompletedProcess[str]
+
+#: A creature whose ability fires on the clock, so a turn has a reminder on it.
+RINGS = TriggeredAbility(Trigger(TriggerEvent.BEGINNING_OF_UPKEEP), ())
 
 
 class Fake:
@@ -38,12 +40,14 @@ class Fake:
         self.completed = subprocess.CompletedProcess(["claude"], code, stdout, stderr)
         self.argv: tuple[str, ...] = ()
         self.stdin = ""
+        self.cwd: object = None
 
     def __call__(self, argv: Sequence[str], **kwargs: object) -> Run:
         """Record the call and return the canned result."""
         self.argv = tuple(argv)
         given = kwargs.get("input")
         self.stdin = given if isinstance(given, str) else ""
+        self.cwd = kwargs.get("cwd")
         return self.completed
 
     def after(self, flag: str) -> str:
@@ -88,71 +92,74 @@ def explain(fake: Fake | Raises | Never, report: TurnReport = REPORT) -> Explana
         return explainer.explain(report, "the briefing")
 
 
-def _answered() -> Fake:
+def envelope_answer() -> Fake:
     """A command that answers properly."""
     return Fake(stdout=envelope(json.dumps(ANSWER)))
 
 
-# --- the call ----------------------------------------------------------------
-
-
 def test_sends_the_briefing_and_reads_the_reply() -> None:
-    fake = _answered()
+    fake = envelope_answer()
     assert explain(fake).play == "abc"
     assert fake.stdin == "the briefing"
 
 
 def test_asks_the_model_it_was_configured_with() -> None:
-    fake = _answered()
+    fake = envelope_answer()
     explain(fake)
     assert fake.after("--model") == "opus"
 
 
-def test_the_coach_may_not_edit_anything() -> None:
-    """It is asked to think about a board, not to touch the repository."""
-    fake = _answered()
+def test_the_coach_gets_no_tools_at_all() -> None:
+    """An empty allow-list, not a deny-list naming today's dangerous tools.
+
+    The deny-list this replaced named the five write tools and left Read,
+    Glob, Grep, WebFetch, WebSearch and Task enabled. That was verified to be
+    exploitable: the same prompt with tools on read /etc/hostname and returned
+    its contents. A rules question is unauthenticated text a player typed, so
+    that is a file-read primitive and an egress primitive in one session.
+    """
+    fake = envelope_answer()
     explain(fake)
-    tools = fake.after("--disallowedTools")
-    assert "Write" in tools
-    assert "Bash" in tools
+    assert fake.after("--tools") == ""
+    assert "--disallowedTools" not in fake.argv, "a deny-list rots; an allow-list does not"
+    assert "--strict-mcp-config" in fake.argv, "an MCP server would put tools back"
+
+
+def test_the_coach_runs_somewhere_with_nothing_in_it() -> None:
+    """The working directory is what the CLI puts in its own system prompt."""
+    fake = envelope_answer()
+    explain(fake)
+    assert fake.cwd not in {"", None}
+    assert "magic" not in str(fake.cwd)
 
 
 # --- the ways it fails --------------------------------------------------------
 
 
-def test_a_failing_command_is_an_error() -> None:
-    with pytest.raises(ExplainerError, match="exited 1: boom"):
-        explain(Fake(code=1, stderr="boom"))
+def test_a_failing_command_is_an_error_without_its_stderr() -> None:
+    """This message reaches a client, and the CORS policy is `*`.
+
+    A CLI's stderr carries absolute paths, config locations and sometimes an
+    account name. The exit code is the part a player can act on.
+    """
+    with pytest.raises(ExplainerError, match="exited 1") as refused:
+        explain(Fake(code=1, stderr="/home/someone/.claude/config.json is bad"))
+    assert "/home/someone" not in str(refused.value)
 
 
 def test_a_missing_command_is_an_error() -> None:
     with pytest.raises(ExplainerError, match="could not ask the coach"):
-        explain(Raises(FileNotFoundError("no claude")))
+        explain(Raises(FileNotFoundError("/usr/local/bin/claude")))
 
 
-def test_a_slow_command_is_an_error() -> None:
-    with pytest.raises(ExplainerError, match="could not ask the coach"):
+def test_a_missing_command_does_not_leak_its_path() -> None:
+    """Same reason as the exit code above: this message is sent to a client."""
+    with pytest.raises(ExplainerError) as refused:
+        explain(Raises(FileNotFoundError("/usr/local/bin/claude")))
+    assert "/usr/local" not in str(refused.value)
+
+
+def test_a_slow_command_says_how_long_it_waited() -> None:
+    """A timeout is the one failure a player can do something about."""
+    with pytest.raises(ExplainerError, match="longer than 90s"):
         explain(Raises(subprocess.TimeoutExpired("claude", 90)))
-
-
-# --- turns with no decision in them -------------------------------------------
-
-
-def test_an_empty_turn_is_answered_without_asking() -> None:
-    """Most of a game is steps with no choice. Those cost nothing."""
-    got = explain(Never(), advise(game(), ME, BOOK))
-    assert "pass the turn" in got.in_short
-    assert got.play == ""
-
-
-def test_a_turn_with_an_unmodelled_card_is_still_asked_about() -> None:
-    """The engine could not speak for it, so somebody has to."""
-    book = Book(
-        cards={"Forest": FOREST, "Odd": facts("Odd Thing", "{1}")},
-        rules={"Forest": FOREST_RULES, "Odd": (UNKNOWN_ABILITY,)},
-    )
-    report = advise(game(battlefield=("Odd",)), ME, book)
-    assert report.unknown
-    fake = _answered()
-    assert explain(fake, report).play == "abc"
-    assert fake.stdin == "the briefing"

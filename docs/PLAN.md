@@ -21,8 +21,23 @@ M6 is built, on `m6`, and both halves check themselves:
 
 Both ask Claude through the local CLI, so neither spends API credits. Both are buttons, never
 automatic. The app shows a refusal as a refusal, and shows the retrieved rules whatever the
-model said. 1131 Python tests at 100% line and branch, 73 TypeScript tests; the file-length
-gate now covers the TypeScript too. Ensemble review of M6 is next.
+model said. 1173 Python tests at 100% line and branch, 74 TypeScript tests; the file-length
+gate now covers the TypeScript too.
+
+One round of ensemble review, four models, eight blocking findings, all fixed by hand. The two
+that mattered most were both about the same thing — the rules question box is unauthenticated
+text that ends up inside a prompt:
+
+- The subprocess was given a *deny-list* naming the write tools, so Read, WebFetch and Task
+  stayed enabled. Verified exploitable before fixing: the same prompt with tools on read
+  `/etc/hostname` and returned it. It is now `--tools ""`, an allow-list of nothing.
+- The QUESTION fence was a fixed marker, so a question containing that marker closed it.
+  It now carries a per-request random tag, and marker-shaped text is broken up first.
+
+Two more were about honesty rather than security, and both were the checker claiming more
+than it had checked: `unsure` used to excuse an answer from citing anything, and the wire
+called the result `trusted` when all that had been verified was that the citations were real.
+The rules route now reports `cited`, and the app says the rules below are the source.
 
 ---
 
@@ -829,19 +844,25 @@ decks, not all 300 in the set.
 kid understands.** Claude is never the source of truth for rules, and never appears in a
 correctness test.
 
-It enters `core` as a protocol:
+It enters as a protocol, in `packages/coach` rather than `core` — `core` has no business
+knowing a model exists:
 
 ```python
-class Coach(Protocol):
-    async def advise(self, state: GameState, options: TurnOptions) -> Advice: ...
+class Explainer(Protocol):
+    def explain(self, report: TurnReport, briefing: str) -> Explanation: ...
 ```
 
 ### Call shapes
 
-**Turn coach** — `claude-opus-5`, `thinking={"type": "adaptive"}`,
-`output_config={"effort": "medium"}`, structured output. Input: compact state JSON + the
-engine's enumerated options + oracle text for cards in play. Output: recommendation, reasoning,
-alternatives, warnings, kid-language explanation.
+**Turn coach** — `claude-opus-5` through the local CLI, which is why it costs nothing per
+call and why there is no `thinking` or `output_config` to set. Input: the engine's own
+`TurnReport`, rendered as text by `coach/briefing.py` — every fact in it already checked.
+Output: `play`, `attack`, `because`, `in_short`, `watch_out`, `check_yourself`.
+
+*No `alternatives` field, which this section originally promised.* It was dropped on
+purpose: the alternatives are the numbered attacks and the PLAYABLE cards, already on
+screen, already exact, and already ranked by the engine. Asking a model to re-list them
+in prose would put a second, unchecked copy of the options next to the checked one.
 
 **Rules Q&A** — retrieval first, then one call. FTS5 over the Comprehensive Rules picks the
 passages, they go into the prompt verbatim with their references, and the answer's citations
@@ -965,7 +986,7 @@ ensemble review (§6) before the next begins.
 | **M3** ✅ | Effect extraction pipeline + review CLI + FDN golden fixture and signed manifest. Card explainer CLI. | Useful immediately; proves the build-time Claude pattern *and* the multi-set pipeline in one go. |
 | **M4** ✅ | Mana solver, legality, trigger scanner, combat simulator. Hypothesis suites. Convergence-loop review. | The engine. This is what makes it a coach rather than a notepad. |
 | **M5** ✅ | FastAPI + WebSocket; Expo app as a **manual** tracker (tap cards in from your decklist). | **Probably 70% of the total value.** Ship before touching the camera. |
-| **M6** | Claude coach + rules Q&A over M4's output. | Turns correct answers into understandable ones. |
+| **M6** | Claude coach + rules Q&A over M4's output. **Done.** | Turns correct answers into understandable ones. |
 | **M7** | Single-card scan, then board scan → state diff → one-tap accept. Accuracy corpus. | The original ask, now with a tracker behind it to correct mistakes. |
 | **M8** | Web view on the laptop; teaching features — quiz mode, end-of-game review, son's tablet view. | The reason to build this instead of buying a rules app. |
 | **M9** | Enable a second set end-to-end as a **test of the abstraction**, not a feature. | If set #2 takes an evening, the design held. If it takes a week, we learn exactly where. |

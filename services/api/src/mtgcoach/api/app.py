@@ -136,7 +136,7 @@ def _reading(app: FastAPI, server: Server) -> None:
 
 
 def _playing(app: FastAPI, server: Server) -> None:
-    """The routes that change the game, or take a minute to answer."""
+    """The routes that change the game and broadcast the result."""
 
     @app.post("/games/{session_id}/events", response_model=None)
     async def send_event(session_id: str, body: dict[str, object]) -> dict[str, Json]:

@@ -2,9 +2,12 @@
  * What Claude said, and what the server checked before passing it on.
  *
  * Separate from the board types because these are the only payloads that began
- * life inside a language model. Every one of them carries a `trusted` flag, and
- * the guards below are the second half of the check the server already did --
- * a cast is a claim, and this is where the claim gets tested.
+ * life inside a language model. Each carries a flag saying what the server was
+ * able to check, and the two flags are deliberately different words: a turn
+ * recommendation is `trusted` because the engine agreed with the *choice*, and
+ * a rules answer is only `cited` because a citation is not a proof. The guards
+ * below are the second half of the check -- a cast is a claim, and this is
+ * where the claim gets tested.
  */
 
 import { asObject, isStrings } from "./shapes";
@@ -76,14 +79,16 @@ export interface RulesAnswer {
 export interface Asked {
   readonly answer: RulesAnswer;
   /**
-   * Whether the answer stayed inside the rules it was given.
+   * Whether every rule the answer named was one the server retrieved for it.
    *
-   * False means `answer` is the refusal text: the model cited a rule nobody
-   * retrieved, which is what a remembered rule looks like from here. `rules`
-   * is still populated, so the question is not lost -- the player reads the
-   * rule instead of the answer.
+   * **Not** whether the answer is right about what those rules say — nothing
+   * reads the rule and checks the claim against it, and calling this `trusted`
+   * would promise a child something nobody verified. False means `answer` is
+   * the refusal text: the model cited a rule nobody retrieved, or cited none
+   * at all. `rules` is populated either way, so the question is never lost --
+   * the player reads the rule instead of the answer.
    */
-  readonly trusted: boolean;
+  readonly cited: boolean;
   readonly rules: readonly RuleText[];
 }
 
@@ -116,7 +121,7 @@ export function isCoaching(value: unknown): value is Coaching {
 /** Whether a decoded response is shaped like a rules answer. */
 export function isAsked(value: unknown): value is Asked {
   const body = asObject(value);
-  if (body === null || typeof body["trusted"] !== "boolean" || !Array.isArray(body["rules"])) {
+  if (body === null || typeof body["cited"] !== "boolean" || !Array.isArray(body["rules"])) {
     return false;
   }
   const answer = asObject(body["answer"]);

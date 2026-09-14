@@ -14,6 +14,7 @@ meets first, and the one worth a sentence rather than a stack trace.
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import pytest
@@ -77,3 +78,62 @@ def test_the_command_line_serves(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     code = main(["--db", str(_stocked(tmp_path)), "--data", str(DATA), "--port", "9999"])
     assert code == 0
     assert served == [("0.0.0.0", 9999)]  # noqa: S104 - serving the LAN is the point
+
+
+def _dealt(tmp_path: Path, data_root: Path) -> TestClient:
+    """A server assembled from a stocked database and this data root."""
+    return TestClient(assemble(_stocked(tmp_path), data_root, FDN))
+
+
+def test_the_rules_are_loaded_when_they_are_installed(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = tmp_path / "data"
+    (root / "rules").mkdir(parents=True)
+    excerpt = FIXTURES / "rules_excerpt.txt"
+    (root / "rules" / "comprehensive.txt").write_text(
+        excerpt.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    _copy_sets(root)
+    with _dealt(tmp_path, root) as client:
+        body = decoded(client.post("/games", json={"you": "elves", "them": "elves"}).json())
+        assert body["rules_available"] is True
+    assert "rules questions are off" not in capsys.readouterr().out
+
+
+def test_a_server_without_the_rules_still_starts(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The tracker, the engine and the turn coach all work without them."""
+    root = tmp_path / "data"
+    _copy_sets(root)
+    with _dealt(tmp_path, root) as client:
+        body = decoded(client.post("/games", json={"you": "elves", "them": "elves"}).json())
+        assert body["rules_available"] is False
+    # Printed, because a question box that silently answers nothing is worse
+    # than one that says it is switched off.
+    assert "rules questions are off" in capsys.readouterr().out
+
+
+def test_a_rules_document_that_is_not_the_rules_does_not_stop_the_server(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A truncated download, or the HTML of an error page.
+
+    Catching only "not installed" turned that into a stack trace at startup, so
+    a bad download stopped the tracker working at all -- over a feature the
+    tracker does not need.
+    """
+    root = tmp_path / "data"
+    (root / "rules").mkdir(parents=True)
+    (root / "rules" / "comprehensive.txt").write_text("<html>404</html>", encoding="utf-8")
+    _copy_sets(root)
+    with _dealt(tmp_path, root) as client:
+        body = decoded(client.post("/games", json={"you": "elves", "them": "elves"}).json())
+        assert body["rules_available"] is False
+    assert "rules questions are off" in capsys.readouterr().out
+
+
+def _copy_sets(root: Path) -> None:
+    """The real per-set data, so `assemble` has decks to deal."""
+    shutil.copytree(DATA / "sets", root / "sets", dirs_exist_ok=True)

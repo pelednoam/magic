@@ -49,9 +49,8 @@ def test_an_answer_that_is_only_an_admission_of_doubt_survives() -> None:
 
 
 def test_an_answer_with_nothing_in_it_is_an_error() -> None:
-    """The CLI's own error envelope decodes to exactly this."""
     with pytest.raises(ExplainerError, match="answer was empty"):
-        parse(json.dumps({"type": "result", "is_error": True, "result": None}))
+        parse(json.dumps({"type": "result", "result": None}))
 
 
 def test_an_answer_that_is_only_citations_is_an_error() -> None:

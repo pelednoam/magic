@@ -2,8 +2,8 @@
 
 Full-text search over the Comprehensive Rules, so that a question is answered
 with the rule in front of it rather than from memory. SQLite's FTS5, because it
-is already a dependency, it needs no model and no network, and 3,500 short
-passages is a size where BM25 over words is simply the right tool.
+is already a dependency, it needs no model and no network, and a few thousand
+short passages is a size where BM25 over words is simply the right tool.
 
 The search is a *retrieval*, not an answer. It is allowed to be approximate:
 what it returns goes into a prompt, and the model reads all of it. What is not
@@ -17,7 +17,7 @@ import threading
 from typing import TYPE_CHECKING, Self
 
 from mtgcoach.rules.corpus import Kind, Passage
-from mtgcoach.rules.terms import query
+from mtgcoach.rules.terms import query, references_in
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -84,20 +84,37 @@ class RuleIndex:
         self.close()
 
     def close(self) -> None:
-        """Close the connection."""
-        self._connection.close()
+        """Close the connection.
+
+        Under the lock, because a question in flight on a worker thread is
+        holding it: closing underneath one turns a slow answer into a segfault
+        rather than an error.
+        """
+        with self._lock:
+            self._connection.close()
 
     def search(self, question: str, limit: int = DEFAULT_LIMIT) -> tuple[Passage, ...]:
         """The passages most likely to answer this, best first.
+
+        A rule named in the question comes first, exactly. "What does 702.19b
+        say?" tokenises to "702" and "19b" and ranked the right rule nowhere in
+        particular; asking for it by number is both cheaper and correct, and it
+        is the one case where a question says precisely what it wants.
 
         Empty when the question has no searchable words in it, which is a real
         answer -- "what?" is not a question the rules can be looked up for, and
         returning the eight highest-ranked passages for nothing would be worse
         than returning none.
         """
+        named = self.cited(references_in(question))[:limit]
         wanted = query(question)
         if not wanted:
-            return ()
+            return named
+        found = [p for p in self._matching(wanted, limit) if p not in named]
+        return (*named, *found)[:limit]
+
+    def _matching(self, wanted: str, limit: int) -> tuple[Passage, ...]:
+        """The passages an FTS5 query matches, best first."""
         with self._lock:
             rows = self._connection.execute(
                 # bm25 weights the title above the body: a question about
@@ -112,8 +129,13 @@ class RuleIndex:
     def cited(self, references: Sequence[str]) -> tuple[Passage, ...]:
         """The passages with exactly these references, in the order given.
 
-        Exact, unlike ``search``: this is how a citation is checked, and a
-        near-miss there would defeat the point of checking.
+        Exact, unlike the ranked search: a reference either names a passage in
+        this index or it does not. Used by ``search`` for a question that gives
+        a rule number, and available to a caller that wants to resolve a set of
+        citations back to their text. The *check* that a citation was supplied
+        lives in ``rules.answer``, which compares against what it handed out
+        rather than against the whole corpus -- citing a real rule nobody
+        retrieved is exactly the failure being caught.
         """
         found = [self._exact(reference) for reference in references]
         return tuple(passage for passage in found if passage is not None)

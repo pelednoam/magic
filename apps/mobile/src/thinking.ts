@@ -9,8 +9,13 @@
  *   moves, and an answer that arrives after a change is dropped. Advice about a
  *   board nobody is looking at any more reads as current, which is worse than
  *   no advice at all.
- * - **A rules answer is about the rules.** Trample works the same way after a
- *   land drop, so an answer stays until the next question replaces it.
+ * - **A rules answer is about the rules** -- but it is asked *with the board in
+ *   the prompt*, so "can my creature block that one?" is answered about the
+ *   creatures that were there. Once they are not, the answer is about a
+ *   position nobody is in, exactly like stale turn advice. So it is cleared on
+ *   a change too. The asymmetry that is left is smaller and real: turn advice
+ *   drops a *late arrival* as well, because it would otherwise appear a minute
+ *   after the board it describes.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -75,10 +80,16 @@ export function useQuestions(
   coach: Coach,
   sessionId: string,
   seat: string,
+  version: number,
 ): Thinking<Asked> & { readonly ask: (question: string) => void } {
   const [reply, setReply] = useState<Asked | null>(null);
   const [asking, setAsking] = useState(false);
   const [problem, setProblem] = useState("");
+
+  useEffect(() => {
+    setReply(null);
+    setProblem("");
+  }, [version]);
 
   const ask = useCallback(
     (question: string) => {

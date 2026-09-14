@@ -128,7 +128,7 @@ def test_a_rules_answer_arrives_with_the_rules_it_was_drawn_from(
         citations=("702.19b",),
     )
     body = ask(client, session_id, question="how does trample work when blocked?")
-    assert flag(body, "trusted")
+    assert flag(body, "cited")
     assert "702.19b" in [text(rule, "reference") for rule in rows(body, "rules")]
 
 
@@ -143,7 +143,7 @@ def test_a_citation_the_search_did_not_find_is_refused(
         citations=("104.3a",),
     )
     body = ask(client, session_id, question="how does trample work?")
-    assert not flag(body, "trusted")
+    assert not flag(body, "cited")
     assert "You win!" not in text(obj(body, "answer"), "in_short")
     # The retrieved rules survive, so the question is answered by the rules
     # themselves even when the words around them are not.

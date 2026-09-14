@@ -9,7 +9,7 @@ the outside, and it is the failure §8 says must never reach a child.
 from __future__ import annotations
 
 from helpers_rules import PASSAGES
-from mtgcoach.rules.answer import Answer, refusal, settle, trusted, verify
+from mtgcoach.rules.answer import Answer, cited, refusal, settle, verify
 
 TRAMPLE = [p for p in PASSAGES if p.reference in {"702.19b", "Trample"}]
 
@@ -24,8 +24,8 @@ def _said(**fields: object) -> Answer:
     return Answer(**{**base, **fields})  # type: ignore[arg-type]
 
 
-def test_an_answer_citing_a_rule_it_was_given_is_trusted() -> None:
-    assert trusted(_said(), TRAMPLE)
+def test_an_answer_citing_a_rule_it_was_given_passes() -> None:
+    assert cited(_said(), TRAMPLE)
 
 
 def test_an_answer_citing_a_rule_it_was_not_given_is_not() -> None:
@@ -46,7 +46,7 @@ def test_an_answer_with_no_words_is_refused() -> None:
 
 
 def test_the_child_sentence_alone_is_enough_to_have_said_something() -> None:
-    assert trusted(_said(answer=""), TRAMPLE)
+    assert cited(_said(answer=""), TRAMPLE)
 
 
 def test_an_answer_with_nothing_to_look_up_is_refused() -> None:
@@ -55,14 +55,33 @@ def test_an_answer_with_nothing_to_look_up_is_refused() -> None:
     assert "no rule to look up" in problems[0]
 
 
-def test_an_answer_that_admits_it_does_not_know_may_cite_nothing() -> None:
-    """It claims nothing, so there is nothing to check it against."""
-    assert trusted(_said(citations=(), unsure="These rules do not cover that."), TRAMPLE)
+def test_a_real_citation_is_not_treated_as_proof_of_the_claim() -> None:
+    """The limit of this check, written down so nobody mistakes it for more.
+
+    "Trample doubles all damage [702.19b]" cites a rule that was retrieved and
+    says no such thing. It passes, and it has to -- nothing here reads the
+    rule. That is exactly why the wire field is `cited` and not `trusted`, and
+    why the retrieved rules are printed under every answer.
+    """
+    wrong = _said(answer="Trample doubles all damage.", citations=("702.19b",))
+    assert cited(wrong, TRAMPLE)
 
 
-def test_an_answer_given_no_rules_at_all_must_say_so() -> None:
-    assert not trusted(_said(citations=()), [])
-    assert trusted(_said(citations=(), unsure="nothing matched"), [])
+def test_admitting_doubt_does_not_excuse_an_uncited_claim() -> None:
+    """The hole this closed: a confident paragraph with a disclaimer stapled on.
+
+    `unsure` used to exempt an answer from citing anything, so
+    "trample doubles all damage" plus unsure="one minor detail" passed. The
+    admission has to be the whole answer, not a footnote to one.
+    """
+    assert not cited(_said(citations=(), unsure="one minor detail"), TRAMPLE)
+
+
+def test_an_answer_that_cites_nothing_never_passes() -> None:
+    """However it is dressed, and whatever was retrieved."""
+    assert not cited(_said(citations=()), TRAMPLE)
+    assert not cited(_said(citations=()), [])
+    assert not cited(_said(citations=(), unsure="nothing matched"), [])
 
 
 def test_the_refusal_says_what_went_wrong_without_repeating_the_answer() -> None:
@@ -83,7 +102,7 @@ def _settled(*citations: str) -> Answer:
 
 def test_a_citation_copied_with_its_title_still_names_the_rule() -> None:
     """What the live model did on the first try, for every single answer."""
-    assert trusted(_settled("702.19b (Trample)"), TRAMPLE)
+    assert cited(_settled("702.19b (Trample)"), TRAMPLE)
     assert _settled("702.19b (Trample)").citations == ("702.19b",)
 
 

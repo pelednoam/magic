@@ -6,12 +6,18 @@ a different way: **the answer may only cite passages that were put in front of
 it.** Retrieval happens first, the passages go in the prompt verbatim, and an
 answer citing anything else is refused unread.
 
-That is weaker than the turn coach's check and it is honest about being weaker.
-It cannot tell whether the model read rule 509.1a correctly; it can tell whether
-the model is quoting a rule nobody gave it, which is what a confidently wrong
-rules answer looks like from the outside. What it buys, and what matters at a
-kitchen table, is that every answer comes with a number somebody can look up --
-and that the number is real.
+That is weaker than the turn coach's check, and the difference has a name.
+``coach.advice.trusted`` means *the engine agrees with this choice*. Nothing
+here can mean that: a citation is not a proof, and "trample doubles all damage
+[702.19b]" cites a real retrieved rule that says nothing of the kind. So what
+this returns is ``cited`` -- every rule it named was one we put in front of it,
+and it named at least one. The word "trusted" is deliberately not used on this
+side of the project, because it would be a lie in a place where a child reads
+the result.
+
+What that buys, and what matters at a kitchen table, is that every answer comes
+with a number somebody can look up, that the number is real, and that the rule
+it points at is printed underneath the answer for them to read.
 """
 
 from __future__ import annotations
@@ -34,8 +40,8 @@ class Answer:
     answer: str = ""
     #: The same thing for the person being taught. §3's whole point.
     in_short: str = ""
-    #: The rules it is drawn from, by reference. Never empty in a trusted
-    #: answer: an answer with nothing to look up is one nobody can check.
+    #: The rules it is drawn from, by reference. Never empty in an answer that
+    #: passes: one with nothing to look up is one nobody can check.
     citations: tuple[str, ...] = field(default_factory=tuple[str, ...])
     #: Where the answer stops. A question the given rules do not settle is
     #: answered by saying so, which is a better answer than a guess.
@@ -118,28 +124,39 @@ def _check_substance(answer: Answer) -> tuple[str, ...]:
     """An answer has to say something, and say where it got it.
 
     An uncited answer is the shape a remembered one takes: fluent, plausible,
-    and impossible to look up. The exception is an answer that says it does not
-    know, which is allowed to cite nothing because it claims nothing.
+    and impossible to look up. There is no exception for one that also fills in
+    ``unsure`` -- there was, and it was a hole straight through the check: a
+    confident uncited paragraph plus ``unsure="one minor detail"`` passed. The
+    admission has to be the whole answer, not a disclaimer attached to one.
     """
     if not answer.answer and not answer.in_short:
         return ("says nothing",)
-    if not answer.citations and not answer.unsure:
-        return ("gives no rule to look up, and does not say it is unsure",)
+    if not answer.citations:
+        return ("makes a claim with no rule to look up",)
     return ()
 
 
-def trusted(answer: Answer, supplied: Sequence[Passage]) -> bool:
-    """Whether this answer can be shown."""
+def cited(answer: Answer, supplied: Sequence[Passage]) -> bool:
+    """Whether every rule this answer names was one it was given.
+
+    Not "whether it is right". See the module docstring: nothing here reads the
+    rule and checks the claim against it.
+    """
     return not verify(answer, supplied)
 
 
 def refusal(problems: Sequence[str]) -> Answer:
-    """What to show instead of an answer that failed its checks."""
+    """What to show instead of an answer that failed its checks.
+
+    Not silence. The retrieved rules go to the client either way, so a refused
+    answer still leaves the player with the actual rules on screen -- which is
+    the part that was certainly true all along.
+    """
     return Answer(
         answer=(
             "The answer did not stay inside the rules it was given, so it is not shown. "
-            "Ask again, or look the card up."
+            "The rules below are the real ones; read those."
         ),
-        in_short="I could not answer that one safely. Let us read the card together.",
+        in_short="I could not answer that one safely. Let us read the rule together.",
         unsure="; ".join(problems),
     )

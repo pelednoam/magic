@@ -13,6 +13,7 @@ file, and its uncovered lines then count against the gate like any other.
 from __future__ import annotations
 
 import importlib
+import re
 import tomllib
 from pathlib import Path
 
@@ -67,3 +68,56 @@ def test_source_roots_match_coverage_config() -> None:
     with (REPO_ROOT / "pyproject.toml").open("rb") as f:
         configured = tomllib.load(f)["tool"]["coverage"]["run"]["source"]
     assert sorted(configured) == sorted(SOURCE_ROOTS)
+
+
+#: Where each distribution's manifest lives, by the name it publishes.
+DISTRIBUTIONS: dict[str, str] = {
+    "packages/core": "mtgcoach-core",
+    "packages/carddata": "mtgcoach-carddata",
+    "packages/coach": "mtgcoach-coach",
+    "packages/rules": "mtgcoach-rules",
+    "packages/vision": "mtgcoach-vision",
+    "services/api": "mtgcoach-api",
+}
+
+#: Which distribution each namespace package belongs to.
+OWNERS: dict[str, str] = {
+    "core": "mtgcoach-core",
+    "carddata": "mtgcoach-carddata",
+    "coach": "mtgcoach-coach",
+    "rules": "mtgcoach-rules",
+    "vision": "mtgcoach-vision",
+    "api": "mtgcoach-api",
+}
+
+IMPORTED = re.compile(r"^\s*from\s+mtgcoach\.(\w+)|^\s*import\s+mtgcoach\.(\w+)", re.MULTILINE)
+
+
+def _imports_of(distribution: Path) -> set[str]:
+    """Every sibling distribution this one imports from."""
+    found: set[str] = set()
+    for path in (distribution / "src").rglob("*.py"):
+        for first, second in IMPORTED.findall(path.read_text(encoding="utf-8")):
+            found.add(OWNERS[first or second])
+    return found
+
+
+def _declared_by(distribution: Path) -> set[str]:
+    """Every ``mtgcoach-*`` this distribution's manifest declares."""
+    with (distribution / "pyproject.toml").open("rb") as f:
+        declared = tomllib.load(f)["project"]["dependencies"]
+    return {name for name in declared if name.startswith("mtgcoach-")}
+
+
+@pytest.mark.parametrize(("where", "name"), sorted(DISTRIBUTIONS.items()))
+def test_every_cross_package_import_is_declared(where: str, name: str) -> None:
+    """A workspace install hides this until somebody installs one package alone.
+
+    `uv sync` puts every package on the path whatever the manifests say, so an
+    undeclared dependency imports fine here and fails only for the person who
+    installs the wheel. Two reviewers found `services/api` importing
+    `mtgcoach.rules` without declaring it, on the same diff that added it.
+    """
+    distribution = REPO_ROOT / where
+    missing = _imports_of(distribution) - _declared_by(distribution) - {name}
+    assert missing == set(), f"{name} imports {sorted(missing)} without declaring them"

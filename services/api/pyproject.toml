@@ -6,6 +6,7 @@ dependencies = [
     "mtgcoach-core",
     "mtgcoach-coach",
     "mtgcoach-carddata",
+    "mtgcoach-rules",
     "fastapi>=0.115",
     # Imported at module scope, so declared here rather than relied on through
     # FastAPI: `app.py` imports starlette directly for its status codes, and
@@ -29,3 +30,4 @@ packages = ["src/mtgcoach"]
 mtgcoach-core = { workspace = true }
 mtgcoach-coach = { workspace = true }
 mtgcoach-carddata = { workspace = true }
+mtgcoach-rules = { workspace = true }

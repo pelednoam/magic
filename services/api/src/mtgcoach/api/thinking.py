@@ -10,10 +10,18 @@ Both are deliberately **not** ``async def``. Asking is a subprocess that can
 take a minute, and an async route would hold the event loop for all of it --
 freezing every other player's socket. FastAPI runs a plain ``def`` in a
 threadpool, which is exactly the behaviour wanted here.
+
+Both are also rationed. There is no auth on this server (§4: one LAN, one
+table), so anything unauthenticated that starts a minute-long Node process is a
+way to bring the laptop down by holding down a button. The semaphore below is
+not a security boundary -- nothing here is -- but it turns "unbounded processes"
+into "a queue", which is the difference between a slow tracker and a dead one.
 """
 
 from __future__ import annotations
 
+import threading
+from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
@@ -24,14 +32,52 @@ from mtgcoach.api.coaching import coached
 from mtgcoach.api.context import session
 from mtgcoach.coach.advice import ExplainerError
 from mtgcoach.coach.report import advise
+from mtgcoach.coach.table import table
 from mtgcoach.core.ids import PlayerId
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     from fastapi import FastAPI
 
     from mtgcoach.api.context import Server
     from mtgcoach.api.sessions import Session
     from mtgcoach.api.views import Json
+
+
+#: The longest question this will carry. A rules question is a sentence; past
+#: this it is either a mistake or somebody filling the prompt with their own
+#: text, and both are answered better by saying so than by forwarding it.
+MAX_QUESTION = 500
+
+#: How many of these may be in flight at once. The threadpool has ten workers
+#: by default and the tracker's own routes need some of them, so the slow ones
+#: get a minority of it.
+MAX_IN_FLIGHT = 3
+
+#: Held for the length of a subprocess, so it is acquired without waiting: a
+#: request that queued would just sit on a threadpool worker instead.
+_in_flight = threading.BoundedSemaphore(MAX_IN_FLIGHT)
+
+
+@contextmanager
+def _one_at_a_time() -> Generator[None]:
+    """Take a slot, or refuse.
+
+    Raises:
+        HTTPException: 503 when every slot is busy. Honest and actionable: the
+            engine's own advice is already on screen, and trying again in a
+            moment is exactly the right thing to do.
+    """
+    if not _in_flight.acquire(blocking=False):
+        raise HTTPException(
+            HTTP_503_SERVICE_UNAVAILABLE,
+            "the coach is busy with another question; try again in a moment",
+        )
+    try:
+        yield
+    finally:
+        _in_flight.release()
 
 
 def routes(app: FastAPI, server: Server) -> None:
@@ -42,7 +88,8 @@ def routes(app: FastAPI, server: Server) -> None:
         """Ask Claude what to do about this player's turn."""
         game, player = _seat(server, session_id, body)
         try:
-            return coached(server.explainer, advise(game.state, player, server.catalogue))
+            with _one_at_a_time():
+                return coached(server.explainer, advise(game.state, player, server.catalogue))
         except ExplainerError as unavailable:
             # Not a server fault and not fatal: the deterministic panel is
             # already on screen and already right. 503 says "try again", which
@@ -58,14 +105,21 @@ def routes(app: FastAPI, server: Server) -> None:
         question = body.get("question", "").strip()
         if not question:
             raise HTTPException(HTTP_400_BAD_REQUEST, "ask a question")
+        if len(question) > MAX_QUESTION:
+            raise HTTPException(
+                HTTP_400_BAD_REQUEST,
+                f"that question is {len(question)} characters; keep it under {MAX_QUESTION}",
+            )
         if server.rules is None:
             raise HTTPException(
                 HTTP_503_SERVICE_UNAVAILABLE,
                 "the Comprehensive Rules are not installed on this server",
             )
         report = advise(game.state, player, server.catalogue)
+        board = table(game.state, player, server.catalogue)
         try:
-            return answered(server.asker, server.rules, question, report)
+            with _one_at_a_time():
+                return answered(server.asker, server.rules, question, report, board)
         except ExplainerError as unavailable:
             raise HTTPException(HTTP_503_SERVICE_UNAVAILABLE, str(unavailable)) from unavailable
 

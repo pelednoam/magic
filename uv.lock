@@ -757,6 +757,7 @@ dependencies = [
     { name = "mtgcoach-carddata" },
     { name = "mtgcoach-coach" },
     { name = "mtgcoach-core" },
+    { name = "mtgcoach-rules" },
     { name = "starlette" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -767,6 +768,7 @@ requires-dist = [
     { name = "mtgcoach-carddata", editable = "packages/carddata" },
     { name = "mtgcoach-coach", editable = "packages/coach" },
     { name = "mtgcoach-core", editable = "packages/core" },
+    { name = "mtgcoach-rules", editable = "packages/rules" },
     { name = "starlette", specifier = ">=0.40" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]

@@ -69,6 +69,11 @@ def snapshot(server: Server, game: Session) -> dict[str, Json]:
         # so counting events made this go backwards and the client threw away
         # every undo.
         "version": game.revision,
+        # Whether this server can answer rules questions at all. The document
+        # is an optional install, and without it the app used to show a question
+        # box, let somebody type a question, and only then say the feature was
+        # off. A flag costs one boolean and moves that sentence to the top.
+        "rules_available": server.rules is not None,
         "state": views.state(game.state, server.catalogue.name),
         "advice": {
             str(player): views.report(advise(game.state, player, server.catalogue))

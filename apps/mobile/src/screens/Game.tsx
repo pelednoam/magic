@@ -80,7 +80,7 @@ export function Game({
   }, [accept, coach, game.session_id]);
 
   const coaching = useCoaching(coach, game.session_id, seat, snapshot.version);
-  const questions = useQuestions(coach, game.session_id, seat);
+  const questions = useQuestions(coach, game.session_id, seat, snapshot.version);
 
   const act = useCallback(
     async (event: Record<string, unknown>): Promise<void> => {
@@ -149,6 +149,7 @@ export function Game({
         reply={questions.reply}
         asking={questions.asking}
         problem={questions.problem}
+        available={snapshot.rules_available}
         onAsk={questions.ask}
       />
 

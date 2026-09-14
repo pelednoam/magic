@@ -102,27 +102,46 @@ def _check_attack(explanation: Explanation, report: TurnReport) -> tuple[str, ..
         return (
             f"recommends attacking, but the engine gave no plans: {report.attacks.unavailable}",
         )
-    wanted = frozenset(explanation.attack)
+    # Sorted tuples, not sets. A set made ("bear-1", "bear-1") equal to a plan
+    # attacking with one Bear, so an explanation naming the same creature twice
+    # -- which is not a legal attack and is not a plan the engine costed --
+    # matched one that was.
+    wanted = tuple(sorted(explanation.attack))
     for plan in report.attacks.plans:
-        if frozenset(str(c.instance_id) for c in plan.attackers) == wanted:
+        if tuple(sorted(str(c.instance_id) for c in plan.attackers)) == wanted:
             return ()
-    return (f"recommends an attack the engine did not evaluate: {sorted(wanted)}",)
+    return (f"recommends an attack the engine did not evaluate: {list(wanted)}",)
 
 
 def _check_honesty(explanation: Explanation, report: TurnReport) -> tuple[str, ...]:
-    """Where the engine stops, the explanation has to say so.
+    """Where the engine stops, the explanation has to say so -- about each card.
 
     §8: "If the engine hits an ``Unmodeled`` effect, say so and show the card
     text." Asked for in the prompt and enforced here, because a model that
     forgets is indistinguishable from one that decided the card did not matter.
+
+    Checked *per card*, not as a count. Requiring only that ``check_yourself``
+    be non-empty meant one arbitrary sentence discharged every obligation on
+    the board: a model that mentioned the Pacifism and said nothing about the
+    Equipment passed, and the player read the silence as "counted".
     """
     owed = (*report.unknown, *report.attacks.caveats)
-    if not owed:
+    said = " ".join(explanation.check_yourself).casefold()
+    missing = [item for item in owed if _named(item).casefold() not in said]
+    if not missing:
         return ()
-    if not explanation.check_yourself:
-        missing = ", ".join(owed[:3])
-        return (f"says nothing about {len(owed)} thing(s) not modelled: {missing}",)
-    return ()
+    return (f"says nothing about {len(missing)} of {len(owed)} not modelled: {missing[:3]}",)
+
+
+def _named(item: str) -> str:
+    """The card an unmodelled-thing sentence is about.
+
+    Both producers write "<name>: <reason>" -- ``report._unknown`` and
+    ``statics.caveats``. The name is what a model would repeat; the reason is
+    the engine's own words and asking for those back would be asking it to
+    quote us.
+    """
+    return item.split(":", 1)[0].strip()
 
 
 def trusted(explanation: Explanation, report: TurnReport) -> bool:

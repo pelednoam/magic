@@ -1,15 +1,17 @@
 /**
- * The board and the engine's advice, as the server sends them, written out to match `services/api/views.py`.
+ * The board and the engine's advice, written out to match `services/api/views.py`.
  *
  * Hand-written, like the Python side it mirrors, and for the same reason: the
  * wire is a contract two people agreed on, not a dump of either side's types.
- * `tests/api/test_wire_contract.py` reads this file and fails if the server
- * starts sending a field this does not know about, which is the drift that
- * would otherwise be found by a blank space in the UI.
+ * `tests/api/test_wire_contract.py` reads every file in this folder and fails
+ * if the server starts sending a field none of them knows about, which is the
+ * drift that would otherwise be found by a blank space in the UI.
  *
  * Nothing here interprets anything. `reasons` are sentences the engine wrote
  * and this app prints; it does not know what a land is, and must not learn.
  */
+
+import { asObject } from "./shapes";
 
 /** One card in hand, and the engine's verdict on it. */
 export interface Playable {
@@ -122,6 +124,14 @@ export interface Snapshot {
    * the network chooses, and without this an older one silently won.
    */
   readonly version: number;
+  /**
+   * Whether this server can answer rules questions.
+   *
+   * The Comprehensive Rules are an optional install. False means the question
+   * box has nothing behind it, and saying so up front beats letting somebody
+   * type a question and wait for a 503.
+   */
+  readonly rules_available: boolean;
   readonly state: GameState;
   readonly advice: Readonly<Record<string, Advice>>;
 }
@@ -130,8 +140,6 @@ export interface Snapshot {
 export interface NewGame extends Snapshot {
   readonly session_id: string;
 }
-
-import { asObject } from "./shapes";
 
 /** The two seats. The server names them, and this app only ever displays them. */
 export const YOU = "you";
@@ -147,7 +155,11 @@ export const THEM = "them";
  */
 export function isSnapshot(value: unknown): value is Snapshot {
   const body = asObject(value);
-  if (body === null || typeof body["version"] !== "number") {
+  if (
+    body === null ||
+    typeof body["version"] !== "number" ||
+    typeof body["rules_available"] !== "boolean"
+  ) {
     return false;
   }
   const state = asObject(body["state"]);

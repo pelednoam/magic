@@ -142,6 +142,7 @@ describe("permanent notes", () => {
 describe("a response is not a snapshot because we said so", () => {
   const good = {
     version: 0,
+    rules_available: true,
     state: { players: { you: {}, them: {} } },
     advice: { you: {}, them: {} },
   };
@@ -164,6 +165,12 @@ describe("a response is not a snapshot because we said so", () => {
 
   it("rejects a snapshot with no version, because ordering depends on it", () => {
     expect(isSnapshot({ ...good, version: undefined })).toBe(false);
+  });
+
+  it("rejects a snapshot that does not say whether rules questions work", () => {
+    // A server too old to send it would otherwise render the question box as
+    // though it worked, which is the thing the flag exists to prevent.
+    expect(isSnapshot({ ...good, rules_available: undefined })).toBe(false);
   });
 
   it("rejects a board with no players, which is what the screen reads", () => {
