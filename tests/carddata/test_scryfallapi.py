@@ -20,7 +20,7 @@ from mtgcoach.carddata.scryfallapi import (
 from mtgcoach.core.ids import SetCode
 
 if TYPE_CHECKING:
-    from mtgcoach.carddata.jsondata import JsonObject
+    from mtgcoach.carddata.jsondata import JsonObject, JsonValue
 
 FDN = SetCode("FDN")
 
@@ -117,6 +117,40 @@ def test_something_that_is_not_a_card_object_fails_the_import() -> None:
     """
     pages = Answers({"object": "list", "has_more": False, "data": [{"name": "Forest"}, 7]})
     with pytest.raises(ScryfallError, match="not a card"):
+        list(printings_for(FDN, pages))
+
+
+@pytest.mark.parametrize("envelope", [{}, {"object": "card"}, {"object": 7}])
+def test_a_page_that_is_not_a_list_of_cards_is_refused(envelope: JsonObject) -> None:
+    """One shape was still getting through.
+
+    `_cards_in` refuses an `object: "error"` page and a page with no card list,
+    which leaves something that is neither -- a proxy's own JSON, a single card
+    object -- whose `has_more` is absent. Absent read as "that was the last
+    page".
+    """
+    pages = Answers({**envelope, "data": [{"name": "Forest"}]})
+    with pytest.raises(ScryfallError, match="not a list of cards"):
+        list(printings_for(FDN, pages))
+
+
+@pytest.mark.parametrize("more", [None, 0, "false", "true", []])
+def test_a_page_that_does_not_say_whether_there_are_more_is_refused(more: JsonValue) -> None:
+    """Absent is not false.
+
+    `is not True` read a missing or corrupted `has_more` as the last page, so a
+    truncated or rewritten envelope ended the download and wrote a short file
+    that imported cleanly. Only Scryfall saying `false` ends this.
+    """
+    pages = Answers({"object": "list", "has_more": more, "data": [{"name": "Forest"}]})
+    with pytest.raises(ScryfallError, match="did not say whether"):
+        list(printings_for(FDN, pages))
+
+
+def test_a_page_with_no_has_more_at_all_is_refused() -> None:
+    """Absent is not false."""
+    pages = Answers({"object": "list", "data": [{"name": "Forest"}]})
+    with pytest.raises(ScryfallError, match="did not say whether"):
         list(printings_for(FDN, pages))
 
 

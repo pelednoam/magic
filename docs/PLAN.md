@@ -107,9 +107,35 @@ never be signalled, because its pid is free to belong to somebody else by then, 
 signal a group at all — the stand-in processes carry pid 4242, which on any real machine is
 very likely somebody's.
 
-Six rounds, seventy-odd findings fixed by hand. The critical count went 8, 5, 1, 5, 5, 8 — not
-monotonic, because each round's fixes are the next round's subject. What changed is the kind:
-round one found a live file-read exploit, and round six found a field labelled zero.
+Round seven reviewed the two gap fixes and found eight more; round eight reviewed *those* and
+found nine, three of which were the same one — **a live server token committed to the
+repository**. `data/token` was added in the commit that introduced the token, before the
+`.gitignore` entry existed, so the ignore rule never applied. The scrubber missed it too: it
+matches credential *patterns*, and a bare 43-character base64url blob in a file called `token`
+matches nothing at all — there is no `token =` for a keyword pattern to see and no vendor
+prefix for a shape pattern to see. It exited 0 and called the diff clean, so the value went to
+four model providers. The reviewers finding it is the only reason anybody knew.
+
+Fixed three ways: the value was rotated (the file is gone, and the next start makes a new one),
+the ignore rule now applies because nothing is tracked, and the scrubber redacts a file that is
+*entirely* a credential by path rather than by content — [PR #12] upstream, with the leak
+itself as a test. **The commit is still in local history** and wants a rewrite before any push;
+that is the one thing here left undone.
+
+The other five from that round: a reply missing `play` or `attack` became an explicit "do
+nothing", which the engine agrees with whenever holding back is right — so the server put
+`trusted` on a choice the model never made; `Rationed`'s `_tokens` defaulted to the module
+constant rather than the instance's `burst`, correct only because `_afford` clamps elsewhere;
+`has_more` being absent or non-boolean read as "that was the last page", which is a short
+download that imports cleanly; and the startup line printed `0.0.0.0` as `localhost`, which on
+a phone is the phone.
+
+Eight rounds, ninety-odd findings fixed by hand. The critical count went 8, 5, 1, 5, 5, 8, 8,
+9 — not monotonic, because each round's fixes are the next round's subject. What changed is the
+kind: round one found a live file-read exploit, and round eight found the secret the review
+itself had leaked.
+
+[PR #12]: https://github.com/pelednoam/multi-model-code-review-agent/pull/12
 
 ---
 

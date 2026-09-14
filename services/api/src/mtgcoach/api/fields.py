@@ -47,16 +47,18 @@ def one(payload: Mapping[str, object], field: str) -> str:
     turning a malformed value into empty does not lose information -- it
     substitutes a different recommendation, and one that always passes.
 
-    A *missing* key is "no recommendation" and is fine. An explicit ``null`` is
-    not: the schema asks for a string, and a model that answered ``null``
-    answered off-schema. The two were indistinguishable through ``.get``, which
-    turned a malformed reply into a do-nothing recommendation that passes.
+    An explicit ``null`` is off-schema: the schema asks for a string, and the
+    two were indistinguishable through ``.get``, which turned a malformed reply
+    into a do-nothing recommendation that passes.
+
+    A *missing* key is refused outright -- ``play`` is the only caller and the
+    prompt demands it. See ``_missing``.
 
     Raises:
-        MalformedFieldError: If the field is present and is not a string.
+        MalformedFieldError: If the field is absent, or is not a string.
     """
     if field not in payload:
-        return ""
+        raise _missing(field, "an identifier")
     value = payload[field]
     if not isinstance(value, str):
         raise MalformedFieldError(field, value, "an identifier")
@@ -78,7 +80,9 @@ def words(payload: Mapping[str, object], field: str) -> tuple[str, ...]:
     return tuple(item for item in items if isinstance(item, str) and item)
 
 
-def exactly(payload: Mapping[str, object], field: str) -> tuple[str, ...]:
+def exactly(
+    payload: Mapping[str, object], field: str, *, required: bool = False
+) -> tuple[str, ...]:
     """A list of identifiers, all of them or none.
 
     For the fields a checker compares against the engine: ``attack``,
@@ -93,14 +97,17 @@ def exactly(payload: Mapping[str, object], field: str) -> tuple[str, ...]:
     ``ExplainerError`` and the player gets the engine's own panel, which is
     what they would have got from a refused answer anyway.
 
-    A missing key is "no attack", which is a real recommendation. An explicit
-    ``null`` is off-schema, for the same reason as ``one``.
+    An explicit ``null`` is off-schema, for the same reason as ``one``.
+    ``required`` is for ``attack``, which the prompt demands; ``citations`` is
+    absent-tolerant. See ``_missing``.
 
     Raises:
         MalformedFieldError: If the field is present and is not a list of
-            non-empty strings.
+            non-empty strings, or is absent and ``required``.
     """
     if field not in payload:
+        if required:
+            raise _missing(field, "a list of identifiers")
         return ()
     value = payload[field]
     if not isinstance(value, list):
@@ -109,6 +116,27 @@ def exactly(payload: Mapping[str, object], field: str) -> tuple[str, ...]:
     if not all(isinstance(item, str) and item for item in items):
         raise MalformedFieldError(field, items, "a list of identifiers")
     return tuple(cast("list[str]", items))
+
+
+def _missing(field: str, wanted: str) -> MalformedFieldError:
+    """The error for a field the prompt demanded and the reply did not carry.
+
+    Absent is not the same as "do nothing", and reading it that way put the
+    server's own word behind a choice the model never made. ``{"because":
+    "Wait."}`` in combat became an explicit empty ``attack``, which matches the
+    engine whenever holding back is the right play -- so it came out
+    ``trusted``, and the screen said "do not attack this turn" in the coach's
+    voice. The prompt asks for both keys, so a reply without one is malformed
+    in shape rather than modest in content.
+
+    Only for ``play`` and ``attack``. ``citations`` is absent-tolerant on
+    purpose: an answer with none is refused downstream for being uncited, which
+    is already the safe direction.
+
+    Returned rather than raised so the two call sites read as refusals of their
+    own, and so ``exactly`` can decide whether this is one.
+    """
+    return MalformedFieldError(field, "<no such key>", wanted)
 
 
 class MalformedFieldError(ExplainerError):

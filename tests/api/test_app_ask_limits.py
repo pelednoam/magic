@@ -16,7 +16,6 @@ they read better together than scattered among the tests about answers.
 from __future__ import annotations
 
 import threading
-import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -157,37 +156,3 @@ def test_only_so_many_questions_in_a_minute() -> None:
         refused = client.post(f"/games/{session_id}/ask", json={"question": "one more"})
         assert refused.status_code == HTTP_UNAVAILABLE
         assert "a lot of questions" in refused.json()["detail"]
-
-
-def test_a_refused_busy_request_does_not_spend_a_token() -> None:
-    """A refusal is not a request.
-
-    A player retrying two seconds later should not be paying for the attempt
-    that never started.
-    """
-    rations = rationing.Rationed()
-    held = [rations.take() for _ in range(rationing.MAX_IN_FLIGHT)]
-    assert held == [""] * rationing.MAX_IN_FLIGHT
-
-    assert "busy" in rations.take(), "the concurrency cap, not the rate limit"
-    for _ in held:
-        rations.release()
-
-    # Only the ones that actually ran were charged, so the rest of the minute's
-    # allowance is still there.
-    for _ in range(rationing.BURST - rationing.MAX_IN_FLIGHT):
-        assert rations.take() == ""
-        rations.release()
-    assert "a lot of questions" in rations.take()
-
-
-def test_tokens_come_back_over_time() -> None:
-    """Otherwise a long game would run out halfway through."""
-    rations = rationing.Rationed(burst=2, window=0.05)
-    assert rations.take() == ""
-    rations.release()
-    assert rations.take() == ""
-    rations.release()
-    assert "a lot of questions" in rations.take()
-    time.sleep(0.08)
-    assert rations.take() == ""

@@ -90,8 +90,11 @@ def parse(stdout: str) -> Explanation:
 def _explanation(payload: Mapping[str, object]) -> Explanation:
     """Build an explanation, taking only fields of the right shape."""
     return Explanation(
+        # Both demanded: see `fields._missing`. A reply missing one of them
+        # used to become "do nothing", which the engine agrees with often
+        # enough to come out `trusted`.
         play=one(payload, "play"),
-        attack=exactly(payload, "attack"),
+        attack=exactly(payload, "attack", required=True),
         because=prose(payload, "because"),
         in_short=prose(payload, "in_short"),
         watch_out=words(payload, "watch_out"),

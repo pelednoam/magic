@@ -1,8 +1,8 @@
 """How often the two slow routes may be asked, and by how many at once.
 
-Neither is a security boundary. §4 puts this server on one LAN with no auth and
-PLAN.md records that as a known gap; nothing here changes it, and a rate limit
-in front of an open door is not a lock.
+Neither is a security boundary. The token in ``access`` is the lock; this is
+sized for the hand that slips, not for somebody who wants in. A rate limit is
+not access control and would be a poor one.
 
 What it is for is the failure that does not need an attacker. Both routes start
 a ``claude`` process and spend the operator's subscription, and the client that
@@ -11,9 +11,9 @@ page left open on a second device is enough to turn "a coach" into "the laptop
 is on fire and the quota is gone". A semaphore bounds how many run at once; a
 bucket bounds how many run at all.
 
-Per server, not per module, and deliberately not per client: there is no
-identity here to key on, and inventing one would be pretending at the auth this
-does not have.
+Per server, not per module, and deliberately not per client: every request
+carries the same token, so there is no identity here to key on. A token per
+seat would give it one, and that is where this would become per player.
 """
 
 from __future__ import annotations
@@ -45,9 +45,32 @@ class Rationed:
     burst: int = BURST
     window: float = WINDOW_SECONDS
     _lock: threading.Lock = field(default_factory=threading.Lock)
-    #: Tokens left, as a float because it refills continuously.
-    _tokens: float = float(BURST)
+    #: Tokens left, as a float because it refills continuously. `init=False`
+    #: and set in `__post_init__`, because the default was `float(BURST)` --
+    #: the module constant, so a `Rationed(burst=2)` was constructed holding
+    #: twelve. Harmless as it happened, because `_afford` clamps to
+    #: `self.burst` before looking, so the first call corrected it; but that
+    #: made one field's correctness depend on an unrelated `min` elsewhere,
+    #: and the next reader of either would have to find the other.
+    _tokens: float = field(init=False)
     _refilled: float = field(default_factory=time.monotonic)
+
+    def __post_init__(self) -> None:
+        """Start full, at the capacity this instance was actually given.
+
+        Raises:
+            ValueError: If ``burst`` or ``window`` is not positive. A window of
+                zero divides by zero in the refill, and a burst of zero can
+                never afford a call -- both are better said here than found in
+                the arithmetic.
+        """
+        if self.burst <= 0:
+            msg = f"burst must be positive, not {self.burst}"
+            raise ValueError(msg)
+        if self.window <= 0:
+            msg = f"window must be positive, not {self.window}"
+            raise ValueError(msg)
+        self._tokens = float(self.burst)
 
     def take(self) -> str:
         """Take a slot, or say why there is none.

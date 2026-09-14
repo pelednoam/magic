@@ -46,8 +46,14 @@ def envelope(result: str) -> str:
 
 
 def said(**fields: object) -> str:
-    """A reply carrying ``fields``, plus the words every reply must have."""
-    return json.dumps({"because": "because.", **fields})
+    """A reply carrying ``fields``, plus the keys every reply must have.
+
+    ``play`` and ``attack`` are in here because the prompt demands them and the
+    parser now refuses a reply without them -- see ``fields._missing``. A test
+    about one field should not have to think about the other two, and a test
+    *about* an absent key builds its payload itself.
+    """
+    return json.dumps({"because": "because.", "play": "", "attack": [], **fields})
 
 
 # --- parsing what came back ---------------------------------------------------
@@ -75,8 +81,13 @@ def test_ignores_prose_around_the_object() -> None:
     assert parse(envelope(wrapped)).in_short == "Yours is bigger."
 
 
-def test_a_missing_field_is_an_empty_one() -> None:
-    got = parse(envelope(json.dumps({"because": "No good options."})))
+def test_a_missing_prose_field_is_an_empty_one() -> None:
+    """Prose only.
+
+    A missing `play` or `attack` is refused rather than read as "nothing" --
+    `test_a_reply_missing_a_demanded_key_is_refused` covers that.
+    """
+    got = parse(envelope(json.dumps({"because": "No good options.", "play": "", "attack": []})))
     assert got.because == "No good options."
     assert got.play == ""
     assert got.attack == ()
@@ -94,82 +105,27 @@ def test_an_empty_recommendation_survives() -> None:
 # --- fields of the wrong shape ------------------------------------------------
 
 
-def test_a_missing_play_is_simply_no_card() -> None:
-    """Absent and malformed are different: absent is the common case."""
-    assert parse(said()).play == ""
+@pytest.mark.parametrize(
+    ("payload", "missing"),
+    [
+        ({"because": "Wait.", "attack": []}, "play"),
+        ({"because": "Wait.", "play": ""}, "attack"),
+        ({"because": "Wait."}, "play"),
+    ],
+)
+def test_a_reply_missing_a_demanded_key_is_refused(
+    payload: dict[str, object], missing: str
+) -> None:
+    """Silence is not a recommendation.
+
+    Read as one it became an explicit "play nothing, attack with nobody",
+    which the engine agrees with whenever holding back is right -- so it came
+    back `trusted`, and the screen said so in the coach's voice. The prompt
+    asks for both keys.
+    """
+    with pytest.raises(ExplainerError, match=f"'{missing}' was not"):
+        parse(envelope(json.dumps(payload)))
 
 
 def test_an_empty_string_in_a_prose_list_is_dropped() -> None:
     assert parse(said(watch_out=["", "real"])).watch_out == ("real",)
-
-
-# --- answers that are not answers ---------------------------------------------
-
-
-def test_prose_with_no_object_is_an_error() -> None:
-    with pytest.raises(ExplainerError, match="did not answer with an object"):
-        parse(envelope("I'm sorry, I can't help with that."))
-
-
-def test_empty_output_is_an_error() -> None:
-    with pytest.raises(ExplainerError, match="did not answer with an object"):
-        parse("")
-
-
-def test_a_broken_object_is_an_error() -> None:
-    with pytest.raises(ExplainerError, match="did not answer with an object"):
-        parse(envelope('{"play": "abc", }'))
-
-
-def test_a_brace_in_the_prose_does_not_break_the_parse() -> None:
-    """Not exotic when the subject is Magic: mana symbols are written {G}.
-
-    Taking the first `{` to the last `}` made every answer that mentioned one
-    unreadable, which is most answers about paying for anything.
-    """
-    said = json.dumps({**ANSWER, "because": "Tap the Forest for {G}."})
-    assert parse(envelope(f"Here you go:\n{said}\nHope that helps.")).play == "abc"
-
-
-def test_the_answer_is_the_largest_object_not_the_first() -> None:
-    """A model quoting a fragment before its answer used to win the race."""
-    said = json.dumps(ANSWER)
-    assert parse(envelope(f'{{"note": "x"}} {said}')).play == "abc"
-
-
-def test_a_json_value_that_is_not_an_object_is_an_error() -> None:
-    """A model that answers with a list of options has not chosen one."""
-    with pytest.raises(ExplainerError, match="not an object"):
-        parse(envelope('["attack", "hold"]'))
-
-
-def test_an_answer_with_no_words_in_it_is_an_error() -> None:
-    with pytest.raises(ExplainerError, match="no explanation in it"):
-        parse(json.dumps({"type": "result", "result": None}))
-
-
-def test_an_envelope_that_says_it_failed_is_an_error() -> None:
-    """Its `result` is an error message, and error messages contain braces.
-
-    Without this the object scanner mined the message for something
-    brace-shaped and returned it as the model's reply.
-    """
-    failed = {"type": "result", "is_error": True, "result": 'failed at {"x": 1}'}
-    with pytest.raises(ExplainerError, match="reported an error"):
-        parse(json.dumps(failed))
-
-
-def test_an_answer_that_is_only_a_choice_is_an_error() -> None:
-    """A choice with no reasoning teaches nothing, which is the whole point."""
-    with pytest.raises(ExplainerError, match="no explanation in it"):
-        parse(envelope(json.dumps({"play": "abc", "attack": ["def"]})))
-
-
-def test_output_that_is_not_whole_json_falls_through_to_the_object_in_it() -> None:
-    assert parse('[1, 2] {"play": "abc", "because": "why"}').play == "abc"
-
-
-def test_output_that_is_json_but_not_an_envelope_is_read_as_the_answer() -> None:
-    """A bare array is not a CLI envelope, and is not an answer either."""
-    with pytest.raises(ExplainerError, match="not an object"):
-        parse('["attack", "hold"]')

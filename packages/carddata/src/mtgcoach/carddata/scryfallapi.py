@@ -85,14 +85,31 @@ def printings_for(set_code: SetCode, pages: Pages) -> Iterator[JsonObject]:
 
     Raises:
         ScryfallError: If a page cannot be fetched, if Scryfall reports an
-            error, if it offers more pages without saying where, or if the
+            error, if a page is not a list, if it does not say whether there
+            are more, if it offers more pages without saying where, or if the
             pages do not end.
     """
     url = f"{_SEARCH}?{urllib.parse.urlencode({'q': f'set:{set_code}', 'unique': 'prints'})}"
     for _ in range(MAX_PAGES):
         page = pages.fetch(url)
         yield from _cards_in(page, set_code)
-        if page.get("has_more") is not True:
+        # The envelope, before its pagination is trusted. `_cards_in` refuses an
+        # `object: "error"` page and a page with no card list, which leaves one
+        # shape still getting through: something that is neither a list nor an
+        # error -- a proxy's JSON, a single card object -- whose `has_more` is
+        # simply absent.
+        if page.get("object") != "list":
+            msg = f"Scryfall's answer for {set_code} was not a list of cards"
+            raise ScryfallError(msg)
+        # `is not True` read a *missing* or corrupted `has_more` as "that was
+        # the last page", so a truncated or rewritten envelope ended the
+        # download and wrote a short file that imported cleanly. Absent is not
+        # the same as false, and only Scryfall saying `false` ends this.
+        more = page.get("has_more")
+        if not isinstance(more, bool):
+            msg = f"Scryfall's {set_code} page did not say whether there were more"
+            raise ScryfallError(msg)
+        if not more:
             return
         following = page.get("next_page")
         if not isinstance(following, str):

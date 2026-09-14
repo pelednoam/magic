@@ -49,7 +49,10 @@ Hard rules, in order of importance:
    would have to hold in their head. "Their creature is bigger, so yours would
    just die" -- not "unfavourable trade at parity".
 
-Reply with this JSON object and nothing else:
+Reply with this JSON object and nothing else. Every key must be there; empty is
+how you say "do nothing" -- "play": "" and "attack": []. A key left out is not
+an answer and is discarded, because a missing "attack" is indistinguishable
+from a deliberate one.
 
 {"play": "<instance_id or empty>",
  "attack": ["<instance_id>", ...],

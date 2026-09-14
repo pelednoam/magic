@@ -26,6 +26,10 @@ gate-output.txt
 data/cache/
 data/*.sqlite3
 
+# The server's bearer token. Made on first run, per installation, and the
+# whole of the access control -- see services/api/src/mtgcoach/api/access.py.
+data/token
+
 # Downloaded card data. Four megabytes of Scryfall's JSON per set, and it is
 # theirs rather than ours -- `mtgcoach sets fetch` puts it back.
 data/scryfall/

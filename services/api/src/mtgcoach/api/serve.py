@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING
 import uvicorn
 
 from mtgcoach.api.access import token_at
+from mtgcoach.api.address import reachable
 from mtgcoach.api.app import create_app
 from mtgcoach.api.cards import build
 from mtgcoach.api.context import Claude
@@ -137,26 +138,27 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     serving = assemble(args.db, args.data, SetCode(args.set_code))
-    _announce(serving.token, args.host, args.port)
+    _announce(serving.token, reachable(args.host, args.port))
     uvicorn.run(serving.app, host=args.host, port=args.port)
     return 0
 
 
-def _announce(token: str, host: str, port: int) -> None:
+def _announce(token: str, url: str) -> None:
     """Print the address and the token, because nothing else will.
 
     The token is the whole of the server's access control and the app needs it.
     Printing it at startup is how it gets from the laptop to the phone -- there
-    is nobody to email it to.
+    is nobody to email it to. The address is here for the same reason: the app
+    defaults to ``localhost``, which on a phone is the phone.
     """
-    where = "localhost" if host in {"0.0.0.0", "::"} else host  # noqa: S104 - the LAN is the point
-    print(f"Magic Coach on http://{where}:{port}")  # noqa: T201 - a console script
+    print(f"Magic Coach on {url}")  # noqa: T201 - a console script
     print(f"  token: {token}")  # noqa: T201
     print("  paste it into the app when it asks.")  # noqa: T201
+    print(f"  the app needs the address too: EXPO_PUBLIC_COACH_URL={url}")  # noqa: T201
     print(  # noqa: T201
         "  EXPO_PUBLIC_COACH_TOKEN works for a localhost-only session, but Expo "
         "bakes it into the bundle Metro serves unauthenticated -- so on a LAN, "
-        "paste it."
+        "set the URL and paste the token."
     )
 
 

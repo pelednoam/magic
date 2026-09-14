@@ -38,9 +38,13 @@ def test_an_empty_string_in_an_attack_is_refused() -> None:
         parse(said(attack=["bear-1", ""]))
 
 
-def test_a_missing_attack_is_simply_no_attack() -> None:
-    """Absent and malformed are different: absent is the common case."""
-    assert parse(said()).attack == ()
+def test_an_empty_attack_is_read_as_attacking_with_nobody() -> None:
+    """Which is a real recommendation, and the only way to make it.
+
+    `said` supplies the key, so this is the explicit `[]` -- absent is refused
+    instead, in `test_a_reply_missing_a_demanded_key_is_refused`.
+    """
+    assert parse(said(attack=[])).attack == ()
 
 
 @pytest.mark.parametrize("field", ["play", "attack"])

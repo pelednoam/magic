@@ -26,11 +26,23 @@ uv run python -m mtgcoach.api.serve --set FDN         # the server, on the lapto
 cd apps/mobile && npm install && npm run web          # the app
 ```
 
-The server prints its address and a token when it starts. The token is its only access
-control, so every request needs it — `Authorization: Bearer <token>`, and `?token=` on the
-WebSocket, which a browser will not let a page put a header on. A phone asks for it once and
-you paste it in. `EXPO_PUBLIC_COACH_TOKEN` works for a localhost-only session, but Expo bakes
-it into the bundle Metro serves unauthenticated — so on a LAN, paste it.
+The server prints two things when it starts, and the app needs both:
+
+```
+Magic Coach on http://192.168.1.42:8000
+  token: <43 characters>
+  the app needs the address too: EXPO_PUBLIC_COACH_URL=http://192.168.1.42:8000
+```
+
+The **address** is the laptop's on the LAN, not `localhost` — the app defaults to `localhost`,
+which on a phone is the phone. Set `EXPO_PUBLIC_COACH_URL` to what the server printed before
+`npm run web`, since Metro serves the bundle to the phone and the value is baked into it.
+
+The **token** is the whole of the access control, so every request needs it —
+`Authorization: Bearer <token>`, and `?token=` on the WebSocket, which a browser will not let
+a page put a header on. A phone asks for it once and you paste it in.
+`EXPO_PUBLIC_COACH_TOKEN` works for a localhost-only session, but Expo bakes that into the
+bundle Metro serves unauthenticated — so on a LAN, set the URL and paste the token.
 
 What that closes is not a guest's phone. It is a web page the household visits, which could
 make cross-origin requests to `http://<laptop>:8000` and previously needed to know nothing at
