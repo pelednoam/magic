@@ -21,8 +21,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol
 
-from mtgcoach.coach.briefing import SHOWN_ATTACKS
-
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -61,6 +59,18 @@ class Explainer(Protocol):
         """
         ...
 
+
+#: How many attacks are put in front of the model, and therefore how many it
+#: may choose from. The engine can enumerate more than a person wants to read,
+#: and past a handful the tail is strictly worse than the head -- they are
+#: already sorted.
+#:
+#: Defined here rather than in ``briefing`` because it is part of the contract
+#: this module enforces: "recommend only from the options below" has to mean
+#: the options below. They disagreed once -- the prompt showed six and the
+#: checker accepted any of them -- so a model could be credited with choosing a
+#: plan it had never been shown.
+SHOWN_ATTACKS = 6
 
 #: How much model text a refusal may quote back. Long enough to recognise a
 #: mangled instance id, short enough that a refusal stays a sentence.

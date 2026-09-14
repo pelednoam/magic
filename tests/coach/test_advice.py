@@ -7,9 +7,18 @@ a fluent right one. These are the checks that keep it.
 
 from __future__ import annotations
 
+import pytest
+
 from helpers import ME, UNKNOWN_ABILITY, facts
 from helpers_coach import Book, game, land
-from mtgcoach.coach.advice import Explanation, refusal, trusted, verify
+from mtgcoach.coach.advice import (
+    SHOWN_ATTACKS,
+    Explanation,
+    offered,
+    refusal,
+    trusted,
+    verify,
+)
 from mtgcoach.coach.report import TurnReport, advise
 from mtgcoach.core.steps import Step
 
@@ -156,3 +165,27 @@ def test_a_refusal_says_why_and_points_at_what_is_still_right() -> None:
     assert shown.watch_out
     assert shown.play == ""
     assert shown.attack == ()
+
+
+def test_an_attack_past_the_ones_shown_is_refused() -> None:
+    """Recommend only from the options below means the options below.
+
+    The prompt lists the first few plans. Accepting one past the cut credits a
+    model with choosing something it was never shown -- and that plan is one
+    nobody read the consequences of, which is the whole value of the list.
+    """
+    report = _combat(battlefield=("Bear",) * 5)
+    if len(report.attacks.plans) <= SHOWN_ATTACKS:
+        pytest.fail("the fixture must produce more plans than the prompt shows")
+    beyond = report.attacks.plans[SHOWN_ATTACKS]
+    said = Explanation(attack=tuple(str(c.instance_id) for c in beyond.attackers))
+    problems = verify(said, report)
+    assert problems
+    assert "did not evaluate" in problems[0]
+
+
+def test_an_attack_among_the_ones_shown_is_fine() -> None:
+    report = _combat(battlefield=("Bear",) * 5)
+    shown = offered(report)[-1]
+    said = Explanation(attack=tuple(str(c.instance_id) for c in shown.attackers))
+    assert trusted(said, report)
