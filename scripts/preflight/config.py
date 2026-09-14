@@ -41,6 +41,7 @@ ARTIFACT_DIRS: list[str] = [
 SOURCE_DIRS: list[str] = [
     "packages/core/src/",
     "packages/carddata/src/",
+    "packages/coach/src/",
     "packages/vision/src/",
     "services/api/src/",
     "tools/",

@@ -13,6 +13,7 @@ members = [
     "magic-coach",
     "mtgcoach-api",
     "mtgcoach-carddata",
+    "mtgcoach-coach",
     "mtgcoach-core",
     "mtgcoach-vision",
 ]
@@ -522,6 +523,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "mtgcoach-api" },
     { name = "mtgcoach-carddata" },
+    { name = "mtgcoach-coach" },
     { name = "mtgcoach-core" },
     { name = "mtgcoach-vision" },
 ]
@@ -545,6 +547,7 @@ mutation = [
 requires-dist = [
     { name = "mtgcoach-api", editable = "services/api" },
     { name = "mtgcoach-carddata", editable = "packages/carddata" },
+    { name = "mtgcoach-coach", editable = "packages/coach" },
     { name = "mtgcoach-core", editable = "packages/core" },
     { name = "mtgcoach-vision", editable = "packages/vision" },
 ]
@@ -609,6 +612,17 @@ source = { editable = "services/api" }
 name = "mtgcoach-carddata"
 version = "0.0.0"
 source = { editable = "packages/carddata" }
+dependencies = [
+    { name = "mtgcoach-core" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "mtgcoach-core", editable = "packages/core" }]
+
+[[package]]
+name = "mtgcoach-coach"
+version = "0.0.0"
+source = { editable = "packages/coach" }
 dependencies = [
     { name = "mtgcoach-core" },
 ]

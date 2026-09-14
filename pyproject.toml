@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "mtgcoach-core",
     "mtgcoach-carddata",
+    "mtgcoach-coach",
     "mtgcoach-vision",
     "mtgcoach-api",
 ]
@@ -19,6 +20,7 @@ members = ["packages/*", "services/*"]
 [tool.uv.sources]
 mtgcoach-core = { workspace = true }
 mtgcoach-carddata = { workspace = true }
+mtgcoach-coach = { workspace = true }
 mtgcoach-vision = { workspace = true }
 mtgcoach-api = { workspace = true }
 
@@ -50,6 +52,7 @@ extend-exclude = ["scripts", "multi-model-code-review-agent"]
 src = [
     "packages/core/src",
     "packages/carddata/src",
+    "packages/coach/src",
     "packages/vision/src",
     "services/api/src",
     "tools",
@@ -72,6 +75,8 @@ ignore = [
 # fields and a helper that hides half of them behind a dict would be worse.
 # Only what `tests/**` does not already grant -- ruff unions the two lists.
 "tests/helpers.py" = ["PLR0913"]
+# `game()` builds a board out of its parts, which is as many parts as a board has.
+"tests/coach/helpers_coach.py" = ["PLR0913"]
 "tests/**" = ["S101", "PLR2004", "D100", "D103", "INP001"]
 "tools/**" = ["T201", "INP001"]
 # An exhaustive match over a closed union has one branch per member by
@@ -109,10 +114,12 @@ files = ["packages", "services", "tools", "tests"]
 mypy_path = """\
 packages/core/src:\
 packages/carddata/src:\
+packages/coach/src:\
 packages/vision/src:\
 services/api/src:\
 tools:\
-tests\
+tests:\
+tests/coach\
 """
 
 # ---------------------------------------------------------------- pyright
@@ -122,10 +129,12 @@ include = ["packages", "services", "tools", "tests"]
 extraPaths = [
     "packages/core/src",
     "packages/carddata/src",
+    "packages/coach/src",
     "packages/vision/src",
     "services/api/src",
     "tools",
     "tests",
+    "tests/coach",
 ]
 typeCheckingMode = "strict"
 pythonVersion = "3.12"
@@ -135,7 +144,7 @@ reportMissingTypeStubs = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["tools", "tests"]
+pythonpath = ["tools", "tests", "tests/coach"]
 addopts = "-q --strict-markers --strict-config"
 
 # ---------------------------------------------------------------- mutmut
@@ -153,6 +162,7 @@ branch = true
 source = [
     "packages/core/src",
     "packages/carddata/src",
+    "packages/coach/src",
     "packages/vision/src",
     "services/api/src",
     "tools",

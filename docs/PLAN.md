@@ -3,10 +3,11 @@
 An assistant for learning Magic: The Gathering at the kitchen table. Point a phone at a card
 or at the board, and get a clear answer to *"what can I do this turn, and what should I do?"*
 
-**Status:** M0–M3 merged to `main`. M4 (the four solvers — mana, legality, combat, triggers)
-on `m4-engine`, four rounds of ensemble review with the findings fixed by hand: 780 tests,
-100% line and branch, with **52% of the Beginner Box fully modelled** and eleven keywords
-implemented. The fourth round found nothing blocking in the engine. M5 next; see §10.
+**Status:** M0–M4 merged to `main`. The engine is done: 780 tests, 100% line and branch, with
+**52% of the Beginner Box fully modelled** and eleven keywords implemented. M4 took four rounds
+of ensemble review, with every finding fixed by hand; the fourth found nothing blocking in the
+engine. M5 is under way on `m5-tracker`: `packages/coach` — the turn report — is built and
+green at 820 tests; the API and the app are next. See §10.
 
 ---
 
@@ -199,6 +200,8 @@ magic/
 ├─ packages/
 │  ├─ core/          pure Python, stdlib-only — game state, rules engine, mana solver,
 │  │                 combat simulator, effect model. No I/O, no network, no framework.
+│  ├─ coach/         the turn report: the four solvers assembled into one answer.
+│  │                 Takes card data through a Protocol, so it holds none either.
 │  ├─ carddata/      Scryfall ingestion, set/collection management, SQLite, rules FTS
 │  └─ vision/        card detection and recognition (OpenCV)
 ├─ services/
@@ -890,7 +893,7 @@ ensemble review (§6) before the next begins.
 | **M1** ✅ | `core`: state model, events, `reduce`, step walker. 100% + property tests. | The spine. No UI needed to test it. |
 | **M2** ✅ | `carddata`: Scryfall ingestion, `Collection`, the `sets add / audit` commands, FDN decklists as data. | Establishes the set-agnostic data layer before any set-specific work exists to bias it. |
 | **M3** ✅ | Effect extraction pipeline + review CLI + FDN golden fixture and signed manifest. Card explainer CLI. | Useful immediately; proves the build-time Claude pattern *and* the multi-set pipeline in one go. |
-| **M4** | Mana solver, legality, trigger scanner, combat simulator. Hypothesis suites. Convergence-loop review. | The engine. This is what makes it a coach rather than a notepad. |
+| **M4** ✅ | Mana solver, legality, trigger scanner, combat simulator. Hypothesis suites. Convergence-loop review. | The engine. This is what makes it a coach rather than a notepad. |
 | **M5** | FastAPI + WebSocket; Expo app as a **manual** tracker (tap cards in from your decklist). | **Probably 70% of the total value.** Ship before touching the camera. |
 | **M6** | Claude coach + rules Q&A over M4's output. | Turns correct answers into understandable ones. |
 | **M7** | Single-card scan, then board scan → state diff → one-tap accept. Accuracy corpus. | The original ask, now with a tracker behind it to correct mistakes. |
@@ -898,6 +901,21 @@ ensemble review (§6) before the next begins.
 | **M9** | Enable a second set end-to-end as a **test of the abstraction**, not a feature. | If set #2 takes an evening, the design held. If it takes a week, we learn exactly where. |
 
 M0–M5 is a genuinely useful tool. Everything after is upside.
+
+**A package the original tree did not have.** `packages/coach` was added in M5. The four
+solvers each answer a narrow question; something has to assemble them into the one a player
+asks, and putting that in `services/api` would have made it untestable without HTTP. It takes
+card data through a `CardLookup` Protocol, so like `core` it has no dependencies and no set
+knowledge, and the 100% gate applies to it in full.
+
+Two things it will not do, both of which are the point:
+
+- It will not answer for a card the sealed fixture does not model. Those are named in
+  `TurnReport.unknown`, so the player is told where the coach stops. Silence would read as
+  "there is nothing to do", which is a lie, and at 52% coverage it would be a frequent one.
+- It will not swallow the engine's refusals. A board too large to search exactly, or a
+  creature with `*` power, comes back as `Attacks.unavailable` — a sentence, not an empty
+  list. An empty attack list *is* advice, and it would be the wrong advice.
 
 ---
 

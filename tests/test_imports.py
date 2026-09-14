@@ -26,6 +26,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SOURCE_ROOTS = (
     "packages/core/src",
     "packages/carddata/src",
+    "packages/coach/src",
     "packages/vision/src",
     "services/api/src",
     "tools",
