@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from mtgcoach.api.access import BEARER, allowed, new_token, presented, token_at
+from mtgcoach.api.access import SCHEME, allowed, new_token, presented, token_at
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -51,7 +51,7 @@ def test_an_empty_token_file_is_replaced(tmp_path: Path) -> None:
 
 
 def test_a_header_in_the_agreed_shape_is_read() -> None:
-    assert presented(f"{BEARER}abc", None) == "abc"
+    assert presented(f"{SCHEME}abc", None) == "abc"
 
 
 @pytest.mark.parametrize("header", ["abc", "Basic abc", "", None])
@@ -61,7 +61,7 @@ def test_a_header_in_any_other_shape_is_not(header: str | None) -> None:
 
 def test_the_query_string_is_the_fallback() -> None:
     assert presented(None, "abc") == "abc"
-    assert presented(f"{BEARER}header-wins", "query") == "header-wins"
+    assert presented(f"{SCHEME}header-wins", "query") == "header-wins"
 
 
 def test_an_empty_token_is_never_allowed() -> None:
