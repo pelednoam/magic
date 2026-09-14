@@ -17,60 +17,11 @@ from mtgcoach.carddata.scryfall import cards_in
 from mtgcoach.carddata.store import CardStore
 from mtgcoach.coach.advice import ExplainerError, Explanation
 from mtgcoach.core.ids import PlayerId, SetCode
-from mtgcoach.core.steps import Step
 from mtgcoach.selfplay import cli
-from mtgcoach.selfplay.cli import Run, main, said, season
-from mtgcoach.selfplay.coached import Tally
-from mtgcoach.selfplay.records import Game, Kind, Season, Trouble
+from mtgcoach.selfplay.cli import Run, main, season
+from mtgcoach.selfplay.records import Game
 
 CLEAN = Game(seed=1, decks=("elves", "goblins"), turns=20, winner=PlayerId("you"), ending="life")
-
-
-def test_a_clean_season_says_so() -> None:
-    printed = said(Season(games=(CLEAN, CLEAN)))
-    assert "2 games, 2 clean, 0 problem(s)" in printed
-    assert "median" in printed
-
-
-def test_a_problem_is_printed_with_the_seed_that_reproduces_it() -> None:
-    """A seed is a whole game replayed exactly.
-
-    That is the difference between finding a bug and finding it twice.
-    """
-    broken = Game(
-        seed=42,
-        decks=("cats", "pirates"),
-        turns=9,
-        winner=None,
-        ending="decked",
-        trouble=(Trouble(Kind.BROKEN, "lost a card", 9, Step.DRAW),),
-    )
-    printed = said(Season(games=(broken,)))
-    assert "seed 42" in printed
-    assert "cats v pirates" in printed
-    assert "lost a card" in printed
-
-
-def test_the_cards_nothing_can_speak_for_are_named() -> None:
-    """The single most useful number for deciding what to work on next."""
-    game = Game(
-        seed=1,
-        decks=("a", "b"),
-        turns=1,
-        winner=None,
-        ending="life",
-        unknown=tuple(f"Card {n}" for n in range(30)),
-    )
-    printed = said(Season(games=(game,)))
-    assert "cards nothing can speak for (30)" in printed
-    assert printed.rstrip().endswith("...")
-
-
-def test_the_coachs_score_is_reported_when_it_played() -> None:
-    tally = Tally(asked=10, refused=1, untrusted=2, disagreements=["named a card you cannot play"])
-    printed = said(Season(games=(CLEAN,), coaching=(tally,)))
-    assert "10 asked, 7 trusted, 2 failed checks, 1 no answer" in printed
-    assert "disagreed: named a card you cannot play" in printed
 
 
 def test_a_set_with_no_cards_imported_is_refused(tmp_path: Path) -> None:
@@ -174,3 +125,44 @@ def test_a_season_with_the_coach_asks_the_coach(tmp_path: Path) -> None:
     assert asked, "the coach was never asked"
     assert run.coaching, "and its score was never kept"
     assert run.coaching[0].refused == run.coaching[0].asked
+
+
+def test_a_season_can_be_replayed_from_a_journal(tmp_path: Path) -> None:
+    """The whole reason a coached season writes one.
+
+    `--journal` then `--replay` is the identical game in a second, however
+    many times you want it -- which is what makes a bad decision something to
+    study rather than something that happened once.
+    """
+    db = _full(tmp_path)
+    where = tmp_path / "run.jsonl"
+
+    class Deciding:
+        """An explainer that plays the first thing it is offered."""
+
+        def explain(self, report: object, briefing: str) -> Explanation:
+            """Whatever is playable."""
+            del briefing
+            playable = getattr(report, "playable", ())
+            card = str(playable[0].instance_id) if playable else ""
+            return Explanation(play=card, because="the first", in_short="the first")
+
+    with mock.patch.object(cli, "ClaudeCliExplainer", return_value=Deciding()):
+        first = season(
+            Run(
+                db=db,
+                data_root=DATA,
+                set_code=FDN,
+                games=1,
+                seed=0,
+                coach=True,
+                journal=where,
+            )
+        )
+    assert where.is_file(), "the journal was never written"
+
+    again = season(Run(db=db, data_root=DATA, set_code=FDN, games=1, seed=0, replay=where))
+    assert again.games[0].turns == first.games[0].turns
+    assert again.games[0].events == first.games[0].events
+    assert again.games[0].winner == first.games[0].winner
+    assert again.coaching[0].asked == first.coaching[0].asked

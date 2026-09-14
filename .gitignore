@@ -30,6 +30,11 @@ data/*.sqlite3
 # whole of the access control -- see services/api/src/mtgcoach/api/access.py.
 data/token
 
+# Self-play journals: one line per coach decision, holding the full briefing,
+# so a season runs to megabytes. The command that made each one is in
+# docs/SELFPLAY.md, which is what makes them reproducible without keeping them.
+data/selfplay/
+
 # Downloaded card data. Four megabytes of Scryfall's JSON per set, and it is
 # theirs rather than ours -- `mtgcoach sets fetch` puts it back.
 data/scryfall/

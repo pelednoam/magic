@@ -67,6 +67,11 @@ the coach's advice is *applied* and the next position is a consequence of the la
 which is the only way bad advice shows up, since it compounds. That run reports how many of its
 answers survived the engine's checks.
 
+A seed reproduces a deal exactly but not the coach, so a coached run writes a **journal** — every
+briefing, every answer, every verdict — and `--replay` plays it back: the identical game in a
+second instead of twenty minutes, and a way to ask what a change to the engine does to a game the
+coach already played. [docs/SELFPLAY.md](docs/SELFPLAY.md) has the whole thing.
+
 `sets fetch` is the only command that touches the network. It asks Scryfall for one set —
 771 printings for Foundations, five requests — and writes them to a file, so re-importing
 and the effects workflow do not ask again. `mtgcoach decks verify FDN` then checks all ten

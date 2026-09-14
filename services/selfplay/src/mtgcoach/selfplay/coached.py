@@ -24,13 +24,15 @@ from typing import TYPE_CHECKING
 from mtgcoach.coach.advice import ExplainerError, verify
 from mtgcoach.coach.briefing import brief
 from mtgcoach.core.ids import InstanceId
+from mtgcoach.selfplay import journal
 from mtgcoach.selfplay.moves import Move
 
 if TYPE_CHECKING:
-    from mtgcoach.coach.advice import Explainer
+    from mtgcoach.coach.advice import Explainer, Explanation
     from mtgcoach.coach.report import TurnReport
     from mtgcoach.core.ids import PlayerId
     from mtgcoach.core.state import GameState
+    from mtgcoach.selfplay.journal import Journal
 
 
 @dataclass(slots=True)
@@ -55,13 +57,36 @@ class Tally:
         return self.asked - self.refused - self.untrusted
 
 
+@dataclass(frozen=True, slots=True)
+class Asked:
+    """Where a decision was made, for the journal line."""
+
+    state: GameState
+    player: PlayerId
+    briefing: str
+
+
+@dataclass(frozen=True, slots=True)
+class Answered:
+    """And what came of it."""
+
+    said: Explanation | None = None
+    problems: tuple[str, ...] = ()
+    error: str = ""
+
+
 @dataclass(slots=True)
 class Coached:
-    """Asks the coach, applies what it says, and keeps score."""
+    """Asks the coach, applies what it says, keeps score, and writes it down."""
 
     explainer: Explainer
     name: str = "coach"
     tally: Tally = field(default_factory=Tally)
+    #: Which game this is, so a journal line can be looked up again.
+    seed: int = 0
+    #: Where to write what happened. None keeps nothing, which is what a test
+    #: wants and what a run nobody intends to repeat can have.
+    journal: Journal | None = None
 
     def act(self, state: GameState, report: TurnReport, player: PlayerId) -> Move:
         """Whatever the coach recommends, if it survived being checked.
@@ -72,15 +97,17 @@ class Coached:
         unchecked advice anyway would be measuring something nobody is ever
         shown.
         """
-        del state, player
         self.tally.asked += 1
+        briefing = brief(report)
         try:
-            said = self.explainer.explain(report, brief(report))
+            said = self.explainer.explain(report, briefing)
         except ExplainerError as unavailable:
             self.tally.refused += 1
             self.tally.disagreements.append(f"no answer: {unavailable}")
+            self._wrote(Asked(state, player, briefing), Answered(error=str(unavailable)))
             return Move()
         problems = verify(said, report)
+        self._wrote(Asked(state, player, briefing), Answered(said=said, problems=problems))
         if problems:
             self.tally.untrusted += 1
             self.tally.disagreements.extend(problems)
@@ -89,4 +116,22 @@ class Coached:
             play=InstanceId(said.play) if said.play else None,
             attack=tuple(InstanceId(one) for one in said.attack),
             because=said.because,
+        )
+
+    def _wrote(self, at: Asked, outcome: Answered) -> None:
+        """Put this decision in the journal, if there is one."""
+        if self.journal is None:
+            return
+        self.journal.write(
+            journal.Decision(
+                seed=self.seed,
+                turn=at.state.turn,
+                step=str(at.state.step),
+                player=str(at.player),
+                briefing=at.briefing,
+                answer=journal.fields(outcome.said) if outcome.said is not None else None,
+                error=outcome.error,
+                trusted=outcome.said is not None and not outcome.problems,
+                problems=outcome.problems,
+            )
         )

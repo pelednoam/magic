@@ -25,9 +25,12 @@ from mtgcoach.carddata.store import CardStore
 from mtgcoach.core.ids import SetCode
 from mtgcoach.selfplay import dealing, playing
 from mtgcoach.selfplay.coached import Coached
+from mtgcoach.selfplay.journal import Journal, read
 from mtgcoach.selfplay.moves import Seat
 from mtgcoach.selfplay.policy import Greedy
 from mtgcoach.selfplay.records import Game, Season
+from mtgcoach.selfplay.replaying import Replayed
+from mtgcoach.selfplay.saying import said
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -35,15 +38,11 @@ if TYPE_CHECKING:
 #: The set the Beginner Box is, and the only one imported so far.
 DEFAULT_SET: Final = SetCode("FDN")
 
-#: How many of a season's troubles to print. A defect usually fires in every
-#: game, and forty identical lines are harder to read than four.
-SHOWN = 8
+#: An agent that keeps a tally: the coach, or a replay of one.
+type Scored = Coached | Replayed
 
 #: A game needs two decks that can be dealt whole.
 PLAYERS: Final = 2
-
-#: How many unknown cards to name. The whole list is often most of a set.
-NAMED = 12
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +61,12 @@ class Run:
     #: Whether the coach plays. One subprocess per decision, so a game is
     #: minutes rather than milliseconds -- see ``coached``.
     coach: bool = False
+    #: Where to write every decision, so the season can be run again. A
+    #: coached season without one cannot be: the coach is a language model,
+    #: and a seed does not reproduce it.
+    journal: Path | None = None
+    #: A journal to play back instead of asking. See ``replaying``.
+    replay: Path | None = None
 
 
 def season(run: Run) -> Season:
@@ -89,12 +94,12 @@ def season(run: Run) -> Season:
         raise ValueError(msg)
     pairs = list(itertools.permutations(sorted(decks), 2))
     played: list[Game] = []
-    tallies: list[Coached] = []
+    tallies: list[Scored] = []
     for number in range(games):
         this = seed + number
         chosen = pairs[number % len(pairs)]
         seats = tuple(
-            Seat(seat, deck, _agent(this + offset, coach=run.coach, kept=tallies))
+            Seat(seat, deck, _agent(run, this, offset, tallies))
             for offset, (seat, deck) in enumerate(
                 ((dealing.YOU, chosen[0]), (dealing.THEM, chosen[1]))
             )
@@ -104,55 +109,26 @@ def season(run: Run) -> Season:
     return Season(games=tuple(played), coaching=tuple(agent.tally for agent in tallies))
 
 
-def _agent(seed: int, *, coach: bool, kept: list[Coached]) -> Greedy | Coached:
-    """One seat's agent, and a handle on its tally if it keeps one."""
-    if not coach:
-        return Greedy(seed=seed)
-    asking = Coached(explainer=ClaudeCliExplainer(Cli()))
+def _agent(run: Run, seed: int, offset: int, kept: list[Scored]) -> Greedy | Scored:
+    """One seat's agent, and a handle on its tally if it keeps one.
+
+    The two coached kinds share a seed with the game rather than with the
+    seat, because a journal is keyed by the game -- the seat is in the key
+    separately.
+    """
+    if run.replay is not None:
+        playing_back = Replayed(answers=read(run.replay), seed=seed)
+        kept.append(playing_back)
+        return playing_back
+    if not run.coach:
+        return Greedy(seed=seed + offset)
+    asking = Coached(
+        explainer=ClaudeCliExplainer(Cli()),
+        seed=seed,
+        journal=Journal(run.journal) if run.journal is not None else None,
+    )
     kept.append(asking)
     return asking
-
-
-def said(run: Season) -> str:
-    """The season, as something worth reading."""
-    lines = [
-        f"{len(run.games)} games, {run.clean} clean, {len(run.trouble)} problem(s)",
-        f"  turns: {_spread(tuple(game.turns for game in run.games))}",
-        f"  events applied: {sum(game.events for game in run.games)}",
-        f"  endings: {_tally(tuple(game.ending for game in run.games))}",
-    ]
-    lines.extend(
-        f"  coach: {tally.asked} asked, {tally.trusted} trusted, "
-        f"{tally.untrusted} failed checks, {tally.refused} no answer"
-        for tally in run.coaching
-    )
-    lines.extend(
-        f"    disagreed: {reason}"
-        for reason in dict.fromkeys(
-            reason for tally in run.coaching for reason in tally.disagreements
-        )
-    )
-    if run.unknown:
-        lines += [
-            f"  cards nothing can speak for ({len(run.unknown)}): "
-            f"{', '.join(run.unknown[:NAMED])}" + (", ..." if len(run.unknown) > NAMED else ""),
-        ]
-    for game in run.games:
-        for problem in game.trouble[:SHOWN]:
-            lines.append(f"  seed {game.seed} {game.decks[0]} v {game.decks[1]} -- {problem}")
-    return "\n".join(lines)
-
-
-def _spread(numbers: tuple[int, ...]) -> str:
-    """Shortest, typical, longest."""
-    ordered = sorted(numbers)
-    return f"{ordered[0]}-{ordered[-1]}, median {ordered[len(ordered) // 2]}"
-
-
-def _tally(endings: tuple[str, ...]) -> str:
-    """How many games ended each way."""
-    seen = {ending: endings.count(ending) for ending in sorted(set(endings))}
-    return ", ".join(f"{count} {ending}" for ending, count in seen.items())
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -171,6 +147,28 @@ def main(argv: Sequence[str] | None = None) -> int:
             "--games 1 and expect minutes"
         ),
     )
+    parser.add_argument(
+        "--journal",
+        type=Path,
+        default=None,
+        metavar="FILE",
+        help=(
+            "write every coach decision here, one JSON line each, so the "
+            "season can be run again with --replay. A coached season without "
+            "one cannot be repeated: a seed reproduces the deal, not the model"
+        ),
+    )
+    parser.add_argument(
+        "--replay",
+        type=Path,
+        default=None,
+        metavar="FILE",
+        help=(
+            "play a journal back instead of asking. The identical game in a "
+            "second, as many times as you like -- and against a changed "
+            "engine, which is how you learn whether the change moved it"
+        ),
+    )
     args = parser.parse_args(argv)
 
     run = season(
@@ -181,6 +179,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             games=args.games,
             seed=args.seed,
             coach=args.coach,
+            journal=args.journal,
+            replay=args.replay,
         )
     )
     print(said(run))  # noqa: T201 - a console script
