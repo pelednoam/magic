@@ -22,13 +22,13 @@ from mtgcoach.core.events import AdvanceStep
 from mtgcoach.core.reduce import apply
 from mtgcoach.core.steps import Step
 from mtgcoach.selfplay import applying, watching
-from mtgcoach.selfplay.records import Game, Kind, Trouble
+from mtgcoach.selfplay.offers import offered, planned
+from mtgcoach.selfplay.records import Game, Kind, Reached, Trouble
 
 if TYPE_CHECKING:
     from mtgcoach.coach.lookup import CardLookup
-    from mtgcoach.coach.report import Playable, TurnReport
-    from mtgcoach.core.combat.search import Plan
-    from mtgcoach.core.ids import InstanceId, PlayerId
+    from mtgcoach.coach.report import TurnReport
+    from mtgcoach.core.ids import PlayerId
     from mtgcoach.core.state import GameState
     from mtgcoach.selfplay.moves import Seat
 
@@ -57,6 +57,11 @@ class Run:
     trouble: list[Trouble] = field(default_factory=list[Trouble])
     unknown: set[str] = field(default_factory=set[str])
     events: int = 0
+    reached: Reached = field(default_factory=Reached)
+
+    def also(self, **more: int) -> None:
+        """Add to what this game reached."""
+        self.reached = self.reached.and_also(Reached(**more))
 
 
 def play(seats: tuple[Seat, Seat], state: GameState, catalogue: CardLookup, seed: int) -> Game:
@@ -67,6 +72,10 @@ def play(seats: tuple[Seat, Seat], state: GameState, catalogue: CardLookup, seed
     while state.turn <= TURN_CAP:
         report = advise(state, state.active_player, catalogue)
         run.unknown.update(report.unknown)
+        run.also(
+            triggers=1 if report.reminders else 0,
+            biggest_board=max(len(player.battlefield) for player in state.players.values()),
+        )
         if state.step in DECISIONS:
             state = _decide(state, table[state.active_player], report, run)
         dead = _dead(state)
@@ -96,9 +105,15 @@ def _decide(state: GameState, seat: Seat, report: TurnReport, run: Run) -> GameS
         # found that it did -- the one thing this function promises.
         move = seat.agent.act(state, report, seat.player)
         if move.play is not None:
-            state = applying.played(state, seat.player, _offered(report, move.play))
+            card = offered(report, move.play)
+            state = applying.played(state, seat.player, card)
+            if card.is_land:
+                run.also(lands=1)
+            else:
+                run.also(spells=1)
         elif move.attack:
-            state = applying.attacked(state, seat.player, _planned(report, move.attack))
+            state = applying.attacked(state, seat.player, planned(report, move.attack))
+            run.also(attacks=1)
     except (IllegalEventError, LookupError) as refused:
         run.trouble.append(Trouble(Kind.REFUSED, str(refused), state.turn, state.step, seat.player))
         return before
@@ -150,39 +165,6 @@ def _dead(state: GameState) -> PlayerId | None:
     return next((pid for pid, player in state.players.items() if player.life <= 0), None)
 
 
-def _offered(report: TurnReport, instance: InstanceId) -> Playable:
-    """The playable card the agent named.
-
-    Raises:
-        LookupError: If the agent named something that is not in hand or not
-            playable. Recorded as trouble by the caller, which is the point --
-            for Claude it means the coach recommended a card the engine did
-            not offer.
-    """
-    found = next((card for card in report.playable if card.instance_id == instance), None)
-    if found is None:
-        msg = f"{instance} is not a playable card this turn"
-        raise LookupError(msg)
-    return found
-
-
-def _planned(report: TurnReport, attackers: tuple[InstanceId, ...]) -> Plan:
-    """The engine's plan for exactly these attackers.
-
-    Raises:
-        LookupError: If no plan matches. The harness applies the *engine's*
-            outcome, so an attack it never costed has no numbers to apply --
-            and an agent inventing one is exactly what ``advice.verify``
-            refuses on the player's behalf.
-    """
-    wanted = set(attackers)
-    for plan in report.attacks.plans:
-        if {creature.instance_id for creature in plan.attackers} == wanted:
-            return plan
-    msg = f"no costed attack with exactly {sorted(wanted)}"
-    raise LookupError(msg)
-
-
 def _over(run: Run, state: GameState, dead: PlayerId | None, ending: str = "life") -> Game:
     """Everything that happened, as a record."""
     return Game(
@@ -194,4 +176,5 @@ def _over(run: Run, state: GameState, dead: PlayerId | None, ending: str = "life
         trouble=tuple(run.trouble),
         unknown=tuple(sorted(run.unknown)),
         events=run.events,
+        reached=run.reached,
     )

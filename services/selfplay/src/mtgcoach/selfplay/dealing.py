@@ -10,6 +10,7 @@ harness that finds bugs and one that finds them twice.
 from __future__ import annotations
 
 import random
+from itertools import permutations
 from typing import TYPE_CHECKING
 
 from mtgcoach.carddata.decks import load_set_decks
@@ -17,8 +18,11 @@ from mtgcoach.core.cards import CardInstance
 from mtgcoach.core.ids import InstanceId, PlayerId
 from mtgcoach.core.state import start_game
 
+#: A game has two seats, so a pairing is two decks.
+PLAYERS = 2
+
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping
+    from collections.abc import Iterable, Mapping, Sequence
     from pathlib import Path
 
     from mtgcoach.carddata.decks import DeckEntry
@@ -82,6 +86,29 @@ def _whole(
             return None
         made.extend([found] * entry.quantity)
     return tuple(made)
+
+
+def pairings(decks: Sequence[str], seed: int) -> list[tuple[str, str]]:
+    """Every deck against every other, in an order this seed chose.
+
+    Shuffled rather than taken in order, and this matters more than it looks.
+    Walking ``permutations`` in order meant a twelve-game season played
+    ``cats`` nine times -- every pairing starts with the alphabetically first
+    deck before the second one gets a turn. On a three-hundred-game policy run
+    that washes out; on the twelve coached games that cost twenty minutes
+    each, it meant three quarters of the budget went on one deck.
+
+    Shuffled *and* exhaustive: every pairing is visited before any repeats, so
+    a short season is a spread rather than a sample with holes, and a long one
+    still covers everything. The seed picks which spread, so two runs differ
+    and either can be repeated.
+    """
+    # `permutations` is typed as returning tuples of any length, so the pair
+    # is built explicitly rather than cast -- and `PLAYERS` stays the one place
+    # that says how many seats a game has.
+    every = [(first, second) for first, second in permutations(decks, PLAYERS)]
+    random.Random(seed).shuffle(every)  # noqa: S311 - a game, not a secret
+    return every
 
 
 def dealt(

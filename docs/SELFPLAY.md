@@ -103,6 +103,45 @@ uv run python -m mtgcoach.selfplay --games 12 --coach --seed 100 \
 Same decks, same deals, the coach asked fresh. Comparing the two tallies measures how **stable**
 the advice is, which no single run can.
 
+## Variety, and why it is seeded rather than random
+
+A season should cover different decks, different draws and different boards — but **reproducibly**.
+Random and repeatable are not opposites: a seed gives both, as long as it varies the things that
+matter. Unseeded randomness would find just as much and let you re-run none of it, which defeats
+the journal.
+
+What the seed varies:
+
+- **the shuffle**, so every game is a different deal and a different opening hand
+- **which matchups get played** — `dealing.pairings` shuffles all 90 ordered pairings with the seed
+  and walks them, so every pairing is visited before any repeats. A short season is a spread; a long
+  one still covers everything; a different seed gives a different spread
+- **who is on the play**, which alternates with the seed's parity, because going first means
+  skipping a draw and a season where one seat always went first tests half of it
+- **the policy's own choices** — when it holds back an attack, when it plays nothing
+
+This was got wrong first time round, which is why it is written down. The pairings were walked in
+index order, so a twelve-game coached season — the *expensive* one — played `cats` nine times:
+`permutations` in lexicographic order puts the alphabetically first deck on one side of every early
+pairing. Three quarters of a four-hour budget on one deck, and nothing said so.
+
+## What a season reached
+
+Which is the other half of the same lesson. A clean season is only reassuring in proportion to how
+much of a game of Magic happened in it — three hundred games in which nobody cast anything would be
+three hundred clean games. So a season reports what it **reached**, not just what went wrong:
+
+```
+covered: 10 deck(s), 60 pairing(s) -- cats, elves, goblins, healing, ...
+reached: 888 land drops, 1137 spells cast, 383 attacks, 0 turns with a trigger, biggest board 20
+```
+
+That last number is what this reporting was worth. `0 turns with a trigger` across 60 games is not
+a harness bug: the Beginner Box has 31 triggered abilities and every one is event-driven (`enters`
+21, `attacks` 3, `another_creature_enters` 3, `you_gain_life` 2, `dies` 2), while the scanner turns
+only `beginning_of_upkeep` and `end_step` into reminders. **The TRIGGERS NOW panel can never fire
+for Foundations** — see §7 of PLAN.md. No number of clean games would have shown that.
+
 ## Reading the output
 
 ```

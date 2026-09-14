@@ -11,7 +11,6 @@ exactly.
 from __future__ import annotations
 
 import argparse
-import itertools
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -40,9 +39,6 @@ DEFAULT_SET: Final = SetCode("FDN")
 
 #: An agent that keeps a tally: the coach, or a replay of one.
 type Scored = Coached | Replayed
-
-#: A game needs two decks that can be dealt whole.
-PLAYERS: Final = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,13 +82,13 @@ def season(run: Run) -> Season:
         names = {card.name: card.oracle_id for card in cards}
 
     decks = dealing.table(data_root, set_code, names)
-    if len(decks) < PLAYERS:
+    if len(decks) < dealing.PLAYERS:
         msg = (
             f"only {len(decks)} {set_code} deck(s) can be dealt from {db}; "
             f"the import does not cover them. Run `mtgcoach sets add {set_code}`."
         )
         raise ValueError(msg)
-    pairs = list(itertools.permutations(sorted(decks), 2))
+    pairs = dealing.pairings(sorted(decks), seed)
     played: list[Game] = []
     tallies: list[Scored] = []
     for number in range(games):

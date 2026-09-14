@@ -54,6 +54,38 @@ class Trouble:
 
 
 @dataclass(frozen=True, slots=True)
+class Reached:
+    """How much of a game of Magic a game actually contained.
+
+    A clean season is only reassuring in proportion to what it did. These are
+    the things whose absence would mean the engine was never really exercised:
+    spells that were cast, combats that happened, boards that grew, triggers
+    that fired.
+    """
+
+    lands: int = 0
+    #: Non-land cards put onto the battlefield -- what the app's user does when
+    #: they cast one, since the engine has no event for casting.
+    spells: int = 0
+    attacks: int = 0
+    #: The most permanents either player had at once. A season where this never
+    #: passes two never tested combat with choices in it.
+    biggest_board: int = 0
+    #: Turns where the engine reported something triggering.
+    triggers: int = 0
+
+    def and_also(self, other: Reached) -> Reached:
+        """Both, added -- for summing a season."""
+        return Reached(
+            lands=self.lands + other.lands,
+            spells=self.spells + other.spells,
+            attacks=self.attacks + other.attacks,
+            biggest_board=max(self.biggest_board, other.biggest_board),
+            triggers=self.triggers + other.triggers,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class Game:
     """One finished game."""
 
@@ -68,6 +100,10 @@ class Game:
     #: is the single most useful number for deciding what to work on next.
     unknown: tuple[str, ...] = ()
     events: int = 0
+    #: What this game actually reached. Without it a season reports "300 clean
+    #: games" when it might have played three hundred games in which nothing
+    #: happened, and a harness that cannot tell those apart is not evidence.
+    reached: Reached = field(default_factory=Reached)
 
     @property
     def clean(self) -> bool:
@@ -92,6 +128,29 @@ class Season:
     def trouble(self) -> tuple[Trouble, ...]:
         """Everything that went wrong, across the whole run."""
         return tuple(problem for game in self.games for problem in game.trouble)
+
+    @property
+    def decks(self) -> tuple[str, ...]:
+        """Every deck that played, alphabetically.
+
+        A short coached season used to be nine games of the same deck, because
+        the pairings were walked in order rather than chosen by the seed. This
+        is the number that would have said so.
+        """
+        return tuple(sorted({deck for game in self.games for deck in game.decks}))
+
+    @property
+    def pairings(self) -> int:
+        """How many distinct matchups were played."""
+        return len({game.decks for game in self.games})
+
+    @property
+    def reached(self) -> Reached:
+        """Everything the whole season reached."""
+        total = Reached()
+        for game in self.games:
+            total = total.and_also(game.reached)
+        return total
 
     @property
     def unknown(self) -> tuple[str, ...]:

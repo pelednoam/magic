@@ -863,6 +863,36 @@ round. One gap stays open and is written down in the module: the schema's `Trigg
 not distinguish "your upkeep" from "each upkeep", so a card with the latter is not reported on
 the opponent's turn. None is in the Beginner Box, and closing it needs a re-extraction.
 
+**And a bigger one, found by self-play: the TRIGGERS NOW panel can never fire for Foundations.**
+Sixty games and twenty thousand events reached `0 turns with a trigger`, and the reason is not a
+bug in the scanner. The box has 31 triggered abilities and **every one of them is event-driven**:
+
+| Event | Count |
+|---|---|
+| `enters` | 21 |
+| `attacks` | 3 |
+| `another_creature_enters` | 3 |
+| `you_gain_life` | 2 |
+| `dies` | 2 |
+
+`triggers_at` turns exactly two events into reminders — `beginning_of_upkeep` and `end_step` —
+and the box contains neither. The paragraph above says "none is in the Beginner Box" about the
+*upkeep wording* gap and stops there; the consequence it does not draw is that the whole reminder
+feature is dead for the set this app was built for. A player never sees the panel, and the coach's
+fourth hard rule — *"anything under TRIGGERS NOW must be named somewhere in your answer"* — has
+never been exercised against real data.
+
+The classification is right: a "whenever this attacks" trigger genuinely cannot be found by
+walking the battlefield at a step boundary. What is missing is the module that was supposed to
+observe the events — and `enters` is 21 of the 31, is the commonest thing that happens in a
+beginner's game ("When this enters, create a 1/1 Elf"), and is the one the harness can already
+see, because putting a card onto the battlefield is an event the harness applies. That is where
+this gets fixed.
+
+Worth recording *how* this was found: not by a failing test, but by a season reporting what it
+had **reached** rather than only what had gone wrong. Sixty clean games said nothing; sixty clean
+games that also said "0 turns with a trigger" said everything.
+
 **Keywords.** `SUPPORTED_KEYWORDS` was empty through M3 and now holds eleven: flying, reach,
 first strike, double strike, deathtouch, trample, lifelink, menace, indestructible, defender,
 haste. Each is there because a specific rule reads it and a test pins the behaviour — a test

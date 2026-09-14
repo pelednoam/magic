@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from mtgcoach.selfplay.records import Season
+    from mtgcoach.selfplay.records import Reached, Season
 
 #: How many of a season's troubles to print. A defect usually fires in every
 #: game, and forty identical lines are harder to read than four.
@@ -28,6 +28,11 @@ def said(run: Season) -> str:
         f"  turns: {_spread(tuple(game.turns for game in run.games))}",
         f"  events applied: {sum(game.events for game in run.games)}",
         f"  endings: {_tally(tuple(game.ending for game in run.games))}",
+        # What it *reached*, not just what it found. A clean season is only
+        # reassuring in proportion to how much of a game of Magic happened in
+        # it, and a harness that cannot say is not evidence.
+        _covered(run),
+        _reached(run.reached),
     ]
     lines.extend(
         f"  coach: {tally.asked} asked, {tally.trusted} trusted, "
@@ -49,6 +54,22 @@ def said(run: Season) -> str:
         for problem in game.trouble[:SHOWN]:
             lines.append(f"  seed {game.seed} {game.decks[0]} v {game.decks[1]} -- {problem}")
     return "\n".join(lines)
+
+
+def _covered(run: Season) -> str:
+    """Which decks and matchups a season actually played."""
+    return (
+        f"  covered: {len(run.decks)} deck(s), {run.pairings} pairing(s) -- {', '.join(run.decks)}"
+    )
+
+
+def _reached(reached: Reached) -> str:
+    """How much of a game of Magic happened."""
+    return (
+        f"  reached: {reached.lands} land drops, {reached.spells} spells cast, "
+        f"{reached.attacks} attacks, {reached.triggers} turns with a trigger, "
+        f"biggest board {reached.biggest_board}"
+    )
 
 
 def _spread(numbers: tuple[int, ...]) -> str:
