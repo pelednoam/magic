@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from mtgcoach.api.claude import Cli
-from mtgcoach.api.replies import object_in, text, words
+from mtgcoach.api.replies import exactly, object_in, text
 from mtgcoach.coach.advice import ExplainerError
 from mtgcoach.rules.answer import Answer
 
@@ -47,7 +47,7 @@ def parse(stdout: str) -> Answer:
     answer = Answer(
         answer=text(payload, "answer"),
         in_short=text(payload, "in_short"),
-        citations=words(payload, "citations"),
+        citations=exactly(payload, "citations"),
         unsure=text(payload, "unsure"),
     )
     if not answer.answer and not answer.in_short and not answer.unsure:

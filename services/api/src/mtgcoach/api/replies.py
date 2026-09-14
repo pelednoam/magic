@@ -97,15 +97,53 @@ def text(payload: Mapping[str, object], field: str) -> str:
 
 
 def words(payload: Mapping[str, object], field: str) -> tuple[str, ...]:
-    """A list-of-strings field, keeping only the strings.
+    """A list of prose, keeping only the strings.
 
-    A missing or malformed field is an empty one rather than an error. Nothing
-    here is load-bearing for correctness -- the checkers decide whether any of
-    it may be shown -- so a bad field is dropped rather than made into a message
-    the player would see instead of an answer.
+    For fields nothing is checked against: ``watch_out``, ``check_yourself``. A
+    missing or malformed one is empty rather than an error, because a dropped
+    sentence costs a sentence. Use ``exactly`` for anything a checker will then
+    compare against the engine.
     """
     value = payload.get(field)
     if not isinstance(value, list):
         return ()
     items = cast("list[object]", value)
     return tuple(item for item in items if isinstance(item, str) and item)
+
+
+def exactly(payload: Mapping[str, object], field: str) -> tuple[str, ...]:
+    """A list of identifiers, all of them or none.
+
+    For the fields a checker compares against the engine: ``attack``,
+    ``citations``. Dropping a bad element from one of those does not lose a
+    sentence, it changes the claim -- and changes it towards passing. An
+    ``attack`` of ``["bear-1", 7]`` trimmed to ``["bear-1"]`` becomes a
+    *different attack*, one the engine did cost, and the checker then agrees
+    with a recommendation nobody made. Citations behave the same way in
+    reverse: drop the invented one and what is left is all real.
+
+    So a malformed element fails the whole field. The caller turns that into an
+    ``ExplainerError`` and the player gets the engine's own panel, which is
+    what they would have got from a refused answer anyway.
+
+    Raises:
+        MalformedFieldError: If the field is present and is not a list of
+            non-empty strings.
+    """
+    value = payload.get(field)
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise MalformedFieldError(field, value)
+    items = cast("list[object]", value)
+    if not all(isinstance(item, str) and item for item in items):
+        raise MalformedFieldError(field, items)
+    return tuple(cast("list[str]", items))
+
+
+class MalformedFieldError(ExplainerError):
+    """A field a checker would have compared against the engine is not usable."""
+
+    def __init__(self, field: str, value: object) -> None:
+        """Name the field and what arrived instead."""
+        super().__init__(f"the coach's {field!r} was not a list of identifiers: {value!r:.80}")

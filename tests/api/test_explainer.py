@@ -45,7 +45,7 @@ def envelope(result: str) -> str:
     return json.dumps({"type": "result", "result": result, "total_cost_usd": 0.0})
 
 
-def _said(**fields: object) -> str:
+def said(**fields: object) -> str:
     """A reply carrying ``fields``, plus the words every reply must have."""
     return json.dumps({"because": "because.", **fields})
 
@@ -96,22 +96,11 @@ def test_an_empty_recommendation_survives() -> None:
 
 @pytest.mark.parametrize("bad", [42, None, ["abc"], {"id": "abc"}])
 def test_a_play_that_is_not_a_string_is_dropped(bad: object) -> None:
-    assert parse(_said(play=bad)).play == ""
+    assert parse(said(play=bad)).play == ""
 
 
-@pytest.mark.parametrize("bad", ["def", 42, None, {"a": 1}])
-def test_an_attack_that_is_not_a_list_is_dropped(bad: object) -> None:
-    """Notably the string case: "def" must not become ('d', 'e', 'f')."""
-    assert parse(_said(attack=bad)).attack == ()
-
-
-def test_non_strings_inside_a_list_are_dropped_and_the_rest_kept() -> None:
-    assert parse(_said(attack=["a", 7, None, "b", ""])).attack == ("a", "b")
-
-
-def test_an_empty_string_in_a_list_is_dropped() -> None:
-    """An empty instance id matches nothing and would read as "attack with"."""
-    assert parse(_said(watch_out=["", "real"])).watch_out == ("real",)
+def test_an_empty_string_in_a_prose_list_is_dropped() -> None:
+    assert parse(said(watch_out=["", "real"])).watch_out == ("real",)
 
 
 # --- answers that are not answers ---------------------------------------------

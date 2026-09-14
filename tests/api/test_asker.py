@@ -36,9 +36,25 @@ def test_reads_the_agreed_object() -> None:
     assert got.unsure == ""
 
 
-def test_citations_that_are_not_strings_are_dropped() -> None:
-    got = parse(envelope(json.dumps({**ANSWER, "citations": ["702.19b", 7, None, ""]})))
-    assert got.citations == ("702.19b",)
+def test_a_malformed_citation_refuses_the_whole_answer() -> None:
+    """Dropping one moves the answer towards passing, not away from it.
+
+    The check is "every citation was retrieved". Drop the bad element and what
+    is left is all real, so a malformed list becomes a clean bill of health.
+    """
+    with pytest.raises(ExplainerError, match="'citations' was not a list"):
+        parse(envelope(json.dumps({**ANSWER, "citations": ["702.19b", 7]})))
+
+
+def test_a_citation_list_that_is_not_a_list_refuses_the_answer() -> None:
+    with pytest.raises(ExplainerError, match="'citations' was not a list"):
+        parse(envelope(json.dumps({**ANSWER, "citations": "702.19b"})))
+
+
+def test_no_citations_at_all_is_read_and_left_to_the_checker() -> None:
+    """Absent is not malformed. `rules.answer` is what refuses an uncited one."""
+    got = parse(envelope(json.dumps({"answer": "Maybe.", "in_short": "Maybe."})))
+    assert got.citations == ()
 
 
 def test_an_answer_that_is_only_an_admission_of_doubt_survives() -> None:
