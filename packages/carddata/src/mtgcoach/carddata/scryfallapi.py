@@ -98,41 +98,42 @@ def printings_for(set_code: SetCode, pages: Pages) -> Iterator[JsonObject]:
         # a page these checks would have refused, and might never reach the
         # refusal at all. `sets_fetch` happens to drain it into a list, which
         # is exactly the kind of thing that stops being true later.
-        more = _pagination_of(page, set_code)
+        following = _pagination_of(page, set_code)
         yield from _cards_in(page, set_code)
-        if not more:
+        if following is None:
             return
-        following = page.get("next_page")
-        if not isinstance(following, str):
-            # It said there was more and did not say where. Returning here
-            # looked like a finished download and wrote a short file that
-            # imported cleanly -- a set quietly missing its last four hundred
-            # printings, which nothing downstream could notice.
-            msg = f"Scryfall said there were more {set_code} printings but not where"
-            raise ScryfallError(msg)
         url = following
     msg = f"Scryfall kept offering more pages of {set_code} past {MAX_PAGES}"
     raise ScryfallError(msg)
 
 
-def _pagination_of(page: JsonObject, set_code: SetCode) -> bool:
-    """Whether Scryfall says there are more pages after this one.
+def _pagination_of(page: JsonObject, set_code: SetCode) -> str | None:
+    """Where the next page is, or None if this was the last.
+
+    *Every* question about the envelope is settled here, before a single card
+    is handed out. This generator is lazy: a consumer that takes one card and
+    stops -- or writes as it goes -- used to receive cards from a page whose
+    ``next_page`` these checks would have refused, and might never reach the
+    refusal at all. ``sets_fetch`` happens to drain it into a list, which is
+    exactly the kind of thing that stops being true later.
 
     Raises:
-        ScryfallError: If the page is not a card list, or does not say. Both
-            are shapes that used to end the download quietly: `is not True`
-            read a *missing* or corrupted ``has_more`` as "that was the last
-            page", so a truncated or rewritten envelope wrote a short file that
-            imported cleanly. Absent is not the same as false.
+        ScryfallError: If the page is not a card list, does not say whether
+            there are more, or says there are and not where. Each used to end
+            the download quietly: `is not True` read a *missing* or corrupted
+            ``has_more`` as "that was the last page", and a missing
+            ``next_page`` looked like a finished download -- a set quietly
+            short of its last four hundred printings, which nothing downstream
+            could notice.
 
             The ``object`` check catches the one shape ``_cards_in`` lets
-            through -- something that is neither a list nor an error, like a
+            through: something that is neither a list nor an error, like a
             proxy's own JSON or a single card object, whose ``has_more`` is
             simply not there.
     """
     if page.get("object") == "error":
         # Left to `_cards_in`, which has the error's own text to quote.
-        return False
+        return None
     if page.get("object") != "list":
         msg = f"Scryfall's answer for {set_code} was not a list of cards"
         raise ScryfallError(msg)
@@ -140,7 +141,16 @@ def _pagination_of(page: JsonObject, set_code: SetCode) -> bool:
     if not isinstance(more, bool):
         msg = f"Scryfall's {set_code} page did not say whether there were more"
         raise ScryfallError(msg)
-    return more
+    if not more:
+        return None
+    following = page.get("next_page")
+    # An empty string is not a location. It used to be accepted and then
+    # refused one layer down as "not an https URL", which is a true sentence
+    # about the wrong thing.
+    if not isinstance(following, str) or not following.strip():
+        msg = f"Scryfall said there were more {set_code} printings but not where"
+        raise ScryfallError(msg)
+    return following
 
 
 def _cards_in(page: JsonObject, set_code: SetCode) -> Iterator[JsonObject]:

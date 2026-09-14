@@ -54,3 +54,23 @@ def test_asking_nothing_is_not_a_pass(capsys: pytest.CaptureFixture[str]) -> Non
     """
     assert gate.said([]) == 1
     assert "no questions were asked" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "references",
+    [["509.1a", 7], ["509.1a", ""], [None], [{"reference": "509.1a"}], ["  "]],
+)
+def test_a_reference_that_is_not_one_is_refused(tmp_path: Path, references: object) -> None:
+    """A nonempty `any` list used to be enough, whatever was in it.
+
+    `verdicts` then compares `str(reference)` against the retrieved references,
+    which nothing matches -- so the question silently becomes unanswerable
+    rather than wrong, and a `gap` note on it would make that a pass.
+    """
+    where = tmp_path / "q.json"
+    where.write_text(
+        json.dumps({"questions": [{"ask": "can a tapped creature block?", "any": references}]}),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="has a reference that is not one"):
+        gate.asked(where)

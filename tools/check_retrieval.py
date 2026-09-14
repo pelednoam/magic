@@ -84,12 +84,24 @@ def _checked(entry: object, index: int, path: Path) -> dict[str, object]:
         msg = f"{path} question {index} is {type(entry).__name__}, not an object"
         raise ValueError(msg)  # noqa: TRY004 - a bad file, not a bad call
     question = cast("dict[str, object]", entry)
-    if not str(question.get("ask", "")).strip():
+    ask = question.get("ask")
+    # `str(...)` rather than `isinstance` accepted numbers, booleans and whole
+    # objects -- anything whose repr is not blank -- so a JSON transform that
+    # wrapped or renumbered the questions produced a list that still passed.
+    if not isinstance(ask, str) or not ask.strip():
         msg = f"{path} question {index} has no 'ask'"
         raise ValueError(msg)
     wanted = question.get("any")
     if not isinstance(wanted, list) or not wanted:
-        msg = f"{path} question {index} ({question['ask']!r}) has no 'any' references"
+        msg = f"{path} question {index} ({ask!r}) has no 'any' references"
+        raise ValueError(msg)
+    bad = [
+        reference
+        for reference in cast("list[object]", wanted)
+        if not isinstance(reference, str) or not reference.strip()
+    ]
+    if bad:
+        msg = f"{path} question {index} ({ask!r}) has a reference that is not one: {bad!r:.60}"
         raise ValueError(msg)
     return question
 
@@ -102,7 +114,7 @@ def verdicts(index: RuleIndex, questions: list[dict[str, object]]) -> list[tuple
     """
     report: list[tuple[str, str, str]] = []
     for entry in questions:
-        ask = str(entry.get("ask", ""))
+        ask = str(entry["ask"])
         wanted = [str(reference) for reference in _listed(entry.get("any"))]
         found = [passage.reference for passage in index.search(ask, DEFAULT_LIMIT)]
         hit = any(reference in found for reference in wanted)

@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 
 from mtgcoach.rules import negation, phrasing
-from mtgcoach.rules.keywords import ordinary
+from mtgcoach.rules.keywords import NONE, Keywords, ordinary
 
 #: A word worth searching for. Apostrophes are kept inside a word ("player's")
 #: and everything else is a separator, which also means nothing a person types
@@ -76,7 +76,7 @@ _NOISE = frozenset(
 )
 
 
-def query(question: str, keywords: frozenset[str] = frozenset()) -> str:
+def query(question: str, keywords: Keywords = NONE) -> str:
     """A question, as an FTS5 query.
 
     Built from extracted words rather than escaped, which is the difference

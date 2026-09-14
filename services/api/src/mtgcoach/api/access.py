@@ -43,6 +43,28 @@ class MissingTokenError(ValueError):
     """A server was built without a token. There is no open mode."""
 
 
+def usable(found: str) -> bool:
+    """Whether this is something that can be a bearer token.
+
+    A half-written or byte-damaged file used to become the live credential: the
+    read decodes with ``errors="replace"``, so corrupt bytes come back as a
+    string of U+FFFD, which is not empty -- so it was accepted, printed, and
+    could not be sent in an ``Authorization`` header by any client. The server
+    ran with a token nobody could present.
+
+    So: printable ASCII, and nothing that a header cannot carry. Anything else
+    is treated as no token at all and replaced, which is the only recovery
+    there is and what an operator would do by hand.
+
+    Deliberately *not* a strength check. A short token is a weak one, but an
+    operator who put "hunter2" in this file chose it, it is their LAN, and the
+    server prints it at every start where they can see it. Silently replacing
+    somebody's deliberate choice is a different and worse surprise than the one
+    this is for.
+    """
+    return bool(found) and found.isascii() and found.isprintable() and " " not in found
+
+
 def presented(header: str | None, query: str | None) -> str:
     """The token a request carried, from the header or the query string.
 

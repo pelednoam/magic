@@ -16,10 +16,10 @@ from __future__ import annotations
 import pytest
 
 from helpers_rules import PASSAGES
-from mtgcoach.rules.keywords import names_in, ordinary
+from mtgcoach.rules.keywords import NONE, Keywords, keywords_in, ordinary
 from mtgcoach.rules.terms import query
 
-KEYWORDS = names_in(PASSAGES)
+KEYWORDS = keywords_in(PASSAGES)
 
 
 def test_the_keyword_names_come_off_the_document() -> None:
@@ -29,7 +29,7 @@ def test_the_keyword_names_come_off_the_document() -> None:
     a list written out in the module would be wrong by the next set -- and this
     has to work on sets nobody has printed.
     """
-    assert {"deathtouch", "reach", "trample"} == KEYWORDS
+    assert KEYWORDS.names == {"deathtouch", "reach", "trample"}
 
 
 def test_a_two_word_keyword_is_not_collected() -> None:
@@ -38,7 +38,7 @@ def test_a_two_word_keyword_is_not_collected() -> None:
     "First strike" is not a thing somebody writes without meaning it, and the
     phrase is what makes the rule findable.
     """
-    assert not any(" " in name for name in names_in(PASSAGES))
+    assert not any(" " in name for name in keywords_in(PASSAGES).names)
 
 
 def test_a_number_after_the_word_makes_it_a_verb() -> None:
@@ -101,7 +101,29 @@ def test_a_word_that_is_not_a_keyword_is_never_set_aside() -> None:
 
 def test_an_index_with_no_keywords_sets_nothing_aside() -> None:
     """The default, and what every caller that does not pass them gets."""
-    assert ordinary("what happens when my hit points reach zero?", frozenset()) == frozenset()
+    assert ordinary("what happens when my hit points reach zero?", NONE) == frozenset()
+
+
+def test_a_keyword_written_with_a_number_keeps_it() -> None:
+    """Seventy of the hundred and sixty are written with a parameter.
+
+    A number after one of those is the parameter, not an object, so "what does
+    toxic one do?" is a question about toxic -- and demoting it searched for
+    "one" alone. The digit exemption fixed only one spelling of that.
+    """
+    numbered = Keywords(names=frozenset({"toxic", "reach"}), numbered=frozenset({"toxic"}))
+    assert ordinary("what does toxic one do?", numbered) == frozenset()
+    assert ordinary("what does toxic 1 do?", numbered) == frozenset()
+    assert ordinary("what happens when my hit points reach zero?", numbered) == {"reach"}
+
+
+def test_which_keywords_take_a_number_comes_off_the_document() -> None:
+    """Not a list in the source, for the same reason the names are not.
+
+    `Ward [cost]`, `"toxic N"`, `"Crew N"` -- the rules say so themselves,
+    which is the only way this survives a set that adds more.
+    """
+    assert keywords_in(PASSAGES).numbered == frozenset()
 
 
 def test_the_word_is_gone_from_the_query() -> None:

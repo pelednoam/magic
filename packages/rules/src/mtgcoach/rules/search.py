@@ -17,7 +17,7 @@ import threading
 from typing import TYPE_CHECKING, Self
 
 from mtgcoach.rules.corpus import Kind, Passage
-from mtgcoach.rules.keywords import names_in
+from mtgcoach.rules.keywords import NONE, Keywords, keywords_in
 from mtgcoach.rules.terms import query, references_in
 
 if TYPE_CHECKING:
@@ -42,9 +42,7 @@ DEFAULT_LIMIT = 8
 class RuleIndex:
     """A searchable copy of the Comprehensive Rules."""
 
-    def __init__(
-        self, connection: sqlite3.Connection, keywords: frozenset[str] = frozenset()
-    ) -> None:
+    def __init__(self, connection: sqlite3.Connection, keywords: Keywords = NONE) -> None:
         """Wrap an open connection. Prefer ``RuleIndex.build``.
 
         ``keywords`` is every one-word keyword ability this document defines,
@@ -80,7 +78,7 @@ class RuleIndex:
             [(p.reference, p.title, p.text, p.kind.value) for p in indexed],
         )
         connection.commit()
-        return cls(connection, names_in(indexed))
+        return cls(connection, keywords_in(indexed))
 
     def __enter__(self) -> Self:
         """Enter a context manager that closes the index on exit."""
