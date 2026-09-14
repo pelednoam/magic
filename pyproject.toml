@@ -37,6 +37,10 @@ dev = [
     # runs every round. Undeclared, it fails with ImportError at the worst
     # moment -- after four reviewers have already been paid for.
     "jsonschema>=4.23",
+    # starlette's TestClient is an httpx transport; without it the API tests
+    # cannot run at all, and the API is the only thing that needs a server.
+    "httpx>=0.28",
+    "uvicorn>=0.32",
 ]
 mutation = ["mutmut>=3"]
 
@@ -119,7 +123,9 @@ packages/vision/src:\
 services/api/src:\
 tools:\
 tests:\
-tests/coach\
+tests/coach:\
+tests/api:\
+tests/e2e\
 """
 
 # ---------------------------------------------------------------- pyright
@@ -135,6 +141,8 @@ extraPaths = [
     "tools",
     "tests",
     "tests/coach",
+    "tests/api",
+    "tests/e2e",
 ]
 typeCheckingMode = "strict"
 pythonVersion = "3.12"
@@ -144,7 +152,7 @@ reportMissingTypeStubs = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["tools", "tests", "tests/coach"]
+pythonpath = ["tools", "tests", "tests/coach", "tests/api", "tests/e2e"]
 addopts = "-q --strict-markers --strict-config"
 
 # ---------------------------------------------------------------- mutmut

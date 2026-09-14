@@ -1,0 +1,181 @@
+[
+ {
+  "object": "card",
+  "id": "b34bb2dc-c1af-4d77-b0b3-a0fb342a5fc6",
+  "oracle_id": "b34bb2dc-c1af-4d77-b0b3-a0fb342a5fc6",
+  "name": "Forest",
+  "mana_cost": "",
+  "cmc": 0.0,
+  "type_line": "Basic Land \u2014 Forest",
+  "oracle_text": "({T}: Add {G}.)",
+  "power": null,
+  "toughness": null,
+  "colors": [],
+  "color_identity": [
+   "G"
+  ],
+  "keywords": [],
+  "produced_mana": [
+   "G"
+  ],
+  "layout": "normal",
+  "set": "fdn",
+  "collector_number": "1",
+  "rarity": "common",
+  "lang": "en"
+ },
+ {
+  "object": "card",
+  "id": "bc71ebf6-2056-41f7-be35-b2e5c34afa99",
+  "oracle_id": "bc71ebf6-2056-41f7-be35-b2e5c34afa99",
+  "name": "Plains",
+  "mana_cost": "",
+  "cmc": 0.0,
+  "type_line": "Basic Land \u2014 Plains",
+  "oracle_text": "({T}: Add {W}.)",
+  "power": null,
+  "toughness": null,
+  "colors": [],
+  "color_identity": [
+   "W"
+  ],
+  "keywords": [],
+  "produced_mana": [
+   "W"
+  ],
+  "layout": "normal",
+  "set": "fdn",
+  "collector_number": "2",
+  "rarity": "common",
+  "lang": "en"
+ },
+ {
+  "object": "card",
+  "id": "68954295-54e3-4303-a6bc-fc4547a4e3a3",
+  "oracle_id": "68954295-54e3-4303-a6bc-fc4547a4e3a3",
+  "name": "Llanowar Elves",
+  "mana_cost": "{G}",
+  "cmc": 1.0,
+  "type_line": "Creature \u2014 Elf Druid",
+  "oracle_text": "{T}: Add {G}.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "G"
+  ],
+  "color_identity": [
+   "G"
+  ],
+  "keywords": [],
+  "produced_mana": [
+   "G"
+  ],
+  "layout": "normal",
+  "set": "fdn",
+  "collector_number": "3",
+  "rarity": "common",
+  "lang": "en"
+ },
+ {
+  "object": "card",
+  "id": "b1793c3b-25d6-4fae-a99d-cfdd2210ca67",
+  "oracle_id": "b1793c3b-25d6-4fae-a99d-cfdd2210ca67",
+  "name": "Druid of the Cowl",
+  "mana_cost": "{1}{G}",
+  "cmc": 2.0,
+  "type_line": "Creature \u2014 Elf Druid",
+  "oracle_text": "{T}: Add {G}.",
+  "power": "1",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "color_identity": [
+   "G"
+  ],
+  "keywords": [],
+  "produced_mana": [
+   "G"
+  ],
+  "layout": "normal",
+  "set": "fdn",
+  "collector_number": "4",
+  "rarity": "common",
+  "lang": "en"
+ },
+ {
+  "object": "card",
+  "id": "60ba93eb-39e6-4af2-9c66-cd38f72daff2",
+  "oracle_id": "60ba93eb-39e6-4af2-9c66-cd38f72daff2",
+  "name": "Savannah Lions",
+  "mana_cost": "{W}",
+  "cmc": 1.0,
+  "type_line": "Creature \u2014 Cat",
+  "oracle_text": "",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "color_identity": [
+   "W"
+  ],
+  "keywords": [],
+  "produced_mana": [],
+  "layout": "normal",
+  "set": "fdn",
+  "collector_number": "5",
+  "rarity": "common",
+  "lang": "en"
+ },
+ {
+  "object": "card",
+  "id": "95e94dea-5ac0-4d6f-adec-ca147aee861f",
+  "oracle_id": "95e94dea-5ac0-4d6f-adec-ca147aee861f",
+  "name": "Ajani's Pridemate",
+  "mana_cost": "{1}{W}",
+  "cmc": 2.0,
+  "type_line": "Creature \u2014 Cat Soldier",
+  "oracle_text": "Whenever you gain life, put a +1/+1 counter on Ajani's Pridemate.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "color_identity": [
+   "W"
+  ],
+  "keywords": [],
+  "produced_mana": [],
+  "layout": "normal",
+  "set": "fdn",
+  "collector_number": "6",
+  "rarity": "common",
+  "lang": "en"
+ },
+ {
+  "object": "card",
+  "id": "5748ebf1-24e3-499d-ab7c-c2cebd462a24",
+  "oracle_id": "5748ebf1-24e3-499d-ab7c-c2cebd462a24",
+  "name": "Giant Growth",
+  "mana_cost": "{G}",
+  "cmc": 1.0,
+  "type_line": "Instant",
+  "oracle_text": "Target creature gets +3/+3 until end of turn.",
+  "power": null,
+  "toughness": null,
+  "colors": [
+   "G"
+  ],
+  "color_identity": [
+   "G"
+  ],
+  "keywords": [],
+  "produced_mana": [],
+  "layout": "normal",
+  "set": "fdn",
+  "collector_number": "7",
+  "rarity": "common",
+  "lang": "en"
+ }
+]

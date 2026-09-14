@@ -1,0 +1,91 @@
+"""Starting the server for a real game.
+
+The one place that reads from disk. Everything else takes what it needs as an
+argument, which is what lets the tests build a three-card set in memory; this
+assembles the real thing out of the store and the sealed fixtures, and is the
+only module that knows where either lives.
+
+Run it on the laptop in the same room (§4):
+
+    uv run python -m mtgcoach.api.serve --db data/cards.sqlite3 --set FDN
+"""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+import uvicorn
+
+from mtgcoach.api.app import create_app
+from mtgcoach.api.cards import build
+from mtgcoach.carddata.decks import load_set_decks
+from mtgcoach.carddata.paths import effects_path
+from mtgcoach.carddata.store import CardStore
+from mtgcoach.core.ids import SetCode
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
+
+    from fastapi import FastAPI
+
+    from mtgcoach.carddata.decks import Decklist
+    from mtgcoach.core.ids import OracleId
+
+DEFAULT_PORT = 8000
+
+
+def assemble(db: Path, data_root: Path, set_code: SetCode) -> FastAPI:
+    """Build the app from the card database and a set's sealed data.
+
+    Raises:
+        ValueError: If the set has not been imported. Starting a coach with no
+            cards in it would leave every answer "I cannot speak for this", which
+            looks like a broken engine rather than an empty database.
+    """
+    with CardStore.open(str(db)) as store:
+        cards = store.cards_in_set(set_code)
+        if not cards:
+            msg = f"no {set_code} cards in {db}; run `mtgcoach sets add {set_code}` first"
+            raise ValueError(msg)
+        catalogue = build(cards, effects_path(data_root, set_code))
+        names = {card.name: card.oracle_id for card in cards}
+
+    decks = {deck.key: _library(deck, names) for deck in load_set_decks(data_root, set_code)}
+    return create_app(catalogue, decks)
+
+
+def _library(deck: Decklist, names: Mapping[str, OracleId]) -> tuple[str, ...]:
+    """One decklist as the oracle ids to deal, in order.
+
+    A card the store does not have is dropped rather than dealt as a blank. The
+    decklists are verified against the store by `mtgcoach decks verify`, so this
+    only happens on a partial import -- where a slightly short deck is far more
+    useful than a refusal.
+    """
+    found: list[str] = []
+    for entry in deck.entries:
+        oracle_id = names.get(entry.name)
+        if oracle_id is not None:
+            found.extend([str(oracle_id)] * entry.quantity)
+    return tuple(found)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Parse the arguments and serve until stopped."""
+    parser = argparse.ArgumentParser(description="Serve the Magic Coach API.")
+    parser.add_argument("--db", type=Path, default=Path("data/cards.sqlite3"))
+    parser.add_argument("--data", type=Path, default=Path("data"))
+    parser.add_argument("--set", dest="set_code", default="FDN")
+    parser.add_argument("--host", default="0.0.0.0")  # noqa: S104 - the point is the LAN
+    parser.add_argument("--port", type=int, default=DEFAULT_PORT)
+    args = parser.parse_args(argv)
+
+    app = assemble(args.db, args.data, SetCode(args.set_code))
+    uvicorn.run(app, host=args.host, port=args.port)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

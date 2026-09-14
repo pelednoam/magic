@@ -6,8 +6,10 @@ or at the board, and get a clear answer to *"what can I do this turn, and what s
 **Status:** M0–M4 merged to `main`. The engine is done: 780 tests, 100% line and branch, with
 **52% of the Beginner Box fully modelled** and eleven keywords implemented. M4 took four rounds
 of ensemble review, with every finding fixed by hand; the fourth found nothing blocking in the
-engine. M5 is under way on `m5-tracker`: `packages/coach` — the turn report — is built and
-green at 820 tests; the API and the app are next. See §10.
+engine. M5 is under way on `m5-tracker`: `packages/coach` (the turn report) and
+`services/api` (the authoritative game, over HTTP and a WebSocket) are built and green at 913
+tests, with an end-to-end suite driving a real turn over real HTTP against the real card store
+and the real sealed fixture. The Expo app is next. See §10.
 
 ---
 
@@ -230,6 +232,25 @@ so opening the app is the only setup step.
 reduces them into the authoritative state and broadcasts. No CRDT — there's one game and two
 people sitting next to each other.
 
+Built in M5, and four things about it are worth writing down:
+
+- **The log is the game.** A session holds its event log and carries the derived state as a
+  *cache*; `Session.consistent` replays from the start and asserts the two agree. Undo replays
+  the log minus one event rather than inverting the last one — an undo that computes the
+  opposite of an event is a second implementation of the rules, and the second one is always
+  the one that is wrong.
+- **The wire shape is written by hand** (`api/views.py`), not serialised from the engine's
+  types. A `Creature` carries a `Permanent` carrying a `CardInstance`; dumping that would put
+  the engine's shape on the wire and make every refactor a client change. Every library is a
+  *count*, never a list — a tracker that shows you the top of a deck is a cheating tool.
+- **The API closes a hole `core` documented.** `PlayLand`'s docstring says the reducer cannot
+  tell whether the card is a land, because `core` holds no card data, and that the check
+  "arrives with the card database". `api/guard.py` is that check. An *unmodelled* card is
+  still allowed through, because at 52% coverage refusing what we cannot identify would make
+  the tracker unusable — and the player can see their own card.
+- **Advice goes to both players in every payload.** One screen at a kitchen table: the person
+  defending needs the block advice as much as the attacker needs the attack advice.
+
 ---
 
 ## 5. Engineering standards
@@ -314,6 +335,7 @@ Blanket "100% everywhere" is a lie you'd write `# pragma: no cover` to achieve. 
 | Package | Gate | Rationale |
 |---|---|---|
 | `core` | **100% line + branch**, no pragmas | Pure, deterministic, no I/O. No excuse for an uncovered branch. |
+| `coach` | **100%**, pragmas only for `if TYPE_CHECKING:` | Pure too: card data arrives through a Protocol. |
 | `carddata` | **100%**, pragmas only for `if TYPE_CHECKING:` | I/O behind a protocol; network mocked. |
 | `services/api` | **100%**, pragmas only for `if TYPE_CHECKING:` | Thin. Claude is behind `Coach` and always mocked. |
 | `vision` | **100% on pure functions**; the OpenCV pipeline modules are pragma'd out | You cannot unit-test glare. Gated on accuracy instead (§9). |
@@ -322,6 +344,25 @@ Blanket "100% everywhere" is a lie you'd write `# pragma: no cover` to achieve. 
 `# pragma: no cover` is confined to an **allowlist of paths** checked in CI by
 `tools/check_pragma_allowlist.py`. This is also exactly how the review agent's preflight audit
 expects opt-outs to be expressed (§6), so the two tools agree rather than fight.
+
+**End-to-end, added in M5** (`tests/e2e/`). Nothing fake below the HTTP client: cards come out
+of the real Scryfall reader into a real SQLite store, their behaviour out of the signed FDN
+fixture, the rules out of `core`, the advice out of `coach`, reached over real HTTP and a real
+WebSocket. The unit tests say each piece is right; these say they are the *same* pieces — that
+an oracle id the extractor wrote is the one the store hands back, and that a `{T}: Add {G}` a
+model proposed and a person accepted becomes a Forest the mana solver will tap.
+
+The cost is one fixture (`tests/fixtures/scryfall_fdn_playable.json`): Scryfall-shaped records
+for seven cards whose oracle ids are taken from the sealed file, so both halves line up. The
+committed `scryfall_fdn_sample.json` does not overlap the sealed set at all, which is worth
+knowing — the two fixtures exist for different jobs.
+
+Reading a response under `mypy --strict` and `pyright --strict` needs help, because the honest
+type of decoded JSON is a recursive union and every index has to prove what it indexed was a
+mapping. `tests/wire.py` narrows once, loudly, with the path it was walking in the error — so
+it checks the wire format as much as it reads it. Starlette's `TestClient` is not typed well
+enough for strict pyright, and the three modules that touch it say so in a file-level
+suppression with a reason, rather than the gate being weakened everywhere.
 
 **Property tests (Hypothesis) — where the real bugs are:**
 
@@ -894,7 +935,7 @@ ensemble review (§6) before the next begins.
 | **M2** ✅ | `carddata`: Scryfall ingestion, `Collection`, the `sets add / audit` commands, FDN decklists as data. | Establishes the set-agnostic data layer before any set-specific work exists to bias it. |
 | **M3** ✅ | Effect extraction pipeline + review CLI + FDN golden fixture and signed manifest. Card explainer CLI. | Useful immediately; proves the build-time Claude pattern *and* the multi-set pipeline in one go. |
 | **M4** ✅ | Mana solver, legality, trigger scanner, combat simulator. Hypothesis suites. Convergence-loop review. | The engine. This is what makes it a coach rather than a notepad. |
-| **M5** | FastAPI + WebSocket; Expo app as a **manual** tracker (tap cards in from your decklist). | **Probably 70% of the total value.** Ship before touching the camera. |
+| **M5** | FastAPI + WebSocket ✅; Expo app as a **manual** tracker (tap cards in from your decklist). | **Probably 70% of the total value.** Ship before touching the camera. |
 | **M6** | Claude coach + rules Q&A over M4's output. | Turns correct answers into understandable ones. |
 | **M7** | Single-card scan, then board scan → state diff → one-tap accept. Accuracy corpus. | The original ask, now with a tracker behind it to correct mistakes. |
 | **M8** | Web view on the laptop; teaching features — quiz mode, end-of-game review, son's tablet view. | The reason to build this instead of buying a rules app. |

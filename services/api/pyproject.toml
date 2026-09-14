@@ -2,7 +2,12 @@
 name = "mtgcoach-api"
 version = "0.0.0"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "mtgcoach-core",
+    "mtgcoach-coach",
+    "mtgcoach-carddata",
+    "fastapi>=0.115",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -10,3 +15,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mtgcoach"]
+
+[tool.uv.sources]
+mtgcoach-core = { workspace = true }
+mtgcoach-coach = { workspace = true }
+mtgcoach-carddata = { workspace = true }
