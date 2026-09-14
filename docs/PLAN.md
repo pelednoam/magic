@@ -6,10 +6,11 @@ or at the board, and get a clear answer to *"what can I do this turn, and what s
 **Status:** M0–M4 merged to `main`. The engine is done: 780 tests, 100% line and branch, with
 **52% of the Beginner Box fully modelled** and eleven keywords implemented. M4 took four rounds
 of ensemble review, with every finding fixed by hand; the fourth found nothing blocking in the
-engine. M5 is under way on `m5-tracker`: `packages/coach` (the turn report) and
-`services/api` (the authoritative game, over HTTP and a WebSocket) are built and green at 913
-tests, with an end-to-end suite driving a real turn over real HTTP against the real card store
-and the real sealed fixture. The Expo app is next. See §10.
+engine. M5 is complete on `m5-tracker`: `packages/coach` (the turn report), `services/api` (the
+authoritative game over HTTP and a WebSocket) and `apps/mobile` (the Expo tracker) are built
+and green — 916 Python tests at 100% line and branch, 29 TypeScript tests, and an end-to-end
+suite driving a real turn over real HTTP against the real card store and the real sealed
+fixture. Ensemble review next, then M6. See §10.
 
 ---
 
@@ -210,8 +211,8 @@ magic/
 │  └─ api/           FastAPI — card DB, recognition endpoint, Claude adapter,
 │                    authoritative game session, WebSocket sync
 ├─ apps/
-│  ├─ mobile/        Expo (Android + tablet) — camera, at-the-table UI
-│  └─ web/           Vite + React — big-screen board view on the laptop
+│  ├─ mobile/        Expo (Android + tablet + web) — camera, at-the-table UI
+│  └─ web/           M8: a big-screen laptop view, if Expo's web target is not enough
 ├─ data/sets/<code>/ decklists, effects.json, manifest.json, art hashes  (per set)
 ├─ tests/            all Python tests, mirroring the package tree  (see §6)
 ├─ tools/            our own dev scripts  (scripts/ belongs to the review agent)
@@ -339,7 +340,7 @@ Blanket "100% everywhere" is a lie you'd write `# pragma: no cover` to achieve. 
 | `carddata` | **100%**, pragmas only for `if TYPE_CHECKING:` | I/O behind a protocol; network mocked. |
 | `services/api` | **100%**, pragmas only for `if TYPE_CHECKING:` | Thin. Claude is behind `Coach` and always mocked. |
 | `vision` | **100% on pure functions**; the OpenCV pipeline modules are pragma'd out | You cannot unit-test glare. Gated on accuracy instead (§9). |
-| `apps/*` | strict TS, no coverage gate | Logic-free by design; a few Playwright/Detox smoke tests. |
+| `apps/*` | strict TS, no coverage gate | Logic-free by design. Unit tests for the two modules that *are* logic — the client and the display formatting — and nothing for the components, which are layout. |
 
 `# pragma: no cover` is confined to an **allowlist of paths** checked in CI by
 `tools/check_pragma_allowlist.py`. This is also exactly how the review agent's preflight audit
@@ -935,13 +936,42 @@ ensemble review (§6) before the next begins.
 | **M2** ✅ | `carddata`: Scryfall ingestion, `Collection`, the `sets add / audit` commands, FDN decklists as data. | Establishes the set-agnostic data layer before any set-specific work exists to bias it. |
 | **M3** ✅ | Effect extraction pipeline + review CLI + FDN golden fixture and signed manifest. Card explainer CLI. | Useful immediately; proves the build-time Claude pattern *and* the multi-set pipeline in one go. |
 | **M4** ✅ | Mana solver, legality, trigger scanner, combat simulator. Hypothesis suites. Convergence-loop review. | The engine. This is what makes it a coach rather than a notepad. |
-| **M5** | FastAPI + WebSocket ✅; Expo app as a **manual** tracker (tap cards in from your decklist). | **Probably 70% of the total value.** Ship before touching the camera. |
+| **M5** ✅ | FastAPI + WebSocket; Expo app as a **manual** tracker (tap cards in from your decklist). | **Probably 70% of the total value.** Ship before touching the camera. |
 | **M6** | Claude coach + rules Q&A over M4's output. | Turns correct answers into understandable ones. |
 | **M7** | Single-card scan, then board scan → state diff → one-tap accept. Accuracy corpus. | The original ask, now with a tracker behind it to correct mistakes. |
 | **M8** | Web view on the laptop; teaching features — quiz mode, end-of-game review, son's tablet view. | The reason to build this instead of buying a rules app. |
 | **M9** | Enable a second set end-to-end as a **test of the abstraction**, not a feature. | If set #2 takes an evening, the design held. If it takes a week, we learn exactly where. |
 
 M0–M5 is a genuinely useful tool. Everything after is upside.
+
+**One app, not two.** The tree above listed `apps/mobile` and `apps/web` separately. Expo's web
+target builds the same source to a browser bundle (370 kB, one page), so M5 shipped one app that
+runs on Android, the tablet and the laptop. `apps/web` stays in the plan for M8, to be built
+only if the big-screen view wants a genuinely different layout rather than a wider one.
+
+**How the app stays dumb.** §4 says no rules logic crosses into TypeScript, and that is easy to
+say and easy to erode. Three things hold it:
+
+- The app renders `reasons` **verbatim**. It has no idea what a land is. When the engine says
+  "you need 1 more untapped source", those words go on screen unaltered — which is also why the
+  engine's sentences are written to be read by a nine-year-old rather than parsed by a client.
+- Nothing is applied optimistically. Every action is an event sent to the server, and the board
+  that comes back is the board. A tracker that guessed ahead of the server would be a second
+  rules engine, written in the language chosen for not having one.
+- `Attacks.unavailable` is rendered as its own state. An empty attack list would read as "do not
+  attack", which is advice the engine did not give.
+
+The one module with logic in it is `src/format.ts`, and the test for whether something belongs
+there is: *could it ever disagree with the engine?* Pluralising a list cannot. Deciding whether
+a land is tapped can, so it does not live there.
+
+**Two hand-written contracts, checked against each other.** `services/api/views.py` builds the
+JSON by hand and `apps/mobile/src/wire.ts` declares it by hand — the right call on both sides,
+and a silent drift risk between them. `tests/api/test_wire_contract.py` plays a whole turn,
+unions every field the server ever sends, and compares both directions against the TypeScript.
+A field the app has never heard of is a blank space in the UI; a field the app expects and no
+longer gets is the same bug mirrored. Neither raises anything at runtime, which is exactly why
+it needs a test.
 
 **A package the original tree did not have.** `packages/coach` was added in M5. The four
 solvers each answer a narrow question; something has to assemble them into the one a player

@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "Magic Coach",
+    "slug": "magic-coach",
+    "version": "0.1.0",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "android": {
+      "package": "com.pelednoam.magiccoach",
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    }
+  }
+}

@@ -29,3 +29,8 @@ data/*.sqlite3
 # Unreviewed extractor output. Only the sealed fixture and its manifest are
 # data; `mtgcoach effects seal` is the only way across that line.
 data/sets/*/proposals.json
+
+# The app's dependencies. `npm install` in apps/mobile restores them.
+apps/*/node_modules/
+apps/*/.expo/
+apps/*/dist/

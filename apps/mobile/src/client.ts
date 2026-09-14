@@ -1,0 +1,106 @@
+/**
+ * Talking to the server. No rules, no interpretation, no caching of judgement.
+ *
+ * Every call returns what the server said. The one piece of policy here is what
+ * to do when it says no: an error carries the server's own sentence, because
+ * the server writes better ones than a client can ("you need one more Forest",
+ * not "400").
+ */
+
+import type { NewGame, Snapshot } from "./wire";
+
+/** The server refused, and said why. */
+export class ServerError extends Error {
+  readonly status: number;
+
+  constructor(status: number, detail: string) {
+    super(detail);
+    this.name = "ServerError";
+    this.status = status;
+  }
+}
+
+/** How to reach the server, and how to ask it things. */
+export class Coach {
+  private readonly base: string;
+
+  constructor(base: string) {
+    this.base = base.replace(/\/+$/, "");
+  }
+
+  /** The decks this server can deal. */
+  async decks(): Promise<readonly string[]> {
+    const body = await this.get<{ decks: readonly string[] }>("/decks");
+    return body.decks;
+  }
+
+  /** Start a game between two of them. */
+  async start(you: string, them: string): Promise<NewGame> {
+    return this.send<NewGame>("POST", "/games", { you, them });
+  }
+
+  /** The board and the advice, as they stand. */
+  async look(sessionId: string): Promise<Snapshot> {
+    return this.get<Snapshot>(`/games/${sessionId}`);
+  }
+
+  /** Apply one event. The server decides whether it is legal. */
+  async event(sessionId: string, event: Record<string, unknown>): Promise<Snapshot> {
+    return this.send<Snapshot>("POST", `/games/${sessionId}/events`, event);
+  }
+
+  /** Take the last event back. */
+  async undo(sessionId: string): Promise<Snapshot> {
+    return this.send<Snapshot>("POST", `/games/${sessionId}/undo`, {});
+  }
+
+  /** The address to watch a game on, for whoever owns the socket. */
+  watchUrl(sessionId: string): string {
+    return `${this.base.replace(/^http/, "ws")}/games/${sessionId}/watch`;
+  }
+
+  private async get<T>(path: string): Promise<T> {
+    return this.unwrap<T>(await fetch(`${this.base}${path}`));
+  }
+
+  private async send<T>(
+    method: string,
+    path: string,
+    body: Record<string, unknown>,
+  ): Promise<T> {
+    const response = await fetch(`${this.base}${path}`, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return this.unwrap<T>(response);
+  }
+
+  private async unwrap<T>(response: Response): Promise<T> {
+    if (response.ok) {
+      return (await response.json()) as T;
+    }
+    throw new ServerError(response.status, await detailOf(response));
+  }
+}
+
+/**
+ * The server's explanation, or a plain one if it did not give the usual shape.
+ *
+ * Never throws: this runs while handling an error, and an exception here would
+ * replace a useful message with a confusing one.
+ */
+async function detailOf(response: Response): Promise<string> {
+  try {
+    const body: unknown = await response.json();
+    if (typeof body === "object" && body !== null && "detail" in body) {
+      const detail = (body as { detail: unknown }).detail;
+      if (typeof detail === "string" && detail.length > 0) {
+        return detail;
+      }
+    }
+  } catch {
+    // Not JSON, or the connection went away mid-read. Fall through.
+  }
+  return `the server said ${response.status}`;
+}

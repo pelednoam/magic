@@ -1,0 +1,114 @@
+/**
+ * The shape the server sends, written out to match `services/api/views.py`.
+ *
+ * Hand-written, like the Python side it mirrors, and for the same reason: the
+ * wire is a contract two people agreed on, not a dump of either side's types.
+ * `tests/api/test_wire_contract.py` reads this file and fails if the server
+ * starts sending a field this does not know about, which is the drift that
+ * would otherwise be found by a blank space in the UI.
+ *
+ * Nothing here interprets anything. `reasons` are sentences the engine wrote
+ * and this app prints; it does not know what a land is, and must not learn.
+ */
+
+/** One card in hand, and the engine's verdict on it. */
+export interface Playable {
+  readonly instance_id: string;
+  readonly name: string;
+  readonly playable: boolean;
+  /** Empty when playable. Otherwise the engine's own words, printed verbatim. */
+  readonly reasons: readonly string[];
+  readonly payment: Payment | null;
+}
+
+/** Which sources to tap, and -- the useful half -- which to keep up. */
+export interface Payment {
+  readonly tap: readonly string[];
+  readonly keep: readonly string[];
+}
+
+/** One attack and what the opponent's best answer does to it. */
+export interface Plan {
+  readonly attackers: readonly string[];
+  readonly damage: number;
+  readonly defender_life_after: number;
+  readonly lethal: boolean;
+  readonly you_lose: readonly string[];
+  readonly they_lose: readonly string[];
+  readonly you_gain: number;
+  readonly they_gain: number;
+}
+
+/** The attacks worth making, or the sentence saying why there are none. */
+export interface Attacks {
+  readonly plans: readonly Plan[];
+  /** Empty when there are plans; otherwise why the section is empty. */
+  readonly unavailable: string;
+}
+
+/** A trigger the player is about to miss. */
+export interface Reminder {
+  readonly instance_id: string;
+  readonly name: string;
+  readonly event: string;
+}
+
+/** Everything the coach has to say about this moment, for one player. */
+export interface Advice {
+  readonly turn: number;
+  readonly step: string;
+  readonly your_turn: boolean;
+  readonly life: number;
+  readonly hand: readonly Playable[];
+  readonly attacks: Attacks;
+  readonly reminders: readonly Reminder[];
+  /** Cards the coach cannot speak for. Shown, never hidden. */
+  readonly unknown: readonly string[];
+}
+
+/** One card, by both of its identities and the word printed on it. */
+export interface Card {
+  readonly instance_id: string;
+  readonly oracle_id: string;
+  readonly name: string;
+}
+
+/** One permanent, with the two states a tracker has to show. */
+export interface Permanent extends Card {
+  readonly tapped: boolean;
+  readonly summoning_sick: boolean;
+}
+
+/** One player's half of the board. The library is a count, never a list. */
+export interface Player {
+  readonly life: number;
+  readonly library: number;
+  readonly lands_played_this_turn: number;
+  readonly hand: readonly Card[];
+  readonly battlefield: readonly Permanent[];
+  readonly graveyard: readonly Card[];
+  readonly exile: readonly Card[];
+}
+
+/** The board, as much of it as a client may see. */
+export interface GameState {
+  readonly turn: number;
+  readonly step: string;
+  readonly active_player: string;
+  readonly players: Readonly<Record<string, Player>>;
+}
+
+/** What every route returns: the board, plus advice for both players. */
+export interface Snapshot {
+  readonly state: GameState;
+  readonly advice: Readonly<Record<string, Advice>>;
+}
+
+/** A new game also says what to call it. */
+export interface NewGame extends Snapshot {
+  readonly session_id: string;
+}
+
+/** The two seats. The server names them, and this app only ever displays them. */
+export const YOU = "you";
+export const THEM = "them";
