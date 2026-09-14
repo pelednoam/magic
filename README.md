@@ -8,7 +8,7 @@ a rewrite. See [`docs/PLAN.md`](docs/PLAN.md) for the full design.
 
 ## Status
 
-**M0–M5 merged; M6 (the Claude layer) on `m6`.** The engine, the tracker, the two-seat server
+**M0–M6 merged.** The engine, the tracker, the two-seat server
 and the Expo app all work. The turn coach and the rules question box are the newest parts.
 
 The two checks are deliberately different strengths, and the wire says which you are getting.
