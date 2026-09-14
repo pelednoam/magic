@@ -18,7 +18,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 from mtgcoach.carddata.cli import main
-from mtgcoach.carddata.scryfallapi import HttpPages, ScryfallError
+from mtgcoach.carddata.scryfallapi import ScryfallError
+from mtgcoach.carddata.scryfallhttp import HttpPages
 
 if TYPE_CHECKING:
     from pathlib import Path

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import sqlite3
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -48,7 +49,21 @@ DEFAULT_PORT = 8000
 TOKEN_PATH = Path("token")
 
 
-def assemble(db: Path, data_root: Path, set_code: SetCode) -> FastAPI:
+@dataclass(frozen=True, slots=True)
+class Serving:
+    """A built app and the token it will ask for.
+
+    Together because the token is read from a file and printing it is the only
+    way it reaches the phone. Returning it beside the app means one read and
+    one place that knows where the file is; the first version read it twice and
+    left two call sites able to disagree.
+    """
+
+    app: FastAPI
+    token: str
+
+
+def assemble(db: Path, data_root: Path, set_code: SetCode) -> Serving:
     """Build the app from the card database and a set's sealed data.
 
     Raises:
@@ -66,7 +81,8 @@ def assemble(db: Path, data_root: Path, set_code: SetCode) -> FastAPI:
 
     decks = {deck.key: _library(deck, names) for deck in load_set_decks(data_root, set_code)}
     token = token_at(data_root / TOKEN_PATH)
-    return create_app(catalogue, decks, token, Claude(rules=_rules(data_root)))
+    app = create_app(catalogue, decks, token, Claude(rules=_rules(data_root)))
+    return Serving(app=app, token=token)
 
 
 def _rules(data_root: Path) -> RuleIndex | None:
@@ -120,13 +136,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     args = parser.parse_args(argv)
 
-    app = assemble(args.db, args.data, SetCode(args.set_code))
-    _announce(args.data, args.host, args.port)
-    uvicorn.run(app, host=args.host, port=args.port)
+    serving = assemble(args.db, args.data, SetCode(args.set_code))
+    _announce(serving.token, args.host, args.port)
+    uvicorn.run(serving.app, host=args.host, port=args.port)
     return 0
 
 
-def _announce(data_root: Path, host: str, port: int) -> None:
+def _announce(token: str, host: str, port: int) -> None:
     """Print the address and the token, because nothing else will.
 
     The token is the whole of the server's access control and the app needs it.
@@ -134,11 +150,13 @@ def _announce(data_root: Path, host: str, port: int) -> None:
     is nobody to email it to.
     """
     where = "localhost" if host in {"0.0.0.0", "::"} else host  # noqa: S104 - the LAN is the point
-    token = token_at(data_root / TOKEN_PATH)
     print(f"Magic Coach on http://{where}:{port}")  # noqa: T201 - a console script
     print(f"  token: {token}")  # noqa: T201
+    print("  paste it into the app when it asks.")  # noqa: T201
     print(  # noqa: T201
-        "  give it to the app as EXPO_PUBLIC_COACH_TOKEN, or paste it in when asked"
+        "  EXPO_PUBLIC_COACH_TOKEN works for a localhost-only session, but Expo "
+        "bakes it into the bundle Metro serves unauthenticated -- so on a LAN, "
+        "paste it."
     )
 
 

@@ -8,15 +8,17 @@ so following it blindly is following a redirect somebody else chose.
 from __future__ import annotations
 
 import json
-import urllib.request
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Self, cast
 
 if TYPE_CHECKING:
+    import urllib.request
     from collections.abc import Callable
+    from typing import IO
 
 import pytest
 
-from mtgcoach.carddata.scryfallapi import AGENT, HOST, READ_TIMEOUT, HttpPages, ScryfallError
+from mtgcoach.carddata.scryfallapi import HOST, ScryfallError
+from mtgcoach.carddata.scryfallhttp import AGENT, READ_TIMEOUT, HttpPages
 
 
 @pytest.mark.parametrize(
@@ -72,7 +74,7 @@ def test_the_polite_pause_happens_between_requests_and_not_before_the_first(
 ) -> None:
     """Scryfall is a free service run for players and nobody enforces this."""
     slept: list[float] = []
-    monkeypatch.setattr("mtgcoach.carddata.scryfallapi.time.sleep", slept.append)
+    monkeypatch.setattr("mtgcoach.carddata.scryfallhttp.time.sleep", slept.append)
     monkeypatch.setattr(HttpPages, "_read", _reading(json.dumps({"object": "list"})))
     pages = HttpPages(pause=0.25)
     pages.fetch(f"https://{HOST}/a")
@@ -100,33 +102,32 @@ class Response:
         return self._body
 
 
-def test_the_request_says_who_is_calling(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_the_request_says_who_is_calling() -> None:
     """Scryfall's documentation asks for it.
 
     An anonymous scraper is how a free service ends up behind a login.
     """
     seen: list[urllib.request.Request] = []
 
-    def opened(request: urllib.request.Request, timeout: float = 0.0) -> Response:
+    def opened(request: urllib.request.Request, timeout: float) -> Response:
         seen.append(request)
         assert timeout == READ_TIMEOUT
         return Response(json.dumps({"object": "list"}).encode())
 
-    monkeypatch.setattr(urllib.request, "urlopen", opened)
-    assert HttpPages().fetch(f"https://{HOST}/cards/search") == {"object": "list"}
+    assert HttpPages(opener=_Opening(opened)).fetch(f"https://{HOST}/cards/search") == {
+        "object": "list"
+    }
     (request,) = seen
     assert request.get_header("User-agent") == AGENT
     assert request.get_header("Accept") == "application/json"
 
 
-def test_a_body_that_is_not_utf8_does_not_stop_the_import(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_a_body_that_is_not_utf8_does_not_stop_the_import() -> None:
     """A card name is not going to be, but a truncated response might."""
     body = json.dumps({"object": "list", "name": "x"}).encode()[:-1] + b"\xff}"
-    monkeypatch.setattr(urllib.request, "urlopen", _opening(Response(body)))
+    pages = HttpPages(opener=_Opening(_opening(Response(body))))
     with pytest.raises(ScryfallError, match="not readable"):
-        HttpPages().fetch(f"https://{HOST}/cards/search")
+        pages.fetch(f"https://{HOST}/cards/search")
 
 
 def _reading(body: str) -> Callable[[HttpPages, str], str]:
@@ -138,11 +139,22 @@ def _reading(body: str) -> Callable[[HttpPages, str], str]:
     return read
 
 
-def _opening(response: Response) -> Callable[[urllib.request.Request], Response]:
-    """A `urlopen` that answers with this, whatever it was asked for."""
+def _opening(response: Response) -> Callable[[urllib.request.Request, float], Response]:
+    """An `open` that answers with this, whatever it was asked for."""
 
-    def opened(_request: urllib.request.Request, timeout: float = 0.0) -> Response:
-        del timeout
+    def opened(_request: urllib.request.Request, _timeout: float) -> Response:
         return response
 
     return opened
+
+
+class _Opening:
+    """An opener that hands back whatever it was built with."""
+
+    def __init__(self, answer: Callable[[urllib.request.Request, float], Response]) -> None:
+        """Answer every call with this."""
+        self._answer = answer
+
+    def open(self, request: urllib.request.Request, timeout: float) -> IO[bytes]:
+        """The response, typed as the protocol wants it."""
+        return cast("IO[bytes]", self._answer(request, timeout))

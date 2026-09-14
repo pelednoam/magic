@@ -12,12 +12,12 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from mtgcoach.carddata import commands, effectcommands
+from mtgcoach.carddata import commands, effectcommands, fetchcommand
 from mtgcoach.carddata.claudecli import ClaudeCliExtractor
 from mtgcoach.carddata.jsondata import MalformedJsonError
 from mtgcoach.carddata.paths import validate_set_code
 from mtgcoach.carddata.schema import SchemaError
-from mtgcoach.carddata.scryfallapi import HttpPages
+from mtgcoach.carddata.scryfallhttp import HttpPages
 from mtgcoach.carddata.store import CardStore
 from mtgcoach.core.ids import SetCode
 
@@ -114,7 +114,7 @@ def _dispatch(args: argparse.Namespace, store: CardStore, data_root: Path, out: 
     the wrong thing. argparse has already rejected any pair not listed here.
     """
     handlers: dict[tuple[str, str], Callable[[], int]] = {
-        ("sets", "fetch"): lambda: commands.sets_fetch(
+        ("sets", "fetch"): lambda: fetchcommand.sets_fetch(
             HttpPages(), args.set_code, _destination(args, data_root), out
         ),
         ("sets", "add"): lambda: commands.sets_add(store, args.source, args.set_code, out),

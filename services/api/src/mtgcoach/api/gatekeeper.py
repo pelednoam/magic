@@ -9,10 +9,10 @@ come down to "no route can forget":
   socket is the one that streams the whole board. So this is a plain ASGI
   callable, which sees both.
 
-Preflights go through unanswered by design. A browser sends ``OPTIONS`` with no
-``Authorization`` header -- it is asking whether it *may* send one -- so
-refusing it would refuse the request that follows, and the preflight reveals
-nothing but the CORS policy.
+Preflights never reach here. A browser sends ``OPTIONS`` with no
+``Authorization`` header -- it is asking whether it *may* send one -- and the
+CORS layer sits outside this one and answers it before this is called. That
+ordering is load-bearing, and ``guarded`` below is where it is arranged.
 """
 
 from __future__ import annotations
@@ -35,9 +35,6 @@ if TYPE_CHECKING:
 #: What a refused request is told. Enough to fix it, and nothing about the
 #: token itself -- not its length, and not how close the attempt was.
 REFUSAL = "this server needs its token: send `Authorization: Bearer <token>`"
-
-#: The method a browser uses to ask whether it may send a real request.
-PREFLIGHT = "OPTIONS"
 
 
 class Gatekeeper:
@@ -65,8 +62,14 @@ class Gatekeeper:
         nothing else's: accepting it here would invite a token into URLs that
         reach access logs, proxies and browser history, for no gain -- an HTTP
         client can always set a header.
+
+        No exemption for ``OPTIONS`` either. A real preflight never gets this
+        far -- CORS sits outside and answers it -- so the only ``OPTIONS`` that
+        arrives here is one CORS declined, and letting those through to route
+        matching told anybody who could reach the port which paths exist
+        (405) and which do not (404).
         """
-        if scope.get("method") == PREFLIGHT or self._carries(scope, query=False):
+        if self._carries(scope, query=False):
             await self._app(scope, receive, send)
             return
         refused = JSONResponse({"detail": REFUSAL}, status_code=HTTP_401_UNAUTHORIZED)

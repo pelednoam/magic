@@ -108,10 +108,28 @@ def test_a_page_with_no_card_list_is_refused() -> None:
         list(printings_for(FDN, pages))
 
 
-def test_something_that_is_not_a_card_object_is_skipped() -> None:
-    """A scalar in `data` is not a card, and is not worth failing an import."""
+def test_something_that_is_not_a_card_object_fails_the_import() -> None:
+    """Skipping it was a quiet way to lose a card.
+
+    This is an import, not a search: a page that is not what it should be is
+    worth failing over, because the alternative is a database that is wrong in
+    a way nobody finds until a game.
+    """
     pages = Answers({"object": "list", "has_more": False, "data": [{"name": "Forest"}, 7]})
-    assert [c["name"] for c in printings_for(FDN, pages)] == ["Forest"]
+    with pytest.raises(ScryfallError, match="not a card"):
+        list(printings_for(FDN, pages))
+
+
+def test_more_pages_with_nowhere_to_go_fails_the_import() -> None:
+    """It said there was more and did not say where.
+
+    Returning there looked like a finished download and wrote a short file that
+    imported cleanly -- a set quietly missing four hundred printings, which
+    nothing downstream could notice.
+    """
+    pages = Answers({"object": "list", "has_more": True, "data": [{"name": "Forest"}]})
+    with pytest.raises(ScryfallError, match="not where"):
+        list(printings_for(FDN, pages))
 
 
 def test_pages_that_never_end_are_refused() -> None:

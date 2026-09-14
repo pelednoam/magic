@@ -28,8 +28,9 @@ cd apps/mobile && npm install && npm run web          # the app
 
 The server prints its address and a token when it starts. The token is its only access
 control, so every request needs it — `Authorization: Bearer <token>`, and `?token=` on the
-WebSocket, which a browser will not let a page put a header on. A build on the same laptop
-picks it up from `EXPO_PUBLIC_COACH_TOKEN`; a phone asks for it once and you paste it in.
+WebSocket, which a browser will not let a page put a header on. A phone asks for it once and
+you paste it in. `EXPO_PUBLIC_COACH_TOKEN` works for a localhost-only session, but Expo bakes
+it into the bundle Metro serves unauthenticated — so on a LAN, paste it.
 
 What that closes is not a guest's phone. It is a web page the household visits, which could
 make cross-origin requests to `http://<laptop>:8000` and previously needed to know nothing at
