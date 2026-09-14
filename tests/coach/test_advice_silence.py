@@ -12,7 +12,7 @@ a recommendation, which is why it was going unchecked.
 
 from __future__ import annotations
 
-from helpers import ME, facts
+from helpers import ME, UNKNOWN_ABILITY, facts
 from helpers_coach import Book, game, land
 from mtgcoach.coach.advice import Explanation, trusted, verify
 from mtgcoach.coach.checks import offered
@@ -87,3 +87,50 @@ def test_attacking_with_nobody_matches_the_plan_that_says_so() -> None:
 
 def test_saying_nothing_about_combat_outside_combat_is_fine() -> None:
     assert trusted(Explanation(attack=()), _main())
+
+
+# --- the words must not recommend what the choice did not ---------------------
+
+
+def test_prose_recommending_an_unplayable_card_is_refused() -> None:
+    """The words a person reads are not the fields that were checked.
+
+    `play` and `attack` are checked exactly; the sentences beside them are what
+    somebody actually reads, and nothing made the two agree. A model that left
+    `play` empty and wrote "cast the Dragon" was marked trusted and showed
+    "cast the Dragon". Natural language cannot be checked in general, so this
+    checks the one case that is common and unambiguous: prose naming a card in
+    this hand that the engine says cannot be played.
+    """
+    report = _main(hand=("Bear",))
+    (bear,) = report.hand
+    assert not bear.playable, "the fixture must have an uncastable card in hand"
+    said = Explanation(in_short="Cast the Grizzly Bears!", because="It is the best play.")
+    problems = verify(said, report)
+    assert problems
+    assert "cannot be played" in problems[-1]
+
+
+def test_prose_about_the_card_it_does_recommend_is_fine() -> None:
+    report = _main(hand=("Forest", "Bear"))
+    forest = next(card for card in report.hand if card.playable)
+    said = Explanation(
+        play=str(forest.instance_id),
+        in_short="Put down a Forest.",
+        because="A land is free.",
+    )
+    assert trusted(said, report)
+
+
+def test_check_yourself_may_name_an_unplayable_card() -> None:
+    """The honesty check requires it, so this must not refuse it.
+
+    Reading `check_yourself` as advice prose made the two checks contradict
+    each other: an explanation had to name the card and was refused for it.
+    """
+    book = Book(
+        cards={**BOOK.cards, "Puzzle": facts("Puzzle", "{2}{U}")},
+        rules={**BOOK.rules, "Puzzle": (UNKNOWN_ABILITY,)},
+    )
+    report = advise(game(hand=("Puzzle",)), ME, book)
+    assert trusted(Explanation(check_yourself=("Puzzle: I cannot read this one",)), report)

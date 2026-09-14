@@ -154,3 +154,33 @@ def test_the_guard_against_running_the_real_command_is_loaded() -> None:
     """
     with pytest.raises(AssertionError, match="tried to run the real"):
         subprocess.run(["/usr/local/bin/claude", "-p"], check=False)
+
+
+def test_the_group_is_the_child_pid_not_something_asked_for() -> None:
+    """`setsid` runs in the child, after the fork the parent returned from.
+
+    So a `getpgid` that wins the race reads the group the child *inherited* --
+    the server's own -- and killing that takes the API down on an ordinary
+    coach request. A process that calls `setsid` leads a group numbered after
+    itself, so the pid is the answer, and it is the answer before the child has
+    run at all.
+    """
+    fake = Raises(subprocess.TimeoutExpired("claude", 90))
+    killed: list[int] = []
+
+    def remember(group: int, _signal: int) -> None:
+        killed.append(group)
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(subprocess, "Popen", fake)
+        patch.setattr(os, "killpg", remember)
+        # Would be asked in the racy version, and would answer wrongly.
+        patch.setattr(os, "getpgid", _the_servers_group)
+        with pytest.raises(ExplainerError):
+            ClaudeCliExplainer().explain(REPORT, "the briefing")
+    assert killed == [4242], "the child's pid, not whatever getpgid said"
+
+
+def _the_servers_group(_pid: int) -> int:
+    """What `getpgid` returns when it wins the race against `setsid`."""
+    return os.getpgrp()

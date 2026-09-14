@@ -41,6 +41,13 @@ export interface Thinking<T> {
 function useSlowAsk<T extends { readonly version: number }, A extends unknown[]>(
   send: (...args: A) => Promise<T>,
   version: number,
+  /**
+   * Which board that version counts. A version is a number per *game*, so two
+   * games are both on 0 to start with — and an answer about one of them would
+   * have matched the other. Same for the two seats, which get different advice
+   * about the same board.
+   */
+  board: string,
 ): Thinking<T> & { readonly ask: (...args: A) => void } {
   // One piece of state, not three. They only ever change together, and a
   // panel that showed an answer and a spinner at once was possible while they
@@ -50,6 +57,7 @@ function useSlowAsk<T extends { readonly version: number }, A extends unknown[]>
   // The board as it is *now*, which is not what the callback closed over: it
   // is made once per render and answers a minute later.
   const current = useRef(version);
+  const showing = useRef(board);
   // Which request the panel is showing. A second question started while the
   // first is in flight makes the first's reply irrelevant, including its
   // "finished" — otherwise the spinner stopped while the second was running.
@@ -60,9 +68,10 @@ function useSlowAsk<T extends { readonly version: number }, A extends unknown[]>
   // of advice about a position nobody is in, which is the whole thing this
   // exists to prevent. It also left the in-flight request holding the button
   // disabled for up to its full minute, over a result nothing could use.
-  const moved = current.current !== version;
+  const moved = current.current !== version || showing.current !== board;
   if (moved) {
     current.current = version;
+    showing.current = board;
     token.current += 1;
     if (held.reply !== null || held.problem !== "" || held.asking) {
       setHeld(NOTHING as Thinking<T>);
@@ -83,14 +92,20 @@ function useSlowAsk<T extends { readonly version: number }, A extends unknown[]>
       // is showing. An error carries no revision of its own — there is no
       // reply — so it falls back to the board we knew about when we asked,
       // which is what a reply uses the server's answer instead of.
-      const stillWanted = () => mine === token.current && asked === current.current;
+      const here = showing.current;
+      const stillWanted = () =>
+        mine === token.current && asked === current.current && here === showing.current;
       setHeld({ reply: null, problem: "", asking: true });
       send(...args)
         .then((answer: T) => {
           // The server's own answer to "which board is this about", compared
           // against the board on screen. Better than `asked`: that is what the
           // client believed when it asked, and this is what the server did.
-          if (mine === token.current && answer.version === current.current) {
+          if (
+            mine === token.current &&
+            here === showing.current &&
+            answer.version === current.current
+          ) {
             setHeld({ reply: answer, problem: "", asking: false });
           }
         })
@@ -121,11 +136,8 @@ export function useCoaching(
   seat: string,
   version: number,
 ): Thinking<Coaching> & { readonly ask: () => void } {
-  const send = useCallback(
-    () => coach.explain(sessionId, seat),
-    [coach, seat, sessionId],
-  );
-  return useSlowAsk<Coaching, []>(send, version);
+  const send = useCallback(() => coach.explain(sessionId, seat), [coach, seat, sessionId]);
+  return useSlowAsk<Coaching, []>(send, version, `${sessionId}/${seat}`);
 }
 
 /** Rules answers, which go stale the same way: the board is in the prompt. */
@@ -139,5 +151,5 @@ export function useQuestions(
     (question: string) => coach.ask(sessionId, question, seat),
     [coach, seat, sessionId],
   );
-  return useSlowAsk<Asked, [string]>(send, version);
+  return useSlowAsk<Asked, [string]>(send, version, `${sessionId}/${seat}`);
 }

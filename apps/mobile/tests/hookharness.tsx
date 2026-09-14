@@ -82,13 +82,20 @@ export function mounted<T, A extends unknown[]>(
 ): {
   readonly latest: () => Hook<T> & Asks<A>;
   readonly moveBoard: () => void;
+  /** Render again without changing the version, for a test that changed
+   *  something the hook closes over rather than something it is passed. */
+  readonly rerender: () => void;
 } {
   let seen: (Hook<T> & Asks<A>) | null = null;
   let setVersion: (n: number) => void = () => undefined;
+  let setNudge: (next: (n: number) => number) => void = () => undefined;
 
   function Probe() {
     const [version, set] = useState(0);
+    const [nudge, bump] = useState(0);
     setVersion = set;
+    setNudge = bump;
+    void nudge;
     seen = use(version);
     return null;
   }
@@ -104,7 +111,16 @@ export function mounted<T, A extends unknown[]>(
       }
       return seen;
     },
-    moveBoard: () => { act(() => { setVersion(Math.random()); }); },
+    moveBoard: () => {
+      act(() => {
+        setVersion(Math.random());
+      });
+    },
+    rerender: () => {
+      act(() => {
+        setNudge((n) => n + 1);
+      });
+    },
   };
 }
 

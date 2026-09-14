@@ -79,7 +79,8 @@ def passages_in(document: str) -> tuple[Passage, ...]:
     """Every rule and glossary entry in the Comprehensive Rules.
 
     Raises:
-        CorpusError: If the document does not have the shape of the rules.
+        CorpusError: If the document is not shaped like the rules. How *much*
+            it has is ``library``'s business, not this function's.
     """
     lines = document.replace("\r\n", "\n").split("\n")
     start, glossary, end = _bounds(lines)

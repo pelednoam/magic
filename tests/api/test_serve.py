@@ -89,11 +89,7 @@ def test_the_rules_are_loaded_when_they_are_installed(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     root = tmp_path / "data"
-    (root / "rules").mkdir(parents=True)
-    excerpt = FIXTURES / "rules_excerpt.txt"
-    (root / "rules" / "comprehensive.txt").write_text(
-        excerpt.read_text(encoding="utf-8"), encoding="utf-8"
-    )
+    _install_rules(root, _long_enough())
     _copy_sets(root)
     with _dealt(tmp_path, root) as client:
         body = decoded(client.post("/games", json={"you": "elves", "them": "elves"}).json())
@@ -115,18 +111,28 @@ def test_a_server_without_the_rules_still_starts(
     assert "rules questions are off" in capsys.readouterr().out
 
 
+@pytest.mark.parametrize(
+    "installed",
+    [
+        pytest.param("<html>404</html>", id="the HTML of an error page"),
+        pytest.param(
+            (FIXTURES / "rules_excerpt.txt").read_text(encoding="utf-8"),
+            id="a download that stopped early",
+        ),
+    ],
+)
 def test_a_rules_document_that_is_not_the_rules_does_not_stop_the_server(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    installed: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """A truncated download, or the HTML of an error page.
+    """Catching only "not installed" turned this into a stack trace at startup.
 
-    Catching only "not installed" turned that into a stack trace at startup, so
-    a bad download stopped the tracker working at all -- over a feature the
-    tracker does not need.
+    A bad download stopped the tracker working at all -- over a feature the
+    tracker does not need. The second case is the subtle one: it is genuinely
+    rules-shaped, just far too little of it, and it used to be indexed and
+    advertised as the Comprehensive Rules.
     """
     root = tmp_path / "data"
-    (root / "rules").mkdir(parents=True)
-    (root / "rules" / "comprehensive.txt").write_text("<html>404</html>", encoding="utf-8")
+    _install_rules(root, installed)
     _copy_sets(root)
     with _dealt(tmp_path, root) as client:
         body = decoded(client.post("/games", json={"you": "elves", "them": "elves"}).json())
@@ -137,3 +143,34 @@ def test_a_rules_document_that_is_not_the_rules_does_not_stop_the_server(
 def _copy_sets(root: Path) -> None:
     """The real per-set data, so `assemble` has decks to deal."""
     shutil.copytree(DATA / "sets", root / "sets", dirs_exist_ok=True)
+
+
+def _install_rules(root: Path, document: str) -> None:
+    """Put a rules document where `assemble` will look for it."""
+    where = root / "rules" / "comprehensive.txt"
+    where.parent.mkdir(parents=True, exist_ok=True)
+    where.write_text(document, encoding="utf-8")
+
+
+def _long_enough() -> str:
+    """A rules-shaped document with enough in it to be believed.
+
+    Generated rather than vendored: the real one is a megabyte of Wizards'
+    text, and what this test needs is the shape and the size, not the content.
+    """
+    rules = [f"100.{n}. Rule number {n} says something about the game." for n in range(1, 900)]
+    return "\n\n".join(
+        [
+            "Contents",
+            "Glossary",
+            "Credits",
+            "1. Game Concepts",
+            "100. General",
+            *rules,
+            "Glossary",
+            "Trample",
+            "A keyword ability.",
+            "Credits",
+            "Published by someone.",
+        ]
+    )

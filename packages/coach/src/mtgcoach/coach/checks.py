@@ -13,8 +13,9 @@ owed, look for it in the words, and report what is missing by name.
 
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING
+
+from mtgcoach.coach.silence import mentions
 
 if TYPE_CHECKING:
     from mtgcoach.coach.advice import Explanation
@@ -103,74 +104,48 @@ def _short(value: str) -> str:
     return value if len(value) <= _READABLE else value[:_READABLE] + "..."
 
 
-def honesty(explanation: Explanation, report: TurnReport) -> tuple[str, ...]:
-    """Where the engine stops, the explanation has to say so -- about each card.
+def prose(explanation: Explanation, report: TurnReport) -> tuple[str, ...]:
+    """The words must not tell the player to do what the choice did not.
 
-    §8: "If the engine hits an ``Unmodeled`` effect, say so and show the card
-    text." Asked for in the prompt and enforced here, because a model that
-    forgets is indistinguishable from one that decided the card did not matter.
+    ``play`` and ``attack`` are checked exactly; the sentences beside them are
+    what a person actually reads, and nothing makes the two agree. A model that
+    leaves ``play`` empty and writes "cast the Dragon" is marked trusted and
+    shows "cast the Dragon".
 
-    Checked *per card*, not as a count. Requiring only that ``check_yourself``
-    be non-empty meant one arbitrary sentence discharged every obligation on
-    the board: a model that mentioned the Pacifism and said nothing about the
-    Equipment passed, and the player read the silence as "counted".
+    Natural language cannot be checked in general and this does not try. It
+    checks the one case that is both common and unambiguous: prose naming a
+    card that is *in this hand* and that the engine says cannot be played. That
+    is a recommendation to do something illegal, said in words, and it is
+    exactly the shape of a model's most confident mistake.
+
+    ``check_yourself`` is not prose for this purpose -- ``honesty`` *requires*
+    it to name cards the engine could not read, which are usually unplayable
+    too. Reading it here made the two checks contradict each other: an
+    explanation had to name the card and was refused for naming it.
     """
-    owed = (*report.unknown, *report.attacks.caveats)
-    said = " ".join(explanation.check_yourself)
-    missing = [item for item in owed if not _mentions(said, _named(item))]
-    if not missing:
+    said = _advice(explanation)
+    forbidden = [
+        card.name
+        for card in report.hand
+        if not card.playable and card.name != _named_play(explanation, report)
+    ]
+    named = [name for name in forbidden if mentions(said, name)]
+    if not named:
         return ()
-    return (f"says nothing about {len(missing)} of {len(owed)} not modelled: {missing[:3]}",)
+    return (f"its words name {len(named)} card(s) that cannot be played: {sorted(set(named))}",)
 
 
-def triggers(explanation: Explanation, report: TurnReport) -> tuple[str, ...]:
-    """A trigger that is firing has to be named somewhere in the answer.
+def _named_play(explanation: Explanation, report: TurnReport) -> str:
+    """The name of the card it recommends playing, if it recommends one."""
+    if not explanation.play:
+        return ""
+    found = next((c for c in report.hand if str(c.instance_id) == explanation.play), None)
+    return found.name if found is not None else ""
 
-    Stopping the *shortcut* passing over a trigger was only half of it: the
-    model was then asked, and nothing made it mention the trigger either. An
-    explanation that says "nothing to do, pass the turn" over a firing trigger
-    is the same wrong answer, arrived at the long way round, and it was marked
-    trusted. Anywhere in the words counts -- this is a check on silence, not on
-    where a model chose to put it.
+
+def _advice(explanation: Explanation) -> str:
+    """The words that tell the player what to do.
+
+    Not ``check_yourself``, which tells them what nobody worked out.
     """
-    if not report.reminders:
-        return ()
-    said = _everything(explanation)
-    silent = [r.name for r in report.reminders if not _mentions(said, r.name)]
-    if not silent:
-        return ()
-    return (f"says nothing about {len(silent)} trigger(s) firing now: {silent[:3]}",)
-
-
-def _mentions(said: str, name: str) -> bool:
-    """Whether ``said`` names this card, as a word rather than as letters.
-
-    A plain substring search found "Rat" inside "strategy", so an explanation
-    that never mentioned the Rat was credited with mentioning it -- and the
-    checks that use this are the ones about *silence*, where a false positive
-    is the whole failure.
-    """
-    return re.search(rf"(?<!\w){re.escape(name)}(?!\w)", said, re.IGNORECASE) is not None
-
-
-def _everything(explanation: Explanation) -> str:
-    """Every word the explanation carries, for checks about silence."""
-    return " ".join(
-        (
-            explanation.because,
-            explanation.in_short,
-            *explanation.watch_out,
-            *explanation.check_yourself,
-        )
-    )
-
-
-def _named(item: str) -> str:
-    """The card an unmodelled-thing sentence is about.
-
-    Both producers write "<name>: <reason>" -- ``report._unknown`` and
-    ``statics.caveats``. The name is what a model would repeat; the reason is
-    the engine's own words and asking for those back would be asking it to
-    quote us.
-    """
-    return item.split(":", 1)[0].strip()
+    return " ".join((explanation.because, explanation.in_short, *explanation.watch_out))

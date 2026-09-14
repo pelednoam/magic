@@ -12,15 +12,21 @@ from typing import TYPE_CHECKING
 import pytest
 
 from helpers_rules import EXCERPT
-from mtgcoach.rules.corpus import CorpusError
-from mtgcoach.rules.library import RULES_FILE, RulesNotInstalledError, index_at, rules_path
+from mtgcoach.rules.corpus import CorpusError, passages_in
+from mtgcoach.rules.library import (
+    LEAST_CREDIBLE,
+    RULES_FILE,
+    RulesNotInstalledError,
+    index_at,
+    rules_path,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
 def test_the_document_is_read_and_indexed() -> None:
-    with index_at(EXCERPT) as index:
+    with index_at(EXCERPT, least=1) as index:
         assert [p.reference for p in index.search("trample")]
 
 
@@ -69,5 +75,26 @@ def test_a_document_with_a_byte_order_mark_is_read(tmp_path: Path) -> None:
     installed = tmp_path / RULES_FILE
     installed.parent.mkdir(parents=True)
     installed.write_text(EXCERPT.read_text(encoding="utf-8"), encoding="utf-8-sig")
-    with index_at(rules_path(tmp_path)) as index:
+    with index_at(rules_path(tmp_path), least=1) as index:
         assert index.cited(["702.19b"])
+
+
+def test_a_truncated_download_is_refused(tmp_path: Path) -> None:
+    """It carries the four markers and parses to a handful of rules.
+
+    Without this the server indexed it, said `rules_available`, and answered
+    questions out of a fragment -- which is the confidently-incomplete failure
+    this whole package exists to avoid.
+    """
+    installed = tmp_path / RULES_FILE
+    installed.parent.mkdir(parents=True)
+    installed.write_text(EXCERPT.read_text(encoding="utf-8"), encoding="utf-8")
+    with pytest.raises(CorpusError, match="truncated download"):
+        index_at(rules_path(tmp_path))
+
+
+def test_the_real_document_would_pass(tmp_path: Path) -> None:
+    """Guard on the guard: a minimum nothing can reach checks nothing."""
+    assert len(passages_in(EXCERPT.read_text(encoding="utf-8"))) < LEAST_CREDIBLE
+    assert LEAST_CREDIBLE < 3000, "the real document has a few thousand"
+    assert tmp_path.exists()

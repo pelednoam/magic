@@ -83,7 +83,23 @@ boundary: §4 puts this on one LAN with no auth and that is still a known gap. I
 failure that needs no attacker, which is a stuck finger on a button that starts a Node process
 and spends a subscription.
 
-Four rounds, forty-odd findings fixed by hand; the critical count went 8, 5, 1, 5.
+A fifth round found the one that could have taken the server down. `os.getpgid` was asked for
+the child's process group immediately after `Popen` returned — but `setsid` runs *in the
+child*, after the fork the parent has already returned from, so a call that won that race read
+the group the child **inherited**: the server's own. The `finally` then `SIGKILL`ed it, on an
+ordinary coach request. There is no need to ask at all — a process that calls `setsid` leads a
+group numbered after its own pid — and `kill_group` now refuses to signal this process's group
+whatever it is handed.
+
+Also from that round: the prose beside a checked choice was itself unchecked, so
+`play=""` with "cast the Dragon" in `in_short` passed and displayed; a truncated rules
+download that happened to carry the four markers was indexed and advertised as the
+Comprehensive Rules; and the client's staleness was keyed on a version number that restarts at
+zero for every game.
+
+Five rounds, sixty-odd findings fixed by hand. The critical count went 8, 5, 1, 5, 5 — not
+monotonic, because each round's fixes were the next round's subject, which is what an ensemble
+review is for.
 
 ---
 

@@ -21,7 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol
 
-from mtgcoach.coach import checks
+from mtgcoach.coach import checks, silence
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -75,8 +75,9 @@ def verify(explanation: Explanation, report: TurnReport) -> tuple[str, ...]:
     return (
         *checks.play(explanation, report),
         *checks.attack(explanation, report),
-        *checks.honesty(explanation, report),
-        *checks.triggers(explanation, report),
+        *silence.honesty(explanation, report),
+        *silence.triggers(explanation, report),
+        *checks.prose(explanation, report),
     )
 
 

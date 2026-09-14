@@ -124,3 +124,34 @@ describe("a board that moves while a question is in flight", () => {
     expect(after).toEqual(after.map(() => null));
   });
 });
+
+describe("a different game or seat with the same version", () => {
+  it("does not show the previous game's answer", async () => {
+    // A version counts changes *within a game*, so two games are both on 0 to
+    // start with. Keyed on the number alone, an answer about one matched the
+    // other — and React reuses the component when only a prop changed.
+    const { coach, settle } = deferred<Asked>();
+    let game = "g1";
+    const hook = mounted((version) => useQuestions(coach, game, "you", version));
+    act(() => { hook.latest().ask("q"); });
+    await settle(ASKED);
+    expect(hook.latest().reply).not.toBeNull();
+
+    game = "g2";
+    hook.rerender();
+    expect(hook.latest().reply).toBeNull();
+  });
+
+  it("does not show the other seat's answer", async () => {
+    const { coach, settle } = deferred<Coaching>();
+    let seat = "you";
+    const hook = mounted((version) => useCoaching(coach, "g1", seat, version));
+    act(() => { hook.latest().ask(); });
+    await settle(ADVICE);
+    expect(hook.latest().reply).not.toBeNull();
+
+    seat = "them";
+    hook.rerender();
+    expect(hook.latest().reply).toBeNull();
+  });
+});

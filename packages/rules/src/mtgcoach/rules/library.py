@@ -29,7 +29,7 @@ from __future__ import annotations
 import shlex
 from typing import TYPE_CHECKING
 
-from mtgcoach.rules.corpus import passages_in
+from mtgcoach.rules.corpus import CorpusError, passages_in
 from mtgcoach.rules.search import RuleIndex
 
 if TYPE_CHECKING:
@@ -37,6 +37,13 @@ if TYPE_CHECKING:
 
 #: Where ``serve`` looks, relative to the data directory.
 RULES_FILE = "rules/comprehensive.txt"
+
+#: The fewest passages an installed document can have and still be the rules.
+#: The real one has a few thousand. A truncated download that happens to carry
+#: the four markers parses to a handful, and without this the server indexed
+#: it, said ``rules_available`` and answered questions out of a fragment --
+#: which is the confidently-incomplete failure this package exists to avoid.
+LEAST_CREDIBLE = 500
 
 
 class RulesNotInstalledError(FileNotFoundError):
@@ -48,13 +55,17 @@ def rules_path(data_root: Path) -> Path:
     return data_root / RULES_FILE
 
 
-def index_at(path: Path) -> RuleIndex:
+def index_at(path: Path, least: int = LEAST_CREDIBLE) -> RuleIndex:
     """Read and index the rules document.
 
     Raises:
         RulesNotInstalledError: If the file is not there, with the command that
             puts it there -- an operator reading a stack trace at a kitchen
             table needs the fix, not the location of the raise.
+        CorpusError: If it is there but is not the rules, or is too little of
+            them to be a real install. ``least`` is how little that is, a
+            parameter only so that a test can index a short excerpt rather than
+            carry a megabyte of Wizards' document.
     """
     if not path.is_file():
         msg = (
@@ -64,4 +75,11 @@ def index_at(path: Path) -> RuleIndex:
             f'  curl -L -o {shlex.quote(str(path))} "$URL"'
         )
         raise RulesNotInstalledError(msg)
-    return RuleIndex.build(passages_in(path.read_text(encoding="utf-8-sig")))
+    found = passages_in(path.read_text(encoding="utf-8-sig"))
+    if len(found) < least:
+        msg = (
+            f"{path} parses to only {len(found)} rules; the Comprehensive Rules "
+            "have a few thousand, so this is probably a truncated download"
+        )
+        raise CorpusError(msg)
+    return RuleIndex.build(found)
