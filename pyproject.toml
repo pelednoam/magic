@@ -10,6 +10,7 @@ dependencies = [
     "mtgcoach-rules",
     "mtgcoach-vision",
     "mtgcoach-api",
+    "mtgcoach-selfplay",
 ]
 
 [tool.uv]
@@ -25,6 +26,7 @@ mtgcoach-coach = { workspace = true }
 mtgcoach-rules = { workspace = true }
 mtgcoach-vision = { workspace = true }
 mtgcoach-api = { workspace = true }
+mtgcoach-selfplay = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -62,6 +64,7 @@ src = [
     "packages/rules/src",
     "packages/vision/src",
     "services/api/src",
+    "services/selfplay/src",
     "tools",
     "tests",
     "tests/coach",
@@ -129,12 +132,14 @@ packages/coach/src:\
 packages/rules/src:\
 packages/vision/src:\
 services/api/src:\
+services/selfplay/src:\
 tools:\
 tests:\
 tests/coach:\
 tests/api:\
 tests/rules:\
-tests/e2e\
+tests/e2e:\
+tests/selfplay\
 """
 
 # ---------------------------------------------------------------- pyright
@@ -148,12 +153,14 @@ extraPaths = [
     "packages/rules/src",
     "packages/vision/src",
     "services/api/src",
+    "services/selfplay/src",
     "tools",
     "tests",
     "tests/coach",
     "tests/api",
     "tests/rules",
     "tests/e2e",
+    "tests/selfplay",
 ]
 typeCheckingMode = "strict"
 pythonVersion = "3.12"

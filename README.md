@@ -50,6 +50,23 @@ all to drive the game or spend the Claude subscription. What it does not close i
 player* is asking: every snapshot still carries both hands, so "you cannot see your opponent's
 hand" is still enforced by the room. A token per seat would fix that, and is the next step.
 
+## Playing it against itself
+
+```bash
+uv run python -m mtgcoach.selfplay --games 300        # instant, a policy on both seats
+uv run python -m mtgcoach.selfplay --games 1 --coach  # Claude on both seats, minutes
+```
+
+Two agents play whole games through the real engine, and every event is checked against the
+things no play may ever break — cards conserved, no card in two places, one land drop a turn.
+The point is not the play, which is foolish: it is that a season puts the engine through states
+in an order nobody chose, and a seed replays any game exactly.
+
+300 games is about 100,000 events and takes a few seconds. `--coach` makes Claude the agent, so
+the coach's advice is *applied* and the next position is a consequence of the last piece of it —
+which is the only way bad advice shows up, since it compounds. That run reports how many of its
+answers survived the engine's checks.
+
 `sets fetch` is the only command that touches the network. It asks Scryfall for one set —
 771 printings for Foundations, five requests — and writes them to a file, so re-importing
 and the effects workflow do not ask again. `mtgcoach decks verify FDN` then checks all ten
