@@ -68,6 +68,14 @@ where `$URL` is the plain-text link on <https://magic.wizards.com/en/rules>. Not
 address on purpose: Wizards publish a new document with every set, and an eighteen-month-old
 copy answers questions about errataed cards with complete confidence.
 
+A question only finds a rule it shares words with, which is a problem when the rule is written
+in a vocabulary a beginner does not have. *"Can a creature that came into play this turn
+block?"* is answered by rule 302.6, and 302.6 says "under its controller's control continuously
+since their most recent turn began" — so nothing matched and the answer was "the rules I was
+given don't talk about how new a creature is". `rules/phrasing.py` maps a few such paraphrases
+onto the rules' own wording; it is short on purpose, and a gate check keeps every phrase in it
+one the current document actually uses.
+
 Without it everything else works, the server says so at startup, and the app shows the
 question box as switched off rather than letting you type into it.
 

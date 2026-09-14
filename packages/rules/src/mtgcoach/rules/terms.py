@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import re
 
+from mtgcoach.rules.phrasing import also
+
 #: A word worth searching for. Apostrophes are kept inside a word ("player's")
 #: and everything else is a separator, which also means nothing a person types
 #: can reach FTS5 as syntax.
@@ -80,10 +82,23 @@ def query(question: str) -> str:
     between "safe as long as nobody types a quote" and "cannot carry syntax at
     all". Words are ORed: a question is a bag of terms, and requiring all of
     them finds nothing as soon as one is spelled differently from the rules.
+
+    Plus whatever ``phrasing`` can add. Those are multi-word phrases rather
+    than words, which FTS5 reads as phrase matches -- which is what is wanted:
+    a question paraphrasing a rule gets the rule's own wording added to the bag
+    so the passage can rank at all.
+
+    Appended, never substituted, so this only ever adds a way to match. It also
+    cannot turn an empty query into a non-empty one: every phrase in the map
+    needs a word to trigger on that is not in ``_NOISE`` -- "play", "cast",
+    "creature" -- so a question with nothing searchable in it triggers nothing
+    either. ``search`` depends on that: an empty query means "the rules cannot
+    be looked up for this", and a query built only from a guess would be a
+    guess with nothing to check it.
     """
     words = [word.lower() for word in _WORD.findall(question)]
     wanted = [word for word in words if word not in _NOISE and len(word) > 1]
-    return " OR ".join(f'"{word}"' for word in wanted)
+    return " OR ".join(f'"{term}"' for term in (*wanted, *also(question)))
 
 
 #: A rule number written out in a question: "702.19b", "rule 100.1", "509.1a".

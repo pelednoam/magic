@@ -983,6 +983,35 @@ how the passage was labelled, and the checker wanted `702.19b`. The prompt now p
 reference in brackets and nothing else, and citations are resolved before they are checked —
 decoration comes off, digits do not.
 
+**Retrieval only finds a rule the question shares words with, and one question does not.**
+Found live, and it is close to the most common beginner question about combat: *"can a creature
+that came into play this turn block?"* The answer is rule 302.6 — and 302.6 contains none of
+those words. It says a creature cannot attack "unless it has been under its controller's control
+continuously since their most recent turn began", then adds that this is informally the
+"summoning sickness" rule. So eight passages about blocking came back, none of them 302.6, and
+the answer was *"the rules I was given don't talk about how new a creature is"*: honest,
+correctly refusing to invent, and useless.
+
+Mostly the document bridges its own vocabulary — 403.5 says the battlefield used to be called
+"in play", 404.1 says a graveyard is a discard pile — so asking in the old words finds the rule
+that explains the old words. What it cannot bridge is a *paraphrase*, because there is no word
+to look up. `rules/phrasing.py` is a deliberately tiny map from how a beginner says a thing to
+how the rules say it, appended to the query so the passage can rank at all. It must stay tiny:
+every entry decides what a question is about before seeing the question, which is exactly the
+cleverness that makes retrieval worse. `tools/check_rules_phrasing.py` checks every target is
+still wording the installed document uses, because a reworded one matches nothing and the only
+symptom is the answer quietly going back to "I can't say".
+
+Now: *"Yes! A creature that just showed up can still block. It only has to wait a turn before it
+can attack"* — cited to 302.6.
+
+*Known gap from the same investigation, not fixed.* An added phrase competes on bm25 like any
+other term and can lose. "What happens when my hit points reach zero?" still retrieves the rules
+for **reach**, the keyword ability, because the question contains the word and a keyword's
+heading is weighted above a body match. The collision between ordinary English and Magic's
+keyword vocabulary — reach, flying, haste, trample, defender — is a separate weakness and wants
+its own fix.
+
 ### Cost, and how to keep it near zero
 
 Opus 5 is $5/$25 per MTok in/out; cache reads are ~10% of input.

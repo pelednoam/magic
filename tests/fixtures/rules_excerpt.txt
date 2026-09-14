@@ -8,6 +8,12 @@ Contents
 
 100. General
 
+110. Permanents
+
+119. Life
+
+302. Creatures
+
 509. Declare Blockers Step
 
 702. Keyword Abilities
@@ -25,6 +31,18 @@ Example: a game with three players is a multiplayer game.
 
 100.1a A two-player game is a game that begins with only two players.
 It may still use any of the options in section 8.
+
+110. Permanents
+
+110.2. A permanent’s owner is the same as the owner of the card that represents it (unless it’s a token; see rule 111.2). A permanent’s controller is, by default, the player under whose control it entered the battlefield. Every permanent has a controller.
+
+119. Life
+
+119.1. Each player begins the game with a starting life total of 20. Some variant games have different starting life totals.
+
+302. Creatures
+
+302.6. A creature’s activated ability with the tap symbol or the untap symbol in its activation cost can’t be activated unless the creature has been under its controller’s control continuously since their most recent turn began. A creature can’t attack unless it has been under its controller’s control continuously since their most recent turn began. This rule is informally called the “summoning sickness” rule.
 
 509. Declare Blockers Step
 
@@ -58,6 +76,9 @@ Glossary
 
 Deathtouch
 A keyword ability that makes damage dealt by an object lethal. See rule 702.2, "Deathtouch."
+
+Summoning Sickness Rule
+Informal term for a player’s inability to attack with a creature or to activate its abilities that include the tap symbol or the untap symbol unless the creature has been under that player’s control since the beginning of that player’s most recent turn. See rule 302.6. See also Haste.
 
 Trample
 A keyword ability that modifies how a creature assigns combat damage.

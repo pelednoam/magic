@@ -36,6 +36,33 @@ def test_a_question_finds_the_rule_it_is_about(index: RuleIndex) -> None:
     assert "702.19b" in _references(index, "how does trample work when blocked?")
 
 
+def test_the_question_a_beginner_actually_asks_finds_the_rule(index: RuleIndex) -> None:
+    """Found live, and it returned nothing useful.
+
+    302.6 contains none of this question's words -- it says "under its
+    controller's control continuously since their most recent turn began" --
+    so retrieval came back with eight passages about blocking and the answer
+    was "the rules I was given don't talk about how new a creature is". Honest,
+    and useless. `phrasing` adds the phrase 302.6 does use.
+    """
+    found = _references(index, "can a creature that came into play this turn block?")
+    assert "302.6" in found, found
+    assert "Summoning Sickness Rule" in found, found
+
+
+def test_the_same_question_in_a_childs_words_finds_it_too(index: RuleIndex) -> None:
+    found = _references(index, "can I attack with a creature I just played?")
+    assert "302.6" in found, found
+
+
+def test_a_childs_word_for_a_life_total_finds_the_life_rules(index: RuleIndex) -> None:
+    """The rules never say "hit points".
+
+    A nine-year-old who has played any other game never says anything else.
+    """
+    assert "119.1" in _references(index, "how many hit points do we start with?")
+
+
 def test_the_heading_outranks_a_passing_mention(index: RuleIndex) -> None:
     """A question about deathtouch wants the deathtouch rules first."""
     found = _references(index, "what does deathtouch do?", limit=3)
