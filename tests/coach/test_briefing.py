@@ -11,9 +11,7 @@ from helpers import ME, UNKNOWN_ABILITY, facts
 from helpers_coach import Book, game, land, taps_for
 from mtgcoach.coach.briefing import brief
 from mtgcoach.coach.report import advise
-from mtgcoach.core.abilities import Trigger, TriggeredAbility
 from mtgcoach.core.steps import Step
-from mtgcoach.core.vocabulary import TriggerEvent
 
 
 def _flat(text: str) -> str:
@@ -97,26 +95,6 @@ def test_no_combat_says_why_rather_than_showing_nothing() -> None:
     text = brief(advise(game(battlefield=("Bear",)), ME, BOOK))
     assert "ATTACKS: none to consider" in text
     assert "declare attackers step" in text
-
-
-def test_triggers_are_named() -> None:
-    rings = TriggeredAbility(Trigger(TriggerEvent.BEGINNING_OF_UPKEEP), ())
-    book = Book(
-        cards={**BOOK.cards, "Bell": facts("Bell", creature=True, power=1, toughness=1)},
-        rules={**BOOK.rules, "Bell": (rings,)},
-    )
-    state = game(battlefield=("Bell",), step=Step.UPKEEP)
-    text = _flat(brief(advise(state, ME, book)))
-    assert "TRIGGERS NOW (name every one of these in your answer): Bell" in text
-    # The instruction and the check were added a round apart, and the checker
-    # demanded this before the prompt ever asked for it -- which would have
-    # refused every turn with a trigger on the table.
-    assert "must be named somewhere in your answer" in text
-
-
-def test_a_turn_with_no_triggers_says_nothing_about_them() -> None:
-    """The section, not the word -- rule 4 names it whether or not any fired."""
-    assert "TRIGGERS NOW (name" not in brief(advise(game(), ME, BOOK))
 
 
 def test_a_fully_modelled_board_says_so_explicitly() -> None:

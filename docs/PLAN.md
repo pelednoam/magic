@@ -882,12 +882,38 @@ feature is dead for the set this app was built for. A player never sees the pane
 fourth hard rule — *"anything under TRIGGERS NOW must be named somewhere in your answer"* — has
 never been exercised against real data.
 
-The classification is right: a "whenever this attacks" trigger genuinely cannot be found by
-walking the battlefield at a step boundary. What is missing is the module that was supposed to
-observe the events — and `enters` is 21 of the 31, is the commonest thing that happens in a
-beginner's game ("When this enters, create a 1/1 Elf"), and is the one the harness can already
-see, because putting a card onto the battlefield is an event the harness applies. That is where
-this gets fixed.
+**Fixed, for 24 of the 31.** The classification had two classes and wanted three. A "whenever
+this attacks" trigger genuinely cannot be found by walking the battlefield — but `enters` can,
+because *the state still remembers it*: a permanent that arrived since its controller's last untap
+step is flagged `summoning_sick`, and that flag is the record of having entered. So
+`triggerscan.ON_ARRIVAL` is the third class, `arrivals()` is its scanner, and `enters` (21) plus
+`another_creature_enters` (3) now reach the panel.
+
+The two shapes are not the same permanent, which is the part worth getting right: *"when this
+enters"* reports the newcomer, *"whenever another creature enters"* reports the thing that was
+already there and names somebody else's arrival as the cause.
+
+The panel was renamed with them. It said **TRIGGERS NOW**, which was true of the only kind it
+could report and is false of an arrival trigger — that one fired when the card was put down, and
+what is being asked is whether it was *resolved*. It is **TRIGGERS TO HANDLE** now, with the
+moment attached to each name — `Volley Veteran (when it came onto the battlefield)` — rather than
+asserted once in the heading. One section, so rule 4 and `silence.triggers` stay one rule and one
+check.
+
+*The window is wider than the trigger.* `summoning_sick` means "since your last untap", not "this
+turn", so a creature played on your turn is still flagged through the opponent's. For a tracker
+somebody fills in by hand that is the better error: the reminder stays up until the turn comes
+round rather than flashing past in one step and being missed. A narrower window wants
+`entered_on_turn` on `Permanent`, which is a state-model change and a bigger one than this was.
+
+Measured the same way it was found — same season, same seed, everything else identical:
+**0 → 1,702 turns with a trigger** across 60 games. Live on real cards it reports Volley Veteran
+and Elvish Regrower, both of which are *also* in `CANNOT SPEAK FOR`, so a beginner now gets
+"this triggered and I cannot tell you what it does — read the card" where they previously got
+silence.
+
+Still event-driven, and still never firing: `attacks` (3), `dies` (2), `you_gain_life` (2). Those
+need a module that observes the event rather than the board.
 
 Worth recording *how* this was found: not by a failing test, but by a season reporting what it
 had **reached** rather than only what had gone wrong. Sixty clean games said nothing; sixty clean
@@ -1208,10 +1234,26 @@ ensemble review (§6) before the next begins.
 | **M5** ✅ | FastAPI + WebSocket; Expo app as a **manual** tracker (tap cards in from your decklist). | **Probably 70% of the total value.** Ship before touching the camera. |
 | **M6** | Claude coach + rules Q&A over M4's output. **Done.** | Turns correct answers into understandable ones. |
 | **M7** | Single-card scan, then board scan → state diff → one-tap accept. Accuracy corpus. | The original ask, now with a tracker behind it to correct mistakes. |
-| **M8** | Web view on the laptop; teaching features — quiz mode, end-of-game review, son's tablet view. | The reason to build this instead of buying a rules app. |
+| **M8** | Web view on the laptop; teaching features — **step-through replay**, quiz mode, end-of-game review, son's tablet view. | The reason to build this instead of buying a rules app. |
 | **M9** | Enable a second set end-to-end as a **test of the abstraction**, not a feature. | If set #2 takes an evening, the design held. If it takes a week, we learn exactly where. |
 
 M0–M5 is a genuinely useful tool. Everything after is upside.
+
+**Step-through replay is the M8 feature to build first, and most of it already exists.** The ask:
+walk a played game one decision at a time in the UI, so a nine-year-old can see what happened and
+ask about it. The substrate is `services/selfplay`'s journal — every decision of a coached game,
+with the exact board the model was shown and what it said, keyed by turn, step and player. A game
+already replays from one deterministically, so the engine half is done.
+
+What is missing is a route and a screen: an endpoint that serves a journal as an ordered list of
+moments, and a view with a step forward and back. Two things make it a teaching tool rather than
+a log viewer, and both are already true of the data — every position can be re-asked ("why?" on
+any step, because the board is there), and the advice shown is the advice that was *checked*, so
+what he reads was true.
+
+Worth noting what it does *not* need: no new engine work, no camera, and no rules the engine does
+not already have. It is the cheapest large win on the list, and it gets better every time a
+coached season runs, because each one is another game to walk through.
 
 **One app, not two.** The tree above listed `apps/mobile` and `apps/web` separately. Expo's web
 target builds the same source to a browser bundle (370 kB, one page), so M5 shipped one app that

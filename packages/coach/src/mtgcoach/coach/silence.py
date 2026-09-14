@@ -58,7 +58,7 @@ def triggers(explanation: Explanation, report: TurnReport) -> tuple[str, ...]:
     silent = [r.name for r in report.reminders if not mentions(said, r.name)]
     if not silent:
         return ()
-    return (f"says nothing about {len(silent)} trigger(s) firing now: {silent[:3]}",)
+    return (f"says nothing about {len(silent)} trigger(s) to handle: {silent[:3]}",)
 
 
 def mentions(said: str, name: str) -> bool:

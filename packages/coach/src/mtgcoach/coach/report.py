@@ -21,13 +21,14 @@ could never be read again.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import partial
 from typing import TYPE_CHECKING
 
 from mtgcoach.coach import mana
 from mtgcoach.coach.attacks import Attacks, attacks_for
+from mtgcoach.coach.warnings import reminders as warnings_for
 from mtgcoach.core.legality import why_not_cast, why_not_play_land
 from mtgcoach.core.manasolver import payments
-from mtgcoach.core.triggerscan import triggers_at
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -106,13 +107,7 @@ def advise(state: GameState, player_id: PlayerId, lookup: CardLookup) -> TurnRep
         life=player.life,
         hand=tuple(_verdict(state, player_id, card, sources, lookup) for card in player.hand),
         attacks=attacks_for(state, player_id, lookup),
-        reminders=triggers_at(
-            state.step,
-            player.battlefield,
-            lookup.abilities,
-            lambda oracle_id: _name(lookup, oracle_id),
-            your_turn=your_turn,
-        ),
+        reminders=warnings_for(state, player, lookup, partial(_name, lookup), your_turn=your_turn),
         unknown=_unknown(state, player_id, lookup),
     )
 

@@ -15,9 +15,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from mtgcoach.coach.checks import SHOWN_ATTACKS
+from mtgcoach.core.vocabulary import TriggerEvent
 
 if TYPE_CHECKING:
     from mtgcoach.coach.report import TurnReport
+    from mtgcoach.core.triggerscan import Reminder
 
 RULES = """\
 You are helping a parent teach a nine-year-old to play Magic: The Gathering.
@@ -41,10 +43,11 @@ Hard rules, in order of importance:
 3. Anything under CANNOT SPEAK FOR must appear in check_yourself. The engine
    does not understand those cards; saying nothing about them would let the
    player think they were counted.
-4. Anything under TRIGGERS NOW must be named somewhere in your answer, by the
-   card's name. Those abilities are happening whether or not anybody notices,
-   and a beginner who is not told will miss them. An answer that does not
-   mention them is discarded, like one that invents a card.
+4. Anything under TRIGGERS TO HANDLE must be named somewhere in your answer, by
+   the card's name. Those abilities happen whether or not anybody notices --
+   some right now, some the moment a card was put down -- and a beginner who
+   is not told will miss them. An answer that does not mention them is
+   discarded, like one that invents a card.
 5. "in_short" is for the child. Short sentences, no jargon, no numbers they
    would have to hold in their head. "Their creature is bigger, so yours would
    just die" -- not "unfavourable trade at parity".
@@ -132,8 +135,25 @@ def _reminders(report: TurnReport) -> str:
     """
     if not report.reminders:
         return ""
-    names = ", ".join(r.name for r in report.reminders)
-    return f"\nTRIGGERS NOW (name every one of these in your answer): {names}"
+    named = ", ".join(f"{r.name} ({_when(r)})" for r in report.reminders)
+    return f"\nTRIGGERS TO HANDLE (name every one of these in your answer): {named}"
+
+
+def _when(reminder: Reminder) -> str:
+    """When this one fired, in words a nine-year-old's parent can act on.
+
+    One section rather than two, with the moment attached to each. The panel
+    used to say "TRIGGERS NOW", which was true of the only kind it could then
+    report and is not true of an arrival trigger -- that one fired when the
+    card was put down, and what is being asked is whether it was resolved.
+    Splitting the section would mean two rules and two checks; annotating each
+    keeps one of each.
+    """
+    if reminder.event is TriggerEvent.ENTERS:
+        return "when it came onto the battlefield"
+    if reminder.event is TriggerEvent.ANOTHER_CREATURE_ENTERS:
+        return "when the other creature arrived"
+    return "now, at this step"
 
 
 def _gaps(report: TurnReport) -> str:

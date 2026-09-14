@@ -172,6 +172,21 @@ Journals are not committed — they hold the full briefing for every decision an
 Keep the ones that found something; the command that produced each is in the table above, and the
 `.log` beside it has the summary that run printed.
 
+## What the journal is for next
+
+A journal is a played game with every board and every piece of advice in it, keyed by turn, step
+and player. That is exactly what a **step-through replay** needs — walk a game one decision at a
+time in the UI, so a child can see what happened and ask about it. The engine half is done: a
+journal already replays deterministically. What is missing is a route that serves one as an
+ordered list of moments and a screen with forward and back. See §10 of PLAN.md.
+
+Two properties make it teaching rather than logging, and the data already has both: every position
+can be re-asked, because the board is right there; and the advice recorded is the advice that was
+*checked*, so what he reads was true when it was shown.
+
+Which is a reason to keep the journals of games worth walking through, even though they are
+gitignored by default.
+
 ## Adding a check
 
 `watching.broken` takes the state on both sides of a transition and yields a sentence per problem.

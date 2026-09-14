@@ -15,6 +15,7 @@ from mtgcoach.core.targets import Controller
 from mtgcoach.core.triggerscan import (
     AT_STEP,
     EVENT_DRIVEN,
+    ON_ARRIVAL,
     every_event_is_classified,
     triggers_at,
 )
@@ -124,8 +125,11 @@ def test_every_trigger_event_is_classified() -> None:
     assert every_event_is_classified()
 
 
-def test_the_two_classifications_do_not_overlap() -> None:
+def test_the_classifications_do_not_overlap() -> None:
+    """A trigger in two of them would be reported twice, once by each scanner."""
     assert not set(AT_STEP.values()) & EVENT_DRIVEN
+    assert not ON_ARRIVAL & EVENT_DRIVEN
+    assert not ON_ARRIVAL & set(AT_STEP.values())
 
 
 def test_each_step_maps_to_a_distinct_event() -> None:

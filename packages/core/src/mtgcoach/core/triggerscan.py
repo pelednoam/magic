@@ -41,18 +41,35 @@ AT_STEP: Final[dict[Step, TriggerEvent]] = {
     Step.END_STEP: TriggerEvent.END_STEP,
 }
 
-#: Triggers driven by something happening rather than by the clock. Listed so
-#: that a new TriggerEvent has to be classified as one or the other rather than
-#: silently never firing.
+#: Triggers whose event the *state* still remembers, so a scanner can find
+#: them after the fact. A permanent that arrived since its controller's last
+#: untap step is flagged ``summoning_sick``, and that flag is the record that
+#: it entered -- so "when this enters" can be reported by looking at the
+#: battlefield, which is the only reason these are not in ``EVENT_DRIVEN``.
+#:
+#: This split was found by self-play, not by a test. Sixty games reached zero
+#: reminders, because the Beginner Box has 31 triggered abilities and every one
+#: was classified event-driven -- so the panel could never fire for the set the
+#: app is built for. These two are 24 of the 31.
+ON_ARRIVAL: Final[frozenset[TriggerEvent]] = frozenset(
+    {
+        TriggerEvent.ENTERS,
+        TriggerEvent.ANOTHER_CREATURE_ENTERS,
+    }
+)
+
+#: Triggers driven by something happening that the state does not remember.
+#: Listed so that a new TriggerEvent has to be classified rather than silently
+#: never firing.
 #:
 #: ATTACKS, BLOCKS and DEALS_COMBAT_DAMAGE are here rather than under a step
 #: because the step is only half their condition: the other half is having
-#: attacked, blocked or connected, which this scanner cannot see.
+#: attacked, blocked or connected, which this scanner cannot see. DIES,
+#: YOU_GAIN_LIFE and YOU_CAST_SPELL are here because nothing on the board
+#: afterwards says they happened.
 EVENT_DRIVEN: Final[frozenset[TriggerEvent]] = frozenset(
     {
-        TriggerEvent.ENTERS,
         TriggerEvent.DIES,
-        TriggerEvent.ANOTHER_CREATURE_ENTERS,
         TriggerEvent.YOU_GAIN_LIFE,
         TriggerEvent.YOU_CAST_SPELL,
         TriggerEvent.ATTACKS,
@@ -108,11 +125,64 @@ def triggers_at(
     )
 
 
-def every_event_is_classified() -> bool:
-    """Whether each trigger event is either clock-driven or event-driven.
+def arrivals(
+    battlefield: Sequence[Permanent],
+    abilities: Callable[[OracleId], Sequence[Ability]],
+    names: Callable[[OracleId], str],
+) -> tuple[Reminder, ...]:
+    """Every arrival trigger on a permanent that has recently arrived.
 
-    Checked by a test rather than asserted at import: a new event that is
-    neither would never fire and nothing would say so.
+    Two shapes, and they are not the same permanent:
+
+    - **"When this enters"** -- the permanent with the ability is the one that
+      arrived, so it is reported when it is itself newly here.
+    - **"Whenever another creature enters"** -- the ability is on a permanent
+      that was already here, and something *else* arriving is what fired it. So
+      it is reported when any other permanent is newly here.
+
+    **The window is "since your last untap step", not "this turn"**, because
+    ``summoning_sick`` is the only record the state keeps of having arrived.
+    That is wider than the moment the trigger fired: a creature played on your
+    turn is still flagged through the opponent's. For a tracker somebody is
+    filling in by hand that is the better error to make -- the reminder stays
+    up until the turn comes back round, rather than flashing past in one step
+    and being missed. A narrower window wants ``entered_on_turn`` on
+    ``Permanent``, which is a state-model change and a bigger one than this.
+
+    Unlike ``triggers_at`` this takes no ``your_turn``: a permanent can arrive
+    on either player's turn, and whose turn it is says nothing about whether
+    its arrival trigger was resolved.
     """
-    covered = set(AT_STEP.values()) | EVENT_DRIVEN
-    return covered == set(TriggerEvent)
+    arrived = [permanent for permanent in battlefield if permanent.summoning_sick]
+    if not arrived:
+        return ()
+    fresh = {permanent.instance_id for permanent in arrived}
+    return tuple(
+        Reminder(permanent.instance_id, names(permanent.card.oracle_id), ability.trigger.event)
+        for permanent in battlefield
+        for ability in abilities(permanent.card.oracle_id)
+        if isinstance(ability, TriggeredAbility)
+        if _arrived_for(ability.trigger.event, permanent.instance_id, fresh)
+    )
+
+
+def _arrived_for(event: TriggerEvent, instance_id: InstanceId, fresh: set[InstanceId]) -> bool:
+    """Whether this arrival trigger has something to fire on."""
+    if event is TriggerEvent.ENTERS:
+        return instance_id in fresh
+    if event is TriggerEvent.ANOTHER_CREATURE_ENTERS:
+        return bool(fresh - {instance_id})
+    return False
+
+
+def every_event_is_classified() -> bool:
+    """Whether each trigger event is clock-, arrival- or event-driven.
+
+    Checked by a test rather than asserted at import: a new event that is none
+    of them would never fire and nothing would say so. That is not a
+    hypothetical -- every trigger in the Beginner Box sat in ``EVENT_DRIVEN``,
+    which this function was perfectly happy with, and the panel was dead for
+    two milestones before a self-play season counted how often it fired.
+    """
+    covered = set(AT_STEP.values()) | ON_ARRIVAL | EVENT_DRIVEN
+    return covered == set(TriggerEvent) and not (ON_ARRIVAL & EVENT_DRIVEN)
