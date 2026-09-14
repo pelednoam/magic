@@ -22,9 +22,10 @@ it points at is printed underneath the answer for them to read.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol
+
+from mtgcoach.rules.citations import resolved
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -48,11 +49,8 @@ class Answer:
     unsure: str = ""
 
 
-#: A citation written as "rule 702.19b" or "Rule 702.19b".
-_PREFIX = re.compile(r"^rules?\s+", re.IGNORECASE)
-
-#: The title a model copies out of the quoted passage: "702.19b (Trample)".
-_TRAILING_TITLE = re.compile(r"\s*\([^()]*\)\s*$")
+#: How much model text a refusal may quote back.
+_READABLE = 80
 
 
 class Asker(Protocol):
@@ -82,8 +80,13 @@ def settle(answer: Answer, supplied: Sequence[Passage]) -> tuple[Answer, tuple[s
     after resolving, a citation is either one of the supplied references or it
     is reported.
     """
-    resolved = _resolved(answer, supplied)
-    return resolved, verify(resolved, supplied)
+    settled = Answer(
+        answer.answer,
+        answer.in_short,
+        resolved(answer.citations, supplied),
+        answer.unsure,
+    )
+    return settled, verify(settled, supplied)
 
 
 def verify(answer: Answer, supplied: Sequence[Passage]) -> tuple[str, ...]:
@@ -91,50 +94,22 @@ def verify(answer: Answer, supplied: Sequence[Passage]) -> tuple[str, ...]:
     return (*_check_citations(answer, supplied), *_check_substance(answer))
 
 
-def _resolved(answer: Answer, supplied: Sequence[Passage]) -> Answer:
-    """The answer with each citation rewritten to the reference it names.
-
-    A key two supplied references share is dropped rather than resolved. The
-    normalisation is lossy by design -- it takes decoration off -- so it can in
-    principle map two of them together, and quietly picking one would rewrite a
-    citation into a rule the model did not name. Left as written, it either
-    matches something exactly or is reported.
-    """
-    known: dict[str, str] = {}
-    ambiguous: set[str] = set()
-    for passage in supplied:
-        key = _names(passage.reference)
-        if key in known and known[key] != passage.reference:
-            ambiguous.add(key)
-        known[key] = passage.reference
-    cited = tuple(
-        dict.fromkeys(
-            c if _names(c) in ambiguous else known.get(_names(c), c) for c in answer.citations
-        )
-    )
-    return Answer(answer.answer, answer.in_short, cited, answer.unsure)
-
-
-def _names(citation: str) -> str:
-    """What a citation refers to, with the decoration taken off.
-
-    Narrow on purpose. Brackets, a "rule" prefix, a trailing title and trailing
-    punctuation all come off; the digits do not. "702.19b" and "702.19c" stay
-    different, which is the only thing this must never get wrong.
-    """
-    bare = citation.strip().strip("[]").strip()
-    bare = _PREFIX.sub("", bare)
-    bare = _TRAILING_TITLE.sub("", bare)
-    return bare.strip().rstrip(".,;").casefold()
-
-
 def _check_citations(answer: Answer, supplied: Sequence[Passage]) -> tuple[str, ...]:
     """Every rule it cites has to be one that was in the prompt."""
     given = {passage.reference for passage in supplied}
     invented = [cited for cited in answer.citations if cited not in given]
     if invented:
-        return (f"cites rules it was not given: {', '.join(sorted(invented))}",)
+        return (f"cites rules it was not given: {_short(', '.join(sorted(invented)))}",)
     return ()
+
+
+def _short(value: str) -> str:
+    """Model text, cut to a length a person can read.
+
+    This ends up in the refusal on screen and every character of it came out of
+    a model; there is no length a malformed citation cannot be.
+    """
+    return value if len(value) <= _READABLE else value[:_READABLE] + "..."
 
 
 def _check_substance(answer: Answer) -> tuple[str, ...]:

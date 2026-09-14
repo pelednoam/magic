@@ -144,3 +144,13 @@ def test_a_slow_command_is_killed_as_a_group() -> None:
 def _itself(pid: int) -> int:
     """A `getpgid` for a process that is its own group leader."""
     return pid
+
+
+def test_the_guard_against_running_the_real_command_is_loaded() -> None:
+    """`-p noclaude` is resolved through `pythonpath`, which is ini ordering.
+
+    If that ever stops working the guard silently disappears and the first test
+    to forget a stand-in spends real quota. This notices.
+    """
+    with pytest.raises(AssertionError, match="tried to run the real"):
+        subprocess.run(["/usr/local/bin/claude", "-p"], check=False)

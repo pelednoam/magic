@@ -47,6 +47,10 @@ if TYPE_CHECKING:
 #: text, and both are answered better by saying so than by forwarding it.
 MAX_QUESTION = 500
 
+#: The longest seat name worth echoing back. The real ones are "you" and
+#: "them"; anything longer is not a seat and does not need quoting in full.
+MAX_SEAT = 40
+
 
 @contextmanager
 def _one_at_a_time(server: Server) -> Generator[None]:
@@ -126,7 +130,9 @@ def _seat(server: Server, session_id: str, body: dict[str, str]) -> tuple[Sessio
             player at the table sends.
     """
     game = session(server, session_id)
-    player = PlayerId(body.get("player", "you"))
+    player = PlayerId(body.get("player", "you")[:MAX_SEAT])
     if player not in game.state.players:
-        raise HTTPException(HTTP_400_BAD_REQUEST, f"no player {player}")
+        # Truncated above, so the message cannot be a megabyte of whatever was
+        # posted -- this reaches a client, and the CORS policy is `*`.
+        raise HTTPException(HTTP_400_BAD_REQUEST, f"no player {player!r}")
     return game, player

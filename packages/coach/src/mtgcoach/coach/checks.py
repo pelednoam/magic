@@ -53,7 +53,7 @@ def play(explanation: Explanation, report: TurnReport) -> tuple[str, ...]:
         return ()
     card = next((c for c in report.hand if str(c.instance_id) == explanation.play), None)
     if card is None:
-        return (f"recommends playing {_short(explanation.play)}, which is not in hand",)
+        return (f"recommends playing {_short(explanation.play)!r}, which is not in hand",)
     if not card.playable:
         because = "; ".join(card.reasons)
         return (f"recommends playing {card.name}, which cannot be played: {because}",)
@@ -87,7 +87,8 @@ def attack(explanation: Explanation, report: TurnReport) -> tuple[str, ...]:
     for plan in offered(report):
         if tuple(sorted(str(c.instance_id) for c in plan.attackers)) == wanted:
             return ()
-    return (f"recommends an attack the engine did not evaluate: {_short(str(list(wanted)))}",)
+    named = _short(", ".join(wanted))
+    return (f"recommends an attack the engine did not evaluate: {named}",)
 
 
 def _short(value: str) -> str:
@@ -95,8 +96,10 @@ def _short(value: str) -> str:
 
     These strings end up in the refusal shown on screen, and every one of them
     came out of a model -- there is no length a malformed ``play`` cannot be.
+    No ``repr``: the caller decides how to present it, and wrapping a list's
+    ``str`` in one produced a line of escaped quotes nobody could read.
     """
-    return repr(value if len(value) <= _READABLE else value[:_READABLE] + "...")
+    return value if len(value) <= _READABLE else value[:_READABLE] + "..."
 
 
 def honesty(explanation: Explanation, report: TurnReport) -> tuple[str, ...]:

@@ -14,7 +14,9 @@ it does catch the thing that actually happens, which is a CLI release moving
 them.
 
 Skipped, loudly, when ``claude`` is not installed: this is a check on the local
-environment, and a machine without the CLI cannot run the coach anyway.
+environment, and a machine without the CLI cannot run the coach anyway. That
+does mean a green run on such a machine says nothing about the lockdown, which
+is why the skip prints rather than passing silently.
 """
 
 from __future__ import annotations
@@ -95,7 +97,8 @@ def main() -> int:
     for flag in absent:
         print(f"`claude --help` no longer mentions {flag}")
     if absent:
-        print("\nThe coach's tool lockdown may not be applied. Check services/api/claude.py.")
+        print("\nThe coach's tool lockdown may not be applied.")
+        print("Check services/api/src/mtgcoach/api/claude.py.")
         return 1
     return 0
 

@@ -15,7 +15,7 @@ M6 is built, on `m6`, and both halves check themselves:
 
 - The **turn coach**. `coach/advice.py` says what an explanation may be and checks every one
   against the engine; `coach/briefing.py` builds the prompt out of the engine's own report.
-- **Rules Q&A**. `packages/rules` parses the Comprehensive Rules into 3,480 quotable passages
+- **Rules Q&A**. `packages/rules` parses the Comprehensive Rules into a few thousand quotable passages
   and indexes them in SQLite FTS5. A question is searched *first*, the passages go into the
   prompt verbatim, and an answer citing anything else is refused.
 
@@ -1019,7 +1019,7 @@ ensemble review (§6) before the next begins.
 | **M3** ✅ | Effect extraction pipeline + review CLI + FDN golden fixture and signed manifest. Card explainer CLI. | Useful immediately; proves the build-time Claude pattern *and* the multi-set pipeline in one go. |
 | **M4** ✅ | Mana solver, legality, trigger scanner, combat simulator. Hypothesis suites. Convergence-loop review. | The engine. This is what makes it a coach rather than a notepad. |
 | **M5** ✅ | FastAPI + WebSocket; Expo app as a **manual** tracker (tap cards in from your decklist). | **Probably 70% of the total value.** Ship before touching the camera. |
-| **M6** | Claude coach + rules Q&A over M4's output. **Done.** | Turns correct answers into understandable ones. |
+| **M6** | Claude coach + rules Q&A over M4's output. Built and reviewed; on `m6`. | Turns correct answers into understandable ones. |
 | **M7** | Single-card scan, then board scan → state diff → one-tap accept. Accuracy corpus. | The original ask, now with a tracker behind it to correct mistakes. |
 | **M8** | Web view on the laptop; teaching features — quiz mode, end-of-game review, son's tablet view. | The reason to build this instead of buying a rules app. |
 | **M9** | Enable a second set end-to-end as a **test of the abstraction**, not a feature. | If set #2 takes an evening, the design held. If it takes a week, we learn exactly where. |

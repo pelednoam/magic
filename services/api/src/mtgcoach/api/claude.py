@@ -24,7 +24,9 @@ and made something up instead, which is the failure mode we want.
 
 from __future__ import annotations
 
+import atexit
 import os
+import shutil
 import signal
 import subprocess
 import tempfile
@@ -59,7 +61,12 @@ def _scratch() -> Path:
     question this server asks. ``mkdtemp`` is 0700 and unguessable, which
     closes it; made once per process because the directory is a constant.
     """
-    return Path(tempfile.mkdtemp(prefix="mtgcoach-coach-"))
+    made = Path(tempfile.mkdtemp(prefix="mtgcoach-coach-"))
+    # Every run would otherwise leave one behind. It is empty and 0700, so the
+    # cost is an inode, but a server restarted nightly for a year is 365 of
+    # them and somebody eventually has to wonder what they are.
+    atexit.register(lambda: shutil.rmtree(made, ignore_errors=True))
+    return made
 
 
 @dataclass(frozen=True, slots=True)
@@ -180,5 +187,5 @@ def _kill_group(process: subprocess.Popen[str]) -> None:
     """
     with suppress(OSError):
         os.killpg(os.getpgid(process.pid), signal.SIGKILL)
-    with suppress(OSError, ValueError):
+    with suppress(OSError, ValueError, subprocess.TimeoutExpired):
         process.wait(timeout=5)

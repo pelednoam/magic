@@ -23,9 +23,6 @@ from mtgcoach.rules.answer import Answer
 from wire import flag, obj, rows, text, words
 
 HTTP_OK = 200
-HTTP_BAD_REQUEST = 400
-HTTP_NOT_FOUND = 404
-HTTP_UNAVAILABLE = 503
 
 GOOD = Answer(
     answer="Lethal damage goes to the blocker first; the rest tramples over.",

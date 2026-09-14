@@ -27,8 +27,10 @@ DEFAULT_ROOTS: Final[tuple[str, ...]] = (
     "services",
     "tools",
     "tests",
-    "apps/mobile/src",
-    "apps/mobile/tests",
+    # The whole app, not just `src` and `tests`: `App.tsx` and the configs sit
+    # at its root, and a limit that skips the entry point is not the limit.
+    # `SKIP` keeps `node_modules` and the build output out.
+    "apps/mobile",
 )
 
 #: What counts as a module here. Not ``.json`` or ``.md``: the limit is about

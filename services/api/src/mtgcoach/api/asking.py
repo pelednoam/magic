@@ -21,7 +21,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from mtgcoach.rules.answer import refusal, settle
-from mtgcoach.rules.question import ask as briefing_for
+from mtgcoach.rules.question import brief
 
 if TYPE_CHECKING:
     from mtgcoach.api.context import Position
@@ -42,7 +42,7 @@ def answered(
         ExplainerError: If no answer could be got at all.
     """
     passages = index.search(question)
-    briefing = briefing_for(question, passages, position.report, position.board)
+    briefing = brief(question, passages, position.report, position.board)
     said, problems = settle(asker.ask(question, briefing), passages)
     return {
         "answer": _answer(refusal(problems) if problems else said),

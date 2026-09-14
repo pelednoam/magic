@@ -30,6 +30,12 @@ export interface Explanation {
   readonly because: string;
   /** One or two sentences for whoever is learning. §3's whole point. */
   readonly in_short: string;
+  /**
+   * Things that will go wrong if they are not noticed — or, when `trusted` is
+   * false, the checker's own objections to the answer it replaced. The panel
+   * labels them differently in that case, because "the coach recommended a
+   * card that is not in your hand" is not a warning about the game.
+   */
   readonly watch_out: readonly string[];
   /** What the engine could not work out. Shown, never hidden. */
   readonly check_yourself: readonly string[];

@@ -60,18 +60,30 @@ Reply with this JSON object and nothing else:
 """
 
 
-def ask(
+def brief(
     question: str,
     passages: Sequence[Passage],
     report: TurnReport | None = None,
     board: Table | None = None,
 ) -> str:
-    """The whole prompt for one question."""
-    parts = [RULES, _question(question), _passages(passages)]
+    """The whole prompt for one question.
+
+    In the order this module's docstring claims: the rules, then the board,
+    then -- last -- the thing a player typed. Everything above the question is
+    the server's own text, so the only untrusted span in the prompt is the one
+    at the bottom, inside the fence, with nothing after it for an injection to
+    reach. The question used to come first, which put it in front of every
+    fact and contradicted the docstring above it.
+
+    Named ``brief`` to match ``coach.briefing.brief``, and to stop colliding
+    with ``Asker.ask`` -- one builds a prompt and the other sends it.
+    """
+    parts = [RULES, _passages(passages)]
     if report is not None:
         parts.append(_turn(report))
     if board is not None:
         parts.append(_board(board))
+    parts.append(_question(question))
     return "\n".join(parts)
 
 
