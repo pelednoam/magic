@@ -27,7 +27,8 @@ from typing import TYPE_CHECKING
 import pytest
 from fastapi.testclient import TestClient
 
-from helpers_api import server
+from helpers_api import Canned, server
+from mtgcoach.coach.advice import Explanation
 from wire import decoded, named, rows, text
 
 if TYPE_CHECKING:
@@ -64,7 +65,17 @@ def sent() -> frozenset[str]:
     "what does this server ever send", not "what is in one response".
     """
     found: set[str] = set()
-    with TestClient(server()) as client:
+    # A canned answer carrying every field, so the coach route contributes its
+    # whole shape. The words are never read here -- `views.explanation` emits
+    # all six keys whatever they hold -- but an empty one would be indistinguish-
+    # able from a route that had stopped sending them.
+    said = Explanation(
+        because="because",
+        in_short="in short",
+        watch_out=("watch out",),
+        check_yourself=("check yourself",),
+    )
+    with TestClient(server(explainer=Canned(said))) as client:
         created = decoded(client.post("/games", json={"you": "green", "them": "other"}).json())
         session_id = created["session_id"]
         assert isinstance(session_id, str)
@@ -104,6 +115,12 @@ def sent() -> frozenset[str]:
 
         for _ in range(STEPS_IN_A_TURN):
             act(type="advance_step")
+
+        # The coach route, whose payload is a different shape from the snapshot
+        # and reaches the same screen.
+        coached = client.post(f"/games/{session_id}/coach", json={"player": "you"})
+        assert coached.status_code == HTTP_OK, coached.text
+        found.update(_keys(decoded(coached.json())))
     return frozenset(found)
 
 
@@ -141,5 +158,14 @@ def test_the_server_sends_every_field_the_app_declares(sent: frozenset[str]) -> 
 
 def test_the_turn_actually_covers_the_payload(sent: frozenset[str]) -> None:
     """Guard on the guard: a turn that reached nothing would check nothing."""
-    corners = {"tapped", "they_lose", "tap", "keep", "event", "payment", "unknown"}
+    corners = {
+        "tapped",
+        "they_lose",
+        "tap",
+        "keep",
+        "event",
+        "payment",
+        "unknown",
+        "check_yourself",
+    }
     assert corners <= sent

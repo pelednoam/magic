@@ -82,6 +82,43 @@ export interface Advice {
   readonly unknown: readonly string[];
 }
 
+/**
+ * What Claude said about a turn, once the engine has checked it.
+ *
+ * `play` and `attack` are identifiers, not names: they are a *choice among the
+ * options above*, and the server rejected the answer outright if they were
+ * anything else. The app looks them up in `advice.hand` and `advice.attacks`
+ * rather than printing them, so a coached recommendation and the engine's own
+ * list are always talking about the same card.
+ */
+export interface Explanation {
+  /** An `instance_id` from `advice.hand`, or empty for "play nothing". */
+  readonly play: string;
+  /** `instance_id`s matching one of `advice.attacks.plans`. */
+  readonly attack: readonly string[];
+  /** Two or three sentences for whoever is teaching. */
+  readonly because: string;
+  /** One or two sentences for whoever is learning. §3's whole point. */
+  readonly in_short: string;
+  readonly watch_out: readonly string[];
+  /** What the engine could not work out. Shown, never hidden. */
+  readonly check_yourself: readonly string[];
+}
+
+/** The coach route's reply. */
+export interface Coaching {
+  readonly explanation: Explanation;
+  /**
+   * Whether the engine agreed with what the coach said.
+   *
+   * False means `explanation` is the refusal text, not advice: the model
+   * recommended something the engine had not offered, and the server replaced
+   * it. The screen has to say so -- showing a refusal as though it were advice
+   * is the one failure this whole layer exists to prevent.
+   */
+  readonly trusted: boolean;
+}
+
 /** One card, by both of its identities and the word printed on it. */
 export interface Card {
   readonly instance_id: string;
@@ -159,6 +196,37 @@ export function isSnapshot(value: unknown): value is Snapshot {
   // caused it, which is the worst place for a type error to surface.
   const players = asObject(state["players"]);
   return players !== null && hasSeats(players) && hasSeats(advice);
+}
+
+/**
+ * Whether a decoded response is shaped like the coach's reply.
+ *
+ * Same reasoning as `isSnapshot`, and more necessary: this payload started life
+ * inside a language model, and the only thing between it and the screen is the
+ * server's check and this one.
+ */
+export function isCoaching(value: unknown): value is Coaching {
+  const body = asObject(value);
+  if (body === null || typeof body["trusted"] !== "boolean") {
+    return false;
+  }
+  const explanation = asObject(body["explanation"]);
+  if (explanation === null) {
+    return false;
+  }
+  return (
+    typeof explanation["play"] === "string" &&
+    typeof explanation["because"] === "string" &&
+    typeof explanation["in_short"] === "string" &&
+    isStrings(explanation["attack"]) &&
+    isStrings(explanation["watch_out"]) &&
+    isStrings(explanation["check_yourself"])
+  );
+}
+
+/** An array of strings, and nothing else. */
+function isStrings(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
 /** Both seats present, because the screen reads both. */

@@ -3,15 +3,19 @@
 An assistant for learning Magic: The Gathering at the kitchen table. Point a phone at a card
 or at the board, and get a clear answer to *"what can I do this turn, and what should I do?"*
 
-**Status:** M0–M4 merged to `main`. The engine is done: 780 tests, 100% line and branch, with
-**52% of the Beginner Box fully modelled** and eleven keywords implemented. M4 took four rounds
-of ensemble review, with every finding fixed by hand; the fourth found nothing blocking in the
-engine. M0–M5 merged to `main`. The tracker works end to end: `packages/coach` turns the four solvers
-into a turn report, `services/api` holds the authoritative game over HTTP and a WebSocket, and
-`apps/mobile` is a two-seat Expo client for Android, tablet and the browser. 948 Python tests
-at 100% line and branch, 38 TypeScript tests, and an end-to-end suite driving a real turn
-against the real card store and the real sealed fixture. Two rounds of ensemble review on M5,
-with every finding fixed by hand. M6 — the Claude coach and rules Q&A — is next; see §10.
+**Status:** M0–M5 merged to `main`; M6 in progress on `m6`.
+
+The engine is done — **52% of the Beginner Box fully modelled**, eleven keywords — and the
+tracker works end to end: `packages/coach` turns the four solvers into a turn report,
+`services/api` holds the authoritative game over HTTP and a WebSocket, and `apps/mobile` is a
+two-seat Expo client for Android, tablet and the browser. M4 took four rounds of ensemble
+review and M5 two, with every finding fixed by hand.
+
+M6 has landed its first half: the **turn coach**. `advice.py` states what an explanation may
+be and checks every one against the engine; `briefing.py` builds the prompt out of the
+engine's own report; `api/explainer.py` asks Claude through the local CLI, so a turn's advice
+costs no API credits; and the app has a "Coach me" panel that shows a refusal as a refusal.
+1030 Python tests at 100% line and branch, 57 TypeScript tests. Rules Q&A is next; see §10.
 
 ---
 

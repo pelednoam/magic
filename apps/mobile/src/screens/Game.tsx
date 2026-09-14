@@ -7,17 +7,18 @@
  * rules engine written in the language chosen for not having one.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { Attacks } from "../components/Attacks";
 import { Board } from "../components/Board";
+import { Coaching } from "../components/Coaching";
 import { Hand } from "../components/Hand";
 import { Reminders, Unknown } from "../components/Reminders";
 import type { Coach } from "../client";
 import { turnLine } from "../format";
 import { colour, space, text } from "../theme";
-import type { NewGame, Permanent, Playable, Snapshot } from "../wire";
+import type { Coaching as Reply, NewGame, Permanent, Playable, Snapshot } from "../wire";
 import { isSnapshot } from "../wire";
 import { THEM, YOU } from "../wire";
 
@@ -75,6 +76,44 @@ export function Game({
     return () => { socket.close(); };
   }, [accept, coach, game.session_id]);
 
+  // Claude's answer, kept separately from the board and cleared whenever the
+  // board moves. Advice about a turn that has already changed is worse than no
+  // advice: it reads as current, and it is about a position nobody is in.
+  const [reply, setReply] = useState<Reply | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [unavailable, setUnavailable] = useState("");
+  // The version as the callbacks below see it, which is not the version the
+  // callback closed over: `ask` is created once per render, and its promise
+  // resolves a minute later.
+  const version = useRef(snapshot.version);
+  useEffect(() => {
+    version.current = snapshot.version;
+    setReply(null);
+    setUnavailable("");
+  }, [snapshot.version]);
+
+  const ask = useCallback(() => {
+    setAsking(true);
+    setUnavailable("");
+    // The version at the moment of asking. A minute is long enough for someone
+    // to play a card while the model is thinking, and an answer about the board
+    // as it was must not arrive looking like an answer about the board as it is.
+    const asked = version.current;
+    coach
+      .explain(game.session_id, seat)
+      .then((answer: Reply) => {
+        if (asked === version.current) {
+          setReply(answer);
+        }
+      })
+      .catch((error: unknown) => {
+        if (asked === version.current) {
+          setUnavailable(messageOf(error));
+        }
+      })
+      .finally(() => { setAsking(false); });
+  }, [coach, game.session_id, seat]);
+
   const act = useCallback(
     async (event: Record<string, unknown>): Promise<void> => {
       setProblem("");
@@ -116,6 +155,14 @@ export function Game({
         }}
       />
       <Attacks attacks={advice.attacks} />
+      <Coaching
+        reply={reply}
+        asking={asking}
+        problem={unavailable}
+        hand={advice.hand}
+        plans={advice.attacks.plans}
+        onAsk={ask}
+      />
       <Board
         title="Your battlefield"
         player={mine}

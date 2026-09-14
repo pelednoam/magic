@@ -7,7 +7,8 @@
  * not "400").
  */
 
-import type { NewGame, Snapshot } from "./wire";
+import type { Coaching, NewGame, Snapshot } from "./wire";
+import { isCoaching } from "./wire";
 
 /** The server refused, and said why. */
 export class ServerError extends Error {
@@ -58,6 +59,27 @@ export class Coach {
   /** Take the last event back. */
   async undo(sessionId: string): Promise<Snapshot> {
     return this.send<Snapshot>("POST", `/games/${segment(sessionId)}/undo`, {});
+  }
+
+  /**
+   * Ask Claude about this turn.
+   *
+   * Slow on purpose -- it is a subprocess on the server, not a lookup -- and
+   * separate from every other call for exactly that reason. The engine's own
+   * advice is already on screen and arrived instantly; this is the button you
+   * press when that is not enough.
+   *
+   * A 503 means no answer could be got at all. That is a `ServerError` like
+   * any other, and the panel it is shown in is the only thing that changes.
+   */
+  async explain(sessionId: string, player: string): Promise<Coaching> {
+    const body = await this.send<unknown>("POST", `/games/${segment(sessionId)}/coach`, {
+      player,
+    });
+    if (!isCoaching(body)) {
+      throw new ServerError(0, "the server sent an answer this app cannot read");
+    }
+    return body;
   }
 
   /**

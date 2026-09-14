@@ -89,3 +89,27 @@ export function permanentNote(permanent: Permanent): string {
   }
   return notes.join(" · ");
 }
+
+/**
+ * The plan whose attackers are exactly these, or undefined.
+ *
+ * The server already established that one exists before it passed the coach's
+ * answer on; this finds it again so the screen prints the engine's names and
+ * the engine's numbers rather than anything the model wrote. Compared as a set,
+ * because the order a model lists creatures in means nothing.
+ */
+export function planFor(
+  plans: readonly Plan[],
+  wanted: readonly string[],
+): Plan | undefined {
+  if (wanted.length === 0) {
+    return undefined;
+  }
+  const sought = key(wanted);
+  return plans.find((plan) => key(plan.attacker_ids) === sought);
+}
+
+/** A set of identifiers, as one comparable string. */
+function key(ids: readonly string[]): string {
+  return [...ids].sort().join("|");
+}

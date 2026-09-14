@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
 
+    from mtgcoach.coach.advice import Explanation
     from mtgcoach.coach.attacks import Attacks
     from mtgcoach.coach.report import Playable, TurnReport
     from mtgcoach.core.cards import CardInstance
@@ -53,6 +54,18 @@ def report(turn: TurnReport) -> dict[str, Json]:
         "attacks": attacks(turn.attacks),
         "reminders": [reminder(r) for r in turn.reminders],
         "unknown": list(turn.unknown),
+    }
+
+
+def explanation(advice: Explanation) -> dict[str, Json]:
+    """What the coach said, once the engine has agreed with it."""
+    return {
+        "play": advice.play,
+        "attack": list(advice.attack),
+        "because": advice.because,
+        "in_short": advice.in_short,
+        "watch_out": list(advice.watch_out),
+        "check_yourself": list(advice.check_yourself),
     }
 
 

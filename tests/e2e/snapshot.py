@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 
 HTTP_OK = 200
 HTTP_BAD_REQUEST = 400
+HTTP_UNAVAILABLE = 503
 
 #: Enough advances to reach the other player's combat from anywhere.
 STEPS_IN_TWO_TURNS = 24
@@ -83,3 +84,16 @@ def refuse(client: TestClient, session_id: str, **event: object) -> str:
     response = client.post(f"/games/{session_id}/events", json=event)
     assert response.status_code == HTTP_BAD_REQUEST, response.text
     return text(decoded(response.json()), "detail")
+
+
+def ask(client: TestClient, session_id: str, player: str = "you") -> dict[str, object]:
+    """Ask the coach about a player's turn."""
+    response = client.post(f"/games/{session_id}/coach", json={"player": player})
+    assert response.status_code == HTTP_OK, response.text
+    return decoded(response.json())
+
+
+def no_coach(client: TestClient, session_id: str) -> None:
+    """Ask the coach and require that it was not available."""
+    response = client.post(f"/games/{session_id}/coach", json={"player": "you"})
+    assert response.status_code == HTTP_UNAVAILABLE, response.text

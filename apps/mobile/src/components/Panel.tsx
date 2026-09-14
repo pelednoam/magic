@@ -11,7 +11,10 @@ export function Panel({
   children,
 }: {
   readonly title: string;
-  readonly note?: string;
+  // `| undefined` spelled out because `exactOptionalPropertyTypes` is on: a
+  // caller computing the note (`asking ? "thinking…" : undefined`) is passing
+  // undefined, which is different from not passing the prop at all.
+  readonly note?: string | undefined;
   readonly children: ReactNode;
 }) {
   return (

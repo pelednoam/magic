@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 import pytest
 from fastapi.testclient import TestClient
 
+from helpers_api import NoCoach
 from mtgcoach.api.app import create_app
 from mtgcoach.api.cards import build
 from mtgcoach.carddata.scryfall import cards_in
@@ -28,6 +29,8 @@ from mtgcoach.core.ids import SetCode
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from mtgcoach.api.cards import Catalogue
 
 
 REPO = Path(__file__).resolve().parent.parent.parent
@@ -51,11 +54,22 @@ HTTP_BAD_REQUEST = 400
 
 
 @pytest.fixture(scope="module")
-def client() -> Iterator[TestClient]:
-    """A server holding the real card data, over a real store."""
+def catalogue() -> Catalogue:
+    """The real Foundations cards, read the way the real server reads them."""
     with CardStore.open() as store:
         store.add((card, SetCode("FDN")) for card in cards_in(CARDS))
-        catalogue = build(store.cards_in_set(SetCode("FDN")), EFFECTS)
-    app = create_app(catalogue, {"green": GREEN, "white": WHITE})
+        return build(store.cards_in_set(SetCode("FDN")), EFFECTS)
+
+
+@pytest.fixture(scope="module")
+def client(catalogue: Catalogue) -> Iterator[TestClient]:
+    """A server holding the real card data, over a real store.
+
+    The explainer is the one that refuses: everything below it is real, and a
+    test that reached the actual ``claude`` command would be slow, would cost
+    quota, and would pass or fail for reasons this repository does not control.
+    ``test_coaching`` supplies its own.
+    """
+    app = create_app(catalogue, {"green": GREEN, "white": WHITE}, NoCoach())
     with TestClient(app) as connected:
         yield connected
