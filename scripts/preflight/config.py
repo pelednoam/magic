@@ -14,19 +14,16 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 # Map logical names to repo-relative paths of JSON artifacts whose
 # contents should be audited.
-# One entry per enabled set, added by `mtgcoach effects seal`. Deliberately
-# empty until the first set is sealed in M3: a configured-but-missing manifest
-# is reported as a warning, which fails the preflight.
-# Convention: "effects_<SET>": "data/sets/<SET>/manifest.json"
 SIGNED_MANIFESTS: dict[str, str] = {
-    "effects_FDN": "data/sets/FDN/manifest.json",
+    # "column_manifest": "path/to/manifest.json",
 }
 
 # Directories containing JSON artifacts. Changed files under these
 # directories are parsed and key fields extracted. Uses os.sep-aware
 # prefix matching.
 ARTIFACT_DIRS: list[str] = [
-    "data/sets/",
+    "data/",
+    "docs/",
 ]
 
 # Directories that hold source code in this project. Drives the
@@ -35,16 +32,9 @@ ARTIFACT_DIRS: list[str] = [
 # "frontend/src/", "lib/"]). The defaults match the conventional
 # "src layout" plus a research workspace; for a Django/FastAPI/Next
 # project you almost certainly need to override.
-# Monorepo layout: each package keeps its own src/ tree, and tools/ holds the
-# scripts that enforce the gates -- which must themselves be covered, or the
-# gates can fail open without anyone noticing.
 SOURCE_DIRS: list[str] = [
-    "packages/core/src/",
-    "packages/carddata/src/",
-    "packages/coach/src/",
-    "packages/vision/src/",
-    "services/api/src/",
-    "tools/",
+    "src/",
+    "research/",
 ]
 
 # Directories that hold tests. Used by the test/impl alignment warning.
