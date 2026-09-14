@@ -132,21 +132,46 @@ def test_undo_on_a_game_that_does_not_exist() -> None:
         assert client.post("/games/nope/undo").status_code == HTTP_NOT_FOUND
 
 
-def test_every_snapshot_says_how_far_the_game_has_got() -> None:
-    """The client's only ordering: HTTP replies and broadcasts race."""
+def test_the_version_only_ever_goes_up() -> None:
+    """It is the client's only ordering, and undo is a change like any other.
+
+    Counting *events* made it go backwards on undo -- and the client keeps a
+    snapshot unless the new one is at least as new, so it discarded every undo
+    and undo silently did nothing. This test used to pin that: it asserted the
+    undo snapshot came back as 0.
+    """
     with TestClient(server()) as client:
         session_id = _new_game(client)
-        first = decoded(client.get(f"/games/{session_id}").json())
-        assert number(first, "version") == 0
+        seen = [number(decoded(client.get(f"/games/{session_id}").json()), "version")]
+        seen.append(
+            number(
+                decoded(
+                    client.post(
+                        f"/games/{session_id}/events",
+                        json={"type": "change_life", "player": "you", "amount": -1},
+                    ).json()
+                ),
+                "version",
+            )
+        )
+        seen.append(number(decoded(client.post(f"/games/{session_id}/undo").json()), "version"))
+        assert seen == sorted(seen), f"versions went backwards: {seen}"
+        assert len(set(seen)) == len(seen), f"two states shared a version: {seen}"
+
+
+def test_an_undo_is_newer_than_the_event_it_undid() -> None:
+    """Otherwise the client cannot tell the undo from the thing being undone."""
+    with TestClient(server()) as client:
+        session_id = _new_game(client)
         after = decoded(
             client.post(
                 f"/games/{session_id}/events",
                 json={"type": "change_life", "player": "you", "amount": -1},
             ).json()
         )
-        assert number(after, "version") == 1
         undone = decoded(client.post(f"/games/{session_id}/undo").json())
-        assert number(undone, "version") == 0
+        assert number(undone, "version") > number(after, "version")
+        assert number(undone, "state", "players", "you", "life") == 20
 
 
 def test_a_deck_too_short_to_deal_is_a_bad_request() -> None:

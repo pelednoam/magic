@@ -44,10 +44,11 @@ def _check_land(event: PlayLand, state: GameState, lookup: CardLookup) -> None:
     very same response read "you can only play lands in a main phase". A server
     that contradicts its own coach is worse than one that is merely strict.
 
-    An unmodelled card is still allowed through. That is the same choice the
-    coach makes everywhere else: at 52% of the box modelled, refusing what we
-    cannot identify would make the tracker unusable, and the player can see
-    their own card.
+    A card the coach cannot *identify* is refused. That is a different thing
+    from one whose abilities are unmodelled -- 59 of the box's cards are the
+    second kind, they have facts, and they play normally. The first kind is a
+    card the store has never seen, and nothing about it says "land": treating
+    unknown as permitted reopened the hole this function exists to close.
     """
     player = state.player(event.player)
     card = next((c for c in player.hand if c.instance_id == event.instance_id), None)
@@ -56,7 +57,13 @@ def _check_land(event: PlayLand, state: GameState, lookup: CardLookup) -> None:
         return
     facts = lookup.facts(card.oracle_id)
     if facts is None:
-        return
+        # No facts means the store has never seen this card, or its cost could
+        # not be parsed -- not that its *abilities* are unmodelled, which is a
+        # separate question with a separate answer (`modelled`). So nothing
+        # here says it is a land, and letting it through reopened exactly the
+        # hole this function exists to close.
+        msg = f"{card.oracle_id}: the coach does not know this card, so it cannot play it as a land"
+        raise BadEventError(msg)
     reasons = why_not_play_land(state, event.player, facts)
     if reasons:
         msg = f"{facts.name}: {reasons[0]}"

@@ -144,13 +144,37 @@ export const THEM = "them";
  * boundary, so this is where the claim gets tested.
  */
 export function isSnapshot(value: unknown): value is Snapshot {
-  if (typeof value !== "object" || value === null) {
+  const body = asObject(value);
+  if (body === null || typeof body["version"] !== "number") {
     return false;
   }
-  const body = value as { state?: unknown; advice?: unknown; version?: unknown };
-  return isObject(body.state) && isObject(body.advice) && typeof body.version === "number";
+  const state = asObject(body["state"]);
+  const advice = asObject(body["advice"]);
+  if (state === null || advice === null) {
+    return false;
+  }
+  // Down to what the screen actually dereferences. Checking only that `state`
+  // is an object let `{state: {}}` through, and the crash arrived one render
+  // later inside `snapshot.state.players[YOU]` -- far from the frame that
+  // caused it, which is the worst place for a type error to surface.
+  const players = asObject(state["players"]);
+  return players !== null && hasSeats(players) && hasSeats(advice);
 }
 
-function isObject(value: unknown): boolean {
-  return typeof value === "object" && value !== null;
+/** Both seats present, because the screen reads both. */
+function hasSeats(value: Record<string, unknown>): boolean {
+  return asObject(value[YOU]) !== null && asObject(value[THEM]) !== null;
+}
+
+/**
+ * A plain object, or null.
+ *
+ * Arrays are excluded: `typeof [] === "object"` and `[] !== null`, so the
+ * looser check accepted a JSON array as a snapshot.
+ */
+function asObject(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
 }

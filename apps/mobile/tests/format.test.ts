@@ -140,27 +140,45 @@ describe("permanent notes", () => {
 });
 
 describe("a response is not a snapshot because we said so", () => {
+  const good = {
+    version: 0,
+    state: { players: { you: {}, them: {} } },
+    advice: { you: {}, them: {} },
+  };
+
   it("accepts the real shape", () => {
-    expect(isSnapshot({ version: 0, state: {}, advice: {} })).toBe(true);
+    expect(isSnapshot(good)).toBe(true);
   });
 
   it("rejects null, which a cast used to let through", () => {
     expect(isSnapshot(null)).toBe(false);
   });
 
-  it("rejects an object with no board", () => {
-    expect(isSnapshot({ version: 0, advice: {} })).toBe(false);
-  });
-
   it("rejects a string", () => {
     expect(isSnapshot("ok")).toBe(false);
   });
 
-  it("rejects a board that is not an object", () => {
-    expect(isSnapshot({ version: 0, state: "none", advice: {} })).toBe(false);
+  it("rejects an array, which is an object to `typeof`", () => {
+    expect(isSnapshot([])).toBe(false);
   });
 
   it("rejects a snapshot with no version, because ordering depends on it", () => {
-    expect(isSnapshot({ state: {}, advice: {} })).toBe(false);
+    expect(isSnapshot({ ...good, version: undefined })).toBe(false);
+  });
+
+  it("rejects a board with no players, which is what the screen reads", () => {
+    expect(isSnapshot({ ...good, state: {} })).toBe(false);
+  });
+
+  it("rejects a board missing a seat", () => {
+    expect(isSnapshot({ ...good, state: { players: { you: {} } } })).toBe(false);
+  });
+
+  it("rejects advice missing a seat", () => {
+    expect(isSnapshot({ ...good, advice: { you: {} } })).toBe(false);
+  });
+
+  it("rejects players that is an array", () => {
+    expect(isSnapshot({ ...good, state: { players: [] } })).toBe(false);
   });
 });

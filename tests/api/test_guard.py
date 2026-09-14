@@ -78,13 +78,22 @@ def test_a_second_land_is_refused_by_the_server_too() -> None:
         )
 
 
-def test_an_unmodelled_card_is_allowed_through() -> None:
-    """At 52% modelled, refusing what we cannot identify makes this unusable.
+def test_a_card_the_coach_cannot_identify_is_refused() -> None:
+    """Unknown is not permitted.
 
-    The player can see their own card. Refusing what we *can* identify is the
-    win; refusing what we cannot would be a different tool.
+    No facts means the store has never seen the card, not that its rules are
+    unmodelled -- different questions, different answers, and only the second
+    is common. Nothing about an unknown card says "land", so allowing it
+    reopened the hole this function exists to close.
     """
-    check(PlayLand(ME, InstanceId("card")), _game("Mystery"), BOOK)
+    with pytest.raises(BadEventError, match="does not know this card"):
+        check(PlayLand(ME, InstanceId("card")), _game("Mystery"), BOOK)
+
+
+def test_a_card_whose_rules_are_unmodelled_still_plays() -> None:
+    """59 of the box's cards are this: identified, priced, not understood."""
+    book = Book(cards={**BOOK.cards, "Odd": facts("Odd Land", land=True)})
+    check(PlayLand(ME, InstanceId("card")), _game("Odd"), book)
 
 
 def test_a_card_that_is_not_in_hand_is_left_to_the_reducer() -> None:

@@ -41,6 +41,11 @@ class Session:
     initial: GameState
     events: tuple[Event, ...]
     state: GameState
+    #: How many times this game has *changed*, which is not how many events it
+    #: has: undo removes an event and is itself a change. Counting events made
+    #: this go backwards on undo, and the client -- which uses it to discard a
+    #: stale reply -- discarded every undo instead. Only ever increases.
+    revision: int = 0
 
     def with_event(self, event: Event) -> Session:
         """The session after one more event.
@@ -48,7 +53,12 @@ class Session:
         Raises:
             IllegalEventError: If the reducer rejects the event.
         """
-        return replace(self, events=(*self.events, event), state=apply(self.state, event))
+        return replace(
+            self,
+            events=(*self.events, event),
+            state=apply(self.state, event),
+            revision=self.revision + 1,
+        )
 
     def undone(self) -> Session:
         """The session with its last event taken back.
@@ -60,7 +70,12 @@ class Session:
         if not self.events:
             return self
         kept = self.events[:-1]
-        return replace(self, events=kept, state=replay(self.initial, kept))
+        return replace(
+            self,
+            events=kept,
+            state=replay(self.initial, kept),
+            revision=self.revision + 1,
+        )
 
     @property
     def consistent(self) -> bool:

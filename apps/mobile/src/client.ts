@@ -39,7 +39,13 @@ export class Coach {
     return this.send<NewGame>("POST", "/games", { you, them });
   }
 
-  /** The board and the advice, as they stand. */
+  /**
+   * The board and the advice, as they stand.
+   *
+   * Also how a second device *joins*: a game is a session id, and anyone who
+   * has it can open it. There is no auth, which PLAN.md records as a known
+   * gap -- the server is meant for one LAN and one table.
+   */
   async look(sessionId: string): Promise<Snapshot> {
     return this.get<Snapshot>(`/games/${segment(sessionId)}`);
   }

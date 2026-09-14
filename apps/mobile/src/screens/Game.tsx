@@ -23,7 +23,18 @@ import { THEM, YOU } from "../wire";
 
 import { messageOf } from "./Start";
 
-export function Game({ coach, game }: { readonly coach: Coach; readonly game: NewGame }) {
+export function Game({
+  coach,
+  game,
+  seat,
+}: {
+  readonly coach: Coach;
+  readonly game: NewGame;
+  /** Which side of the table this device is. Both are real seats; the app
+   *  used to assume it was always "you", so a second device could only ever
+   *  start its own game and neither could act as the other player. */
+  readonly seat: string;
+}) {
   const [snapshot, setSnapshot] = useState<Snapshot>(game);
   const [problem, setProblem] = useState("");
 
@@ -76,9 +87,10 @@ export function Game({ coach, game }: { readonly coach: Coach; readonly game: Ne
     [accept, coach, game.session_id],
   );
 
-  const mine = snapshot.state.players[YOU];
-  const theirs = snapshot.state.players[THEM];
-  const advice = snapshot.advice[YOU];
+  const other = seat === YOU ? THEM : YOU;
+  const mine = snapshot.state.players[seat];
+  const theirs = snapshot.state.players[other];
+  const advice = snapshot.advice[seat];
   if (mine === undefined || theirs === undefined || advice === undefined) {
     return <Text style={styles.problem}>This game is not one this app can show.</Text>;
   }
@@ -100,7 +112,7 @@ export function Game({ coach, game }: { readonly coach: Coach; readonly game: Ne
         cards={advice.hand}
         board={mine}
         onPlay={(card: Playable) => {
-          void act({ type: "play_land", player: YOU, instance_id: card.instance_id });
+          void act({ type: "play_land", player: seat, instance_id: card.instance_id });
         }}
       />
       <Attacks attacks={advice.attacks} />
@@ -110,7 +122,7 @@ export function Game({ coach, game }: { readonly coach: Coach; readonly game: Ne
         onTap={(permanent: Permanent) => {
           void act({
             type: "set_tapped",
-            player: YOU,
+            player: seat,
             instance_id: permanent.instance_id,
             tapped: !permanent.tapped,
           });
@@ -123,7 +135,7 @@ export function Game({ coach, game }: { readonly coach: Coach; readonly game: Ne
         <Action label="Next step" onPress={() => { void act({ type: "advance_step" }); }} />
         <Action
           label="Draw"
-          onPress={() => { void act({ type: "draw_card", player: YOU }); }}
+          onPress={() => { void act({ type: "draw_card", player: seat }); }}
         />
         <Action
           label="Undo"

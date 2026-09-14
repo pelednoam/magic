@@ -14,6 +14,7 @@ import { Game } from "./src/screens/Game";
 import { Start } from "./src/screens/Start";
 import { colour } from "./src/theme";
 import type { NewGame } from "./src/wire";
+import { YOU } from "./src/wire";
 
 /**
  * Where the server is. The laptop on the same LAN, by default -- §4's "run it
@@ -24,14 +25,23 @@ const SERVER = process.env["EXPO_PUBLIC_COACH_URL"] ?? "http://localhost:8000";
 export default function App() {
   const [coach] = useState(() => new Coach(SERVER));
   const [game, setGame] = useState<NewGame | null>(null);
+  // Which side of the table this device is. The first device takes "you"; a
+  // device that joins an existing game takes the other seat.
+  const [seat, setSeat] = useState(YOU);
 
   return (
     <SafeAreaView style={styles.screen}>
       <StatusBar style="light" />
       {game === null ? (
-        <Start coach={coach} onStarted={setGame} />
+        <Start
+          coach={coach}
+          onStarted={(started, taken) => {
+            setSeat(taken);
+            setGame(started);
+          }}
+        />
       ) : (
-        <Game coach={coach} game={game} />
+        <Game coach={coach} game={game} seat={seat} />
       )}
     </SafeAreaView>
   );

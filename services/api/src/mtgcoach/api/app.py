@@ -21,14 +21,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
 from mtgcoach.api import views
+from mtgcoach.api.dealing import library
 from mtgcoach.api.eventspec import BadEventError, parse
 from mtgcoach.api.guard import check
 from mtgcoach.api.hub import Hub
 from mtgcoach.api.sessions import SessionStore, UnknownSessionError
 from mtgcoach.coach.report import advise
-from mtgcoach.core.cards import CardInstance
 from mtgcoach.core.errors import IllegalEventError
-from mtgcoach.core.ids import InstanceId, OracleId, PlayerId
+from mtgcoach.core.ids import PlayerId
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -92,7 +92,8 @@ def _routes(app: FastAPI, server: Server) -> None:  # noqa: C901 - one route eac
     def new_game(body: dict[str, str]) -> dict[str, Json]:
         """Start a game between two decks."""
         libraries = {
-            PlayerId(name): _library(server, name, body.get(name, "")) for name in ("you", "them")
+            PlayerId(name): library(server.decks, name, body.get(name, ""))
+            for name in ("you", "them")
         }
         try:
             session = server.store.create(libraries, PlayerId("you"))
@@ -115,18 +116,23 @@ def _routes(app: FastAPI, server: Server) -> None:  # noqa: C901 - one route eac
         try:
             event = parse(body)
             check(event, session.state, server.catalogue)
-            session = server.store.record(session.with_event(event))
+            advanced = session.with_event(event)
         except (BadEventError, IllegalEventError) as refused:
             raise HTTPException(HTTP_400_BAD_REQUEST, str(refused)) from refused
-        snapshot = _snapshot(server, session)
+        # Built before it is committed. The other order left an event stored
+        # after the client had been told the request failed -- so a retry
+        # applied it twice, and every later read failed the same way.
+        snapshot = _snapshot(server, advanced)
+        server.store.record(advanced)
         await server.hub.broadcast(session_id, snapshot)
         return snapshot
 
     @app.post("/games/{session_id}/undo", response_model=None)
     async def undo(session_id: str) -> dict[str, Json]:
         """Take back the last event. Replayed, never inverted."""
-        session = server.store.record(_session(server, session_id).undone())
-        snapshot = _snapshot(server, session)
+        undone = _session(server, session_id).undone()
+        snapshot = _snapshot(server, undone)
+        server.store.record(undone)
         await server.hub.broadcast(session_id, snapshot)
         return snapshot
 
@@ -158,16 +164,6 @@ def _routes(app: FastAPI, server: Server) -> None:  # noqa: C901 - one route eac
             server.hub.leave(session_id, websocket)
 
 
-def _library(server: Server, player: str, deck: str) -> tuple[CardInstance, ...]:
-    """Deal one player their deck, giving every card its own identity."""
-    if deck not in server.decks:
-        raise HTTPException(HTTP_400_BAD_REQUEST, f"unknown deck {deck!r}")
-    return tuple(
-        CardInstance(InstanceId(f"{player}-{index}"), OracleId(oracle))
-        for index, oracle in enumerate(server.decks[deck])
-    )
-
-
 def _session(server: Server, session_id: str) -> Session:
     """The game, or a 404."""
     try:
@@ -184,10 +180,13 @@ def _snapshot(server: Server, session: Session) -> dict[str, Json]:
     the attacker needs the attack advice.
     """
     return {
-        # How many events this game has seen. The client uses it to ignore a
+        # How many times this game has changed. The client uses it to ignore a
         # stale reply: an HTTP response and a broadcast race, and without an
         # ordering the older of the two could permanently roll the board back.
-        "version": len(session.events),
+        # It counts *changes*, not events -- undo is a change that removes one,
+        # so counting events made this go backwards and the client threw away
+        # every undo.
+        "version": session.revision,
         "state": views.state(session.state, server.catalogue.name),
         "advice": {
             str(player): views.report(advise(session.state, player, server.catalogue))

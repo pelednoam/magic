@@ -1009,8 +1009,18 @@ accepted event could leave a game that could never be read again.
 
 **Snapshots are versioned.** An HTTP reply and a socket broadcast race, and without an ordering
 the older of the two silently won: an undo could appear to un-happen, and the next event would
-be sent against a board the server had already moved past. Every snapshot carries the event
-count, and the client takes an update only if it is not older than the one on screen.
+be sent against a board the server had already moved past. Every snapshot carries a revision and
+the client takes an update only if it is not older than the one on screen.
+
+The revision counts *changes*, not events, and the difference is the whole point: undo removes
+an event and is itself a change, so counting events made the number go **backwards** on undo —
+and the client, doing exactly what it was told, discarded every undo. Two reviewers found that
+independently, and a test of mine had pinned the broken behaviour.
+
+**Both devices are seats.** The app takes the seat it is given rather than assuming it is
+`you`: the first device starts a game, a second opens the same session id and takes the other
+side. Without that the WebSocket and the both-players advice had nothing to be for — a second
+device could only start a second game, and neither could ever act as the other player.
 
 **A package the original tree did not have.** `packages/coach` was added in M5. The four
 solvers each answer a narrow question; something has to assemble them into the one a player
