@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from mtgcoach.api.claude import Cli
-from mtgcoach.api.replies import exactly, object_in, text, words
+from mtgcoach.api.replies import exactly, object_in, one, prose, words
 from mtgcoach.coach.advice import ExplainerError, Explanation
 
 if TYPE_CHECKING:
@@ -82,10 +82,10 @@ def parse(stdout: str) -> Explanation:
 def _explanation(payload: Mapping[str, object]) -> Explanation:
     """Build an explanation, taking only fields of the right shape."""
     return Explanation(
-        play=text(payload, "play"),
+        play=one(payload, "play"),
         attack=exactly(payload, "attack"),
-        because=text(payload, "because"),
-        in_short=text(payload, "in_short"),
+        because=prose(payload, "because"),
+        in_short=prose(payload, "in_short"),
         watch_out=words(payload, "watch_out"),
         check_yourself=words(payload, "check_yourself"),
     )

@@ -12,6 +12,7 @@ import {
 } from "react-native";
 
 import type { Coach } from "../client";
+import { messageOf } from "../errors";
 import { colour, space, text } from "../theme";
 import type { NewGame } from "../wire";
 import { THEM, YOU } from "../wire";
@@ -139,11 +140,6 @@ export function Start({
       ) : null}
     </ScrollView>
   );
-}
-
-/** An error as a sentence, whatever it turned out to be. */
-export function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : "could not reach the server";
 }
 
 const styles = StyleSheet.create({

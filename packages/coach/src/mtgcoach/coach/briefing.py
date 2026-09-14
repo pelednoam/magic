@@ -17,6 +17,16 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from mtgcoach.coach.report import TurnReport
 
+#: How many attacks the prompt lists. The engine can enumerate more than a
+#: person wants to read, and past a handful the tail is strictly worse than the
+#: head -- they are already sorted.
+#:
+#: ``advice.offered`` slices by the same number, because "recommend only from
+#: the options below" has to mean the options below. They disagreed once: the
+#: prompt showed six and the checker accepted any of them, so a model could be
+#: credited with choosing a plan it had never been shown.
+SHOWN_ATTACKS = 6
+
 RULES = """\
 You are helping a parent teach a nine-year-old to play Magic: The Gathering.
 
@@ -93,7 +103,7 @@ def _attacks(report: TurnReport) -> str:
     if report.attacks.unavailable:
         return f"\nATTACKS: none to consider -- {report.attacks.unavailable}"
     lines = ["\nATTACKS (best first, the engine worked these out exactly):"]
-    for index, plan in enumerate(report.attacks.plans[:6], 1):
+    for index, plan in enumerate(report.attacks.plans[:SHOWN_ATTACKS], 1):
         who = ", ".join(f"{c.name} [{c.instance_id}]" for c in plan.attackers) or "nobody"
         outcome = [f"{plan.outcome.damage_to_defender} damage"]
         if plan.is_lethal:

@@ -94,9 +94,9 @@ def test_an_empty_recommendation_survives() -> None:
 # --- fields of the wrong shape ------------------------------------------------
 
 
-@pytest.mark.parametrize("bad", [42, None, ["abc"], {"id": "abc"}])
-def test_a_play_that_is_not_a_string_is_dropped(bad: object) -> None:
-    assert parse(said(play=bad)).play == ""
+def test_a_null_play_is_simply_no_card() -> None:
+    """Absent and malformed are different: absent is the common case."""
+    assert parse(said(play=None)).play == ""
 
 
 def test_an_empty_string_in_a_prose_list_is_dropped() -> None:

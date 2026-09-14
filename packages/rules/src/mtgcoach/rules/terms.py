@@ -89,7 +89,7 @@ def query(question: str) -> str:
 #: A rule number written out in a question: "702.19b", "rule 100.1", "509.1a".
 #: Three digits and a dot are what make it unambiguous -- a bare "19b" is not a
 #: rule number, and a year is not either.
-_REFERENCE = re.compile(r"\b(\d{3}\.\d+[a-z]?)\b")
+_REFERENCE = re.compile(r"\b(\d{3}\.\d+[a-z]?)\b", re.IGNORECASE)
 
 
 def references_in(question: str) -> tuple[str, ...]:
@@ -101,4 +101,7 @@ def references_in(question: str) -> tuple[str, ...]:
     badly -- the number tokenises to "702" and "19b", and the rule itself
     ranked nowhere in particular among everything else mentioning 702.
     """
-    return tuple(dict.fromkeys(_REFERENCE.findall(question)))
+    # Lowered, because the index stores them lowered-by-convention -- the
+    # document writes "702.19b" and somebody typing "702.19B" means the same
+    # rule.
+    return tuple(dict.fromkeys(found.lower() for found in _REFERENCE.findall(question)))

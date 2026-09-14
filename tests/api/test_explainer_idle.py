@@ -9,6 +9,7 @@ is why it is tested this closely.
 
 from __future__ import annotations
 
+from fakeprocess import Never
 from helpers import ME, UNKNOWN_ABILITY, facts
 from helpers_coach import Book, game
 from mtgcoach.coach.report import advise
@@ -16,7 +17,7 @@ from mtgcoach.core.abilities import Trigger, TriggeredAbility
 from mtgcoach.core.steps import Step
 from mtgcoach.core.vocabulary import TriggerEvent
 from test_explainer import BOOK, FOREST, FOREST_RULES
-from test_explainer_cli import Never, envelope_answer, explain
+from test_explainer_cli import envelope_answer, explain
 
 #: A creature whose ability fires on the clock, so a turn has a reminder on it.
 RINGS = TriggeredAbility(Trigger(TriggerEvent.BEGINNING_OF_UPKEEP), ())

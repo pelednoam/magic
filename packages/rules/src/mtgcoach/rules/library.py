@@ -60,7 +60,7 @@ def index_at(path: Path) -> RuleIndex:
         msg = (
             f"the Comprehensive Rules are not at {path}. Download the plain-text "
             f"rules from https://magic.wizards.com/en/rules and save them there:\n"
-            f"  mkdir -p {shlex.quote(str(path.parent))}\n"
+            f"  mkdir -p -- {shlex.quote(str(path.parent))}\n"
             f'  curl -L -o {shlex.quote(str(path))} "$URL"'
         )
         raise RulesNotInstalledError(msg)

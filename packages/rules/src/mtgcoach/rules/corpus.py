@@ -9,10 +9,8 @@ a model remembers about trample.
 That is the point of the whole module. §8 says a confidently wrong rule is
 worse than no answer, and the way to keep that promise is to never ask for a
 rule from memory -- to retrieve the text, put it in the prompt, and then check
-that the answer cites something that was actually there.
-
-The parse is deliberately shallow. It does not model the rules; it finds their
-boundaries, so that each one can be found again by number.
+that the answer cites something that was actually there. The parse does not
+model the rules; it finds their boundaries.
 """
 
 from __future__ import annotations
@@ -30,6 +28,12 @@ _NUMBERED = re.compile(r"^(\d{3}(?:\.\d+)?[a-z]?)\.?\s+(\S.*)$")
 #: sentence needs. "Trample" and "Brawl Option" are headings; "An ability can
 #: be one of three things:" is a rule that happens to end in a colon.
 _TITLE = re.compile(r"^[^.:;,]{1,60}$")
+
+#: A chapter heading: "1. Game Concepts", "7. Additional Rules". One or two
+#: digits, so it cannot be confused with a rule number, and it ends whatever
+#: rule was being accumulated -- without it, "8. Multiplayer Rules" became the
+#: last sentence of rule 727.4.
+_CHAPTER = re.compile(r"^\d{1,2}\.\s+\S")
 
 #: Where the glossary begins, the second time this word appears alone on a line
 #: -- the first is the table of contents.
@@ -115,19 +119,55 @@ def _nth(lines: list[str], marker: str, index: int) -> int:
 
 
 def _rules(lines: list[str]) -> tuple[Passage, ...]:
-    """The numbered rules, each under the heading it belongs to."""
+    """The numbered rules, each under the heading it belongs to.
+
+    A rule is not always one line. Plenty carry an unnumbered second paragraph,
+    and several hundred carry an ``Example:`` that is the only part a beginner
+    can actually follow -- 101.2's example of "can't" beating "can" is the rule
+    made usable. Skipping every line that did not start with a number dropped
+    all of it, which made a passage labelled verbatim quietly incomplete. Since
+    the whole design rests on quoting the rules rather than remembering them,
+    that was the worst possible thing to be wrong about.
+
+    So a rule runs until the next numbered line or the next chapter heading,
+    and everything in between belongs to it.
+    """
     found: list[Passage] = []
     title = ""
+    body: list[str] = []
+    reference = ""
     for line in lines:
-        match = _NUMBERED.match(line.strip())
-        if match is None:
+        stripped = line.strip()
+        if not stripped:
             continue
-        reference, text = match.group(1), match.group(2).strip()
+        match = _NUMBERED.match(stripped)
+        if match is None:
+            if _CHAPTER.match(stripped):
+                reference = _flush(found, reference, title, body)
+            elif reference:
+                body.append(stripped)
+            continue
+        reference = _flush(found, reference, title, body)
+        number, text = match.group(1), match.group(2).strip()
         if _TITLE.match(text):
             title = text
-            continue
-        found.append(Passage(reference, title, text, Kind.RULE))
+        else:
+            reference, body = number, [text]
+    _flush(found, reference, title, body)
     return tuple(found)
+
+
+def _flush(found: list[Passage], reference: str, title: str, body: list[str]) -> str:
+    """Emit the rule being accumulated, and return the empty reference.
+
+    Paragraphs are joined with a space rather than kept as lines: what goes in
+    a prompt is a paragraph, and the line breaks are the document's typesetting
+    rather than anything the rule means.
+    """
+    if reference:
+        found.append(Passage(reference, title, " ".join(body), Kind.RULE))
+        body.clear()
+    return ""
 
 
 def _glossary(lines: list[str]) -> tuple[Passage, ...]:

@@ -9,9 +9,13 @@ a rewrite. See [`docs/PLAN.md`](docs/PLAN.md) for the full design.
 ## Status
 
 **M0–M5 merged; M6 (the Claude layer) on `m6`.** The engine, the tracker, the two-seat server
-and the Expo app all work. The turn coach and the rules question box are the newest parts:
-Claude explains, and a checker refuses anything it says that the engine or the Comprehensive
-Rules do not back up.
+and the Expo app all work. The turn coach and the rules question box are the newest parts.
+
+The two checks are deliberately different strengths, and the wire says which you are getting.
+A turn recommendation is `trusted`: it is a choice among options the engine enumerated, and
+the engine agrees with it. A rules answer is only `cited`: every rule it named was one the
+server retrieved for it. Nothing reads that rule and checks the claim against it — so the
+retrieved rules are printed under every answer, and they are the part that is certainly true.
 
 ## Running it
 
@@ -27,11 +31,15 @@ this project exists to avoid:
 
 ```bash
 mkdir -p data/rules
-curl -L -o data/rules/comprehensive.txt \
-  "https://media.wizards.com/2025/downloads/MagicCompRules%2020250207.txt"
+curl -L -o data/rules/comprehensive.txt -- "$URL"
 ```
 
-Without it everything else works and the server says the question box is off.
+where `$URL` is the plain-text link on <https://magic.wizards.com/en/rules>. Not a fixed
+address on purpose: Wizards publish a new document with every set, and an eighteen-month-old
+copy answers questions about errataed cards with complete confidence.
+
+Without it everything else works, the server says so at startup, and the app shows the
+question box as switched off rather than letting you type into it.
 
 Both Claude features shell out to the local `claude` command rather than the API, so they draw
 on a Claude Code subscription and cost no credits.

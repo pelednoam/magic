@@ -21,10 +21,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol
 
+from mtgcoach.coach.briefing import SHOWN_ATTACKS
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from mtgcoach.coach.report import TurnReport
+    from mtgcoach.core.combat.search import Plan
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +62,11 @@ class Explainer(Protocol):
         ...
 
 
+#: How much model text a refusal may quote back. Long enough to recognise a
+#: mangled instance id, short enough that a refusal stays a sentence.
+_READABLE = 80
+
+
 class ExplainerError(RuntimeError):
     """No explanation could be got. The engine's own panel still stands."""
 
@@ -82,11 +90,21 @@ def _check_play(explanation: Explanation, report: TurnReport) -> tuple[str, ...]
         return ()
     card = next((c for c in report.hand if str(c.instance_id) == explanation.play), None)
     if card is None:
-        return (f"recommends playing {explanation.play!r}, which is not in hand",)
+        return (f"recommends playing {_short(explanation.play)}, which is not in hand",)
     if not card.playable:
         because = "; ".join(card.reasons)
         return (f"recommends playing {card.name}, which cannot be played: {because}",)
     return ()
+
+
+def offered(report: TurnReport) -> tuple[Plan, ...]:
+    """The attacks the model was actually shown.
+
+    The same slice ``briefing`` takes, because a checker that accepts more than
+    the prompt offered credits a model with choosing something it never saw --
+    and an attack past the cut is one nobody read the consequences of.
+    """
+    return report.attacks.plans[:SHOWN_ATTACKS]
 
 
 def _check_attack(explanation: Explanation, report: TurnReport) -> tuple[str, ...]:
@@ -107,10 +125,19 @@ def _check_attack(explanation: Explanation, report: TurnReport) -> tuple[str, ..
     # -- which is not a legal attack and is not a plan the engine costed --
     # matched one that was.
     wanted = tuple(sorted(explanation.attack))
-    for plan in report.attacks.plans:
+    for plan in offered(report):
         if tuple(sorted(str(c.instance_id) for c in plan.attackers)) == wanted:
             return ()
-    return (f"recommends an attack the engine did not evaluate: {list(wanted)}",)
+    return (f"recommends an attack the engine did not evaluate: {_short(str(list(wanted)))}",)
+
+
+def _short(value: str) -> str:
+    """Model text, cut to a length a person can read.
+
+    These strings end up in the refusal shown on screen, and every one of them
+    came out of a model -- there is no length a malformed ``play`` cannot be.
+    """
+    return repr(value if len(value) <= _READABLE else value[:_READABLE] + "...")
 
 
 def _check_honesty(explanation: Explanation, report: TurnReport) -> tuple[str, ...]:
@@ -157,6 +184,6 @@ def refusal(problems: Sequence[str]) -> Explanation:
     """
     return Explanation(
         because="The coach's answer disagreed with the rules engine, so it is not shown.",
-        in_short="I got confused there. Use the list on the left -- that part is checked.",
+        in_short="I got confused there. Use the lists above -- those are checked.",
         watch_out=tuple(problems),
     )

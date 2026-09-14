@@ -84,8 +84,9 @@ function Answer({ reply }: { readonly reply: Asked }) {
     <View>
       {reply.cited ? null : (
         <Text style={styles.refused}>
-          The answer used a rule the server did not find, so it is not shown. The
-          rules below are the real ones — read those.
+          The answer did not stay inside the rules the server found — it used one
+          that was not there, or gave none at all — so it is not shown. Any rules
+          listed below are the real ones; read those.
         </Text>
       )}
       {reply.answer.in_short === "" ? null : (

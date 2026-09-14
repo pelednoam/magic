@@ -49,6 +49,7 @@ class Thing:
             parts.append("tapped")
         if self.summoning_sick:
             parts.append("summoning sick")
+
         if self.unreadable:
             parts.append("THE ENGINE CANNOT READ THIS CARD -- say so rather than guessing")
         return ", ".join(parts)
@@ -85,16 +86,22 @@ def _thing(permanent: Permanent, lookup: CardLookup) -> Thing:
     """One permanent. A card with no facts is named by its id and flagged."""
     facts = lookup.facts(permanent.card.oracle_id)
     if facts is None:
+        # No facts means we do not know whether it is a creature, so the flag
+        # is not claimed either way -- the card is flagged unreadable and the
+        # player is told to look at it.
         return Thing(
             name=lookup.name(permanent.card.oracle_id),
             tapped=permanent.tapped,
-            summoning_sick=permanent.summoning_sick,
             unreadable=True,
         )
     return Thing(
         name=facts.name,
         tapped=permanent.tapped,
-        summoning_sick=permanent.summoning_sick,
+        # Only for creatures. The engine marks every permanent that arrived
+        # this turn, because that is what the flag means; a land described as
+        # "summoning sick" reads as a restriction that does not exist, and this
+        # text is going in front of somebody learning what the phrase means.
+        summoning_sick=permanent.summoning_sick and facts.is_creature,
         power=facts.power,
         toughness=facts.toughness,
         keywords=tuple(sorted(facts.keywords)),

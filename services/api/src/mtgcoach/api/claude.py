@@ -24,11 +24,20 @@ and made something up instead, which is the failure mode we want.
 
 from __future__ import annotations
 
+import os
+import signal
 import subprocess
 import tempfile
-from dataclasses import dataclass
+from contextlib import contextmanager, suppress
+from dataclasses import dataclass, field
+from functools import cache
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 from mtgcoach.coach.advice import ExplainerError
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 #: The tools the command may use: none.
 #:
@@ -40,6 +49,19 @@ from mtgcoach.coach.advice import ExplainerError
 NO_TOOLS = ""
 
 
+@cache
+def _scratch() -> Path:
+    """An empty directory only this user can write to.
+
+    Not ``gettempdir()`` itself. The CLI reads a ``CLAUDE.md`` from its working
+    directory and treats it as instructions, so running in the shared temp
+    directory let any local user drop one there and have it prepended to every
+    question this server asks. ``mkdtemp`` is 0700 and unguessable, which
+    closes it; made once per process because the directory is a constant.
+    """
+    return Path(tempfile.mkdtemp(prefix="mtgcoach-coach-"))
+
+
 @dataclass(frozen=True, slots=True)
 class Cli:
     """How to reach the local ``claude`` command."""
@@ -49,8 +71,9 @@ class Cli:
     #: button again rather than wondering whether it is broken.
     timeout_seconds: int = 90
     executable: str = "claude"
-    #: Where the subprocess runs. Defaults to a directory that holds nothing.
-    working_directory: str = tempfile.gettempdir()
+    #: Where the subprocess runs. Defaults to a private empty directory made
+    #: for this process; see ``_scratch``.
+    working_directory: str = field(default_factory=lambda: str(_scratch()))
 
     def run(self, prompt: str) -> str:
         """The command's stdout.
@@ -59,55 +82,98 @@ class Cli:
             ExplainerError: If the command cannot be run, times out, or fails.
         """
         try:
-            completed = subprocess.run(  # noqa: S603 - fixed argv, prompt via stdin, no shell
-                [
-                    self.executable,
-                    "-p",
-                    "--output-format",
-                    "json",
-                    "--model",
-                    self.model,
-                    "--tools",
-                    NO_TOOLS,
-                    # And no MCP servers either. `--tools ""` empties the
-                    # built-in set; a project or user MCP config would put a
-                    # fresh set back, and this process inherits the operator's.
-                    "--strict-mcp-config",
-                ],
-                input=prompt,
-                capture_output=True,
-                text=True,
-                # Pinned, not inherited. `text=True` alone encodes stdin with
-                # the ambient locale codec, so a card name or a question with a
-                # non-ASCII character in it raised UnicodeEncodeError on a
-                # POSIX-locale server -- and Magic prints em-dashes.
-                encoding="utf-8",
-                errors="replace",
-                timeout=self.timeout_seconds,
-                check=False,
-                # Its own process group, so the timeout kills the whole tree.
-                # `claude` is a Node process that spawns more; killing only the
-                # direct child left them running, still holding the quota and
-                # still writing, after the request had already failed.
-                start_new_session=True,
-                # Somewhere with nothing in it. The file tools are gone, but a
-                # working directory is also what the CLI puts in its own system
-                # prompt, and the server's tree is not the model's business.
-                cwd=self.working_directory,
-            )
+            with self._started() as process:
+                stdout, _ = self._talk(process, prompt)
+        except (OSError, subprocess.SubprocessError) as exc:
+            # The exception's class, not its text: `FileNotFoundError` says what
+            # is missing without quoting a path into a response any origin can
+            # read.
+            msg = f"could not ask the coach: {type(exc).__name__}"
+            raise ExplainerError(msg) from exc
+        return stdout
+
+    @contextmanager
+    def _started(self) -> Generator[subprocess.Popen[str]]:
+        """The command, running, killed as a group however the block ends.
+
+        ``Popen`` rather than ``run`` because of that last part. ``run``'s
+        timeout path calls ``process.kill()``, which signals the direct child
+        and nothing else; ``start_new_session=True`` puts the child in its own
+        process group but ``run`` never signals the group. So a timed-out
+        ``claude`` -- a Node process that spawns more -- left its children
+        alive, still holding the quota and still writing, after the request had
+        already failed. ``killpg`` is the part that was missing.
+        """
+        process = subprocess.Popen(  # noqa: S603 - fixed argv, prompt via stdin, no shell
+            self._argv(),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            # Pinned, not inherited. `text=True` alone encodes stdin with the
+            # ambient locale codec, so a card name or a question with a
+            # non-ASCII character in it raised UnicodeEncodeError on a
+            # POSIX-locale server -- and Magic prints em-dashes.
+            encoding="utf-8",
+            errors="replace",
+            # Somewhere with nothing in it. The file tools are gone, but a
+            # working directory is also what the CLI puts in its own system
+            # prompt, and the server's tree is not the model's business.
+            cwd=self.working_directory,
+            start_new_session=True,
+        )
+        try:
+            yield process
+        finally:
+            _kill_group(process)
+
+    def _argv(self) -> list[str]:
+        """The command line. Fixed; nothing from a player reaches it."""
+        return [
+            self.executable,
+            "-p",
+            "--output-format",
+            "json",
+            "--model",
+            self.model,
+            "--tools",
+            NO_TOOLS,
+            # And no MCP servers either. `--tools ""` empties the built-in set;
+            # a project or user MCP config would put a fresh set back, and this
+            # process inherits the operator's.
+            "--strict-mcp-config",
+        ]
+
+    def _talk(self, process: subprocess.Popen[str], prompt: str) -> tuple[str, str]:
+        """Send the prompt, read the reply.
+
+        Raises:
+            ExplainerError: If it takes too long or exits non-zero.
+        """
+        try:
+            stdout, stderr = process.communicate(prompt, timeout=self.timeout_seconds)
         except subprocess.TimeoutExpired as timed_out:
             msg = f"the coach took longer than {self.timeout_seconds}s"
             raise ExplainerError(msg) from timed_out
-        except (OSError, subprocess.SubprocessError) as exc:
-            # The exception's text, not the command's: `FileNotFoundError` says
-            # what is missing without quoting anything the model produced.
-            msg = f"could not ask the coach: {type(exc).__name__}"
-            raise ExplainerError(msg) from exc
-        if completed.returncode != 0:
+        if process.returncode != 0:
             # Deliberately without stderr. This message reaches the client, and
             # the CORS policy is `*` -- a CLI's stderr carries absolute paths,
             # config locations and sometimes an account, none of which is any
             # origin's business. The exit code is what a player can act on.
-            msg = f"the coach exited {completed.returncode}"
+            msg = f"the coach exited {process.returncode}"
             raise ExplainerError(msg)
-        return completed.stdout
+        return stdout, stderr
+
+
+def _kill_group(process: subprocess.Popen[str]) -> None:
+    """End the command and everything it started.
+
+    Best effort on purpose: the group is already gone in the ordinary case, and
+    a failure to kill something that has exited is not worth turning a finished
+    answer into an error.
+    """
+    if process.poll() is None:
+        with suppress(OSError):
+            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+    with suppress(OSError, ValueError):
+        process.wait(timeout=5)

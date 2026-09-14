@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from helpers_rules import PASSAGES
 from mtgcoach.rules.answer import Answer, cited, refusal, settle, verify
+from mtgcoach.rules.corpus import Kind, Passage
 
 TRAMPLE = [p for p in PASSAGES if p.reference in {"702.19b", "Trample"}]
 
@@ -143,4 +144,19 @@ def test_an_invented_rule_survives_resolving_and_is_reported() -> None:
 def test_settling_an_answer_that_was_already_right_changes_nothing() -> None:
     resolved, problems = settle(_said(), TRAMPLE)
     assert resolved == _said()
+    assert problems == ()
+
+
+def test_two_supplied_references_that_normalise_alike_are_left_alone() -> None:
+    """Resolving takes decoration off, so it can in principle merge two of them.
+
+    Picking one would rewrite a citation into a rule the model did not name.
+    Left as written, it either matches something exactly or is reported.
+    """
+    twins = [
+        Passage("702.19b", "Trample", "text", Kind.RULE),
+        Passage("702.19b (Trample)", "Trample", "text", Kind.RULE),
+    ]
+    resolved, problems = settle(_said(citations=("702.19b (Trample)",)), twins)
+    assert resolved.citations == ("702.19b (Trample)",)
     assert problems == ()

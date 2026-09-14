@@ -39,6 +39,27 @@ than it had checked: `unsure` used to excuse an answer from citing anything, and
 called the result `trusted` when all that had been verified was that the citations were real.
 The rules route now reports `cited`, and the app says the rules below are the source.
 
+A second round found five more, and one of them was the worst bug in M6:
+
+- **The rules parser dropped every unnumbered line.** Rules carry continuation paragraphs and
+  211 of them carry an `Example:`, which for a beginner is often the only usable part. A
+  passage labelled verbatim was quietly incomplete — the single worst thing to be wrong about
+  in a design that rests on quoting the rules rather than remembering them.
+- `start_new_session=True` does *not* make `subprocess.run` kill a process tree: `run` signals
+  the direct child and never the group. The comment claimed otherwise. It is `Popen` and an
+  explicit `killpg` now.
+- The parse-failure message quoted 160 bytes of raw stdout back to any origin, undoing the
+  stderr scrubbing two lines above it.
+- The subprocess ran in the shared temp directory, where any local user could leave a
+  `CLAUDE.md` for the CLI to read as instructions. It gets a private 0700 directory.
+- Nothing checked that the CLI still *accepts* the flags — the tests stub the subprocess, so a
+  renamed flag would 503 every request in production with the suite green. `tools/check_cli_flags.py`
+  reads `claude --help` on every gate run.
+
+And the client half of the safety story now has tests: `tests/hooks.test.tsx` renders the two
+hooks into a real DOM and pins the rule that an answer arriving after the board moved is
+dropped rather than displayed.
+
 ---
 
 ## 1. The central design decision
@@ -854,7 +875,8 @@ class Explainer(Protocol):
 
 ### Call shapes
 
-**Turn coach** — `claude-opus-5` through the local CLI, which is why it costs nothing per
+**Turn coach** — Opus through the local CLI (as the alias `opus`, which is what the CLI takes;
+naming a dated model id here and passing an alias there was a contradiction waiting to age), which is why it costs nothing per
 call and why there is no `thinking` or `output_config` to set. Input: the engine's own
 `TurnReport`, rendered as text by `coach/briefing.py` — every fact in it already checked.
 Output: `play`, `attack`, `because`, `in_short`, `watch_out`, `check_yourself`.

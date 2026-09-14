@@ -9,16 +9,13 @@ from __future__ import annotations
 
 import json
 import subprocess
-from typing import TYPE_CHECKING
 
 import pytest
 
+from fakeprocess import Fake
 from mtgcoach.api.asker import ClaudeCliAsker, parse
 from mtgcoach.coach.advice import ExplainerError
 from test_explainer import envelope
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
 
 ANSWER = {
     "answer": "Lethal damage goes to the blocker first, then the rest tramples over.",
@@ -79,21 +76,6 @@ def test_prose_with_no_object_is_an_error() -> None:
         parse(envelope("I'm sorry, I can't help with that."))
 
 
-class Fake:
-    """A stand-in for ``subprocess.run`` that records the prompt."""
-
-    def __init__(self, stdout: str) -> None:
-        """Answer every call with this output."""
-        self.completed = subprocess.CompletedProcess(["claude"], 0, stdout, "")
-        self.stdin = ""
-
-    def __call__(self, _argv: Sequence[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
-        """Record the prompt and return the canned result."""
-        given = kwargs.get("input")
-        self.stdin = given if isinstance(given, str) else ""
-        return self.completed
-
-
 def test_the_briefing_is_what_gets_sent() -> None:
     """The briefing, and only the briefing.
 
@@ -101,9 +83,9 @@ def test_the_briefing_is_what_gets_sent() -> None:
     would put an unfenced copy in front of the model, which is the hazard the
     fence exists for.
     """
-    fake = Fake(envelope(json.dumps(ANSWER)))
+    fake = Fake(stdout=envelope(json.dumps(ANSWER)))
     with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(subprocess, "run", fake)
+        patch.setattr(subprocess, "Popen", fake)
         got = ClaudeCliAsker().ask("how does trample work?", "the briefing")
     assert got.citations == ("702.19b",)
     assert fake.stdin == "the briefing"

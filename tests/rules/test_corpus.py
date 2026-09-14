@@ -119,3 +119,48 @@ def test_a_glossary_entry_at_the_very_end_is_kept() -> None:
         "\nGlossary\n\nCredits", "\nGlossary\n\nLast\nA definition.\nCredits"
     )
     assert [p.reference for p in passages_in(document) if p.kind is Kind.GLOSSARY] == ["Last"]
+
+
+# --- a rule is not always one line --------------------------------------------
+
+
+def test_an_example_belongs_to_the_rule_above_it() -> None:
+    """An example is part of its rule, and 211 rules in the document have one.
+
+    For a beginner the example is often the only usable part. Dropping them
+    made a passage labelled verbatim quietly incomplete -- the worst thing to
+    be wrong about in a design that rests on quoting the rules.
+    """
+    assert "Example: a game with three players" in _by_reference("100.1").text
+
+
+def test_a_continuation_paragraph_belongs_to_the_rule_above_it() -> None:
+    passage = _by_reference("100.1a")
+    assert passage.text.startswith("A two-player game")
+    assert passage.text.endswith("options in section 8.")
+
+
+def test_a_continuation_is_joined_as_a_paragraph_not_kept_as_lines() -> None:
+    """What goes in a prompt is a paragraph; the line breaks are typesetting."""
+    assert "\n" not in _by_reference("100.1a").text
+
+
+def test_a_chapter_heading_ends_the_rule_before_it() -> None:
+    """Without this, "8. Multiplayer Rules" became the last sentence of 903.12."""
+    assert not [p for p in _passages() if p.text.endswith("Multiplayer Rules")]
+
+
+def test_a_rule_after_a_chapter_heading_is_still_found() -> None:
+    assert _by_reference("800.1").text.startswith("A multiplayer game")
+
+
+def test_the_last_rule_before_the_glossary_is_not_lost() -> None:
+    """It is flushed by the end of the loop rather than by the next rule."""
+    assert _by_reference("800.1").kind is Kind.RULE
+
+
+def test_text_before_the_first_rule_is_not_attached_to_anything() -> None:
+    """A stray line above the first numbered rule belongs to no rule at all."""
+    document = _shaped("some preamble", "100.1. A rule.")
+    (passage,) = [p for p in passages_in(document) if p.kind is Kind.RULE]
+    assert passage.text == "A rule."

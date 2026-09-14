@@ -18,6 +18,7 @@ import { Hand } from "../components/Hand";
 import { Question } from "../components/Question";
 import { Reminders, Unknown } from "../components/Reminders";
 import type { Coach } from "../client";
+import { messageOf } from "../errors";
 import { turnLine } from "../format";
 import { useCoaching, useQuestions } from "../thinking";
 import { colour, space, text } from "../theme";
@@ -25,7 +26,6 @@ import type { NewGame, Permanent, Playable, Snapshot } from "../wire";
 import { isSnapshot } from "../wire";
 import { THEM, YOU } from "../wire";
 
-import { messageOf } from "./Start";
 
 export function Game({
   coach,

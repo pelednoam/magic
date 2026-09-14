@@ -20,7 +20,6 @@ into "a queue", which is the difference between a slow tracker and a dead one.
 
 from __future__ import annotations
 
-import threading
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
@@ -50,26 +49,20 @@ if TYPE_CHECKING:
 #: text, and both are answered better by saying so than by forwarding it.
 MAX_QUESTION = 500
 
-#: How many of these may be in flight at once. The threadpool has ten workers
-#: by default and the tracker's own routes need some of them, so the slow ones
-#: get a minority of it.
-MAX_IN_FLIGHT = 3
-
-#: Held for the length of a subprocess, so it is acquired without waiting: a
-#: request that queued would just sit on a threadpool worker instead.
-_in_flight = threading.BoundedSemaphore(MAX_IN_FLIGHT)
-
 
 @contextmanager
-def _one_at_a_time() -> Generator[None]:
-    """Take a slot, or refuse.
+def _one_at_a_time(server: Server) -> Generator[None]:
+    """Take one of this server's slots, or refuse.
+
+    Acquired without waiting: a request that queued would just sit on a
+    threadpool worker, which is the resource being rationed.
 
     Raises:
         HTTPException: 503 when every slot is busy. Honest and actionable: the
             engine's own advice is already on screen, and trying again in a
             moment is exactly the right thing to do.
     """
-    if not _in_flight.acquire(blocking=False):
+    if not server.in_flight.acquire(blocking=False):
         raise HTTPException(
             HTTP_503_SERVICE_UNAVAILABLE,
             "the coach is busy with another question; try again in a moment",
@@ -77,7 +70,7 @@ def _one_at_a_time() -> Generator[None]:
     try:
         yield
     finally:
-        _in_flight.release()
+        server.in_flight.release()
 
 
 def routes(app: FastAPI, server: Server) -> None:
@@ -88,7 +81,10 @@ def routes(app: FastAPI, server: Server) -> None:
         """Ask Claude what to do about this player's turn."""
         game, player = _seat(server, session_id, body)
         try:
-            with _one_at_a_time():
+            # The engine work is inside the limiter too. It is milliseconds
+            # next to the subprocess, but it is not free, and a limit that only
+            # covers the cheap half of a request is not a limit.
+            with _one_at_a_time(server):
                 return coached(server.explainer, advise(game.state, player, server.catalogue))
         except ExplainerError as unavailable:
             # Not a server fault and not fatal: the deterministic panel is
@@ -115,10 +111,10 @@ def routes(app: FastAPI, server: Server) -> None:
                 HTTP_503_SERVICE_UNAVAILABLE,
                 "the Comprehensive Rules are not installed on this server",
             )
-        report = advise(game.state, player, server.catalogue)
-        board = table(game.state, player, server.catalogue)
         try:
-            with _one_at_a_time():
+            with _one_at_a_time(server):
+                report = advise(game.state, player, server.catalogue)
+                board = table(game.state, player, server.catalogue)
                 return answered(server.asker, server.rules, question, report, board)
         except ExplainerError as unavailable:
             raise HTTPException(HTTP_503_SERVICE_UNAVAILABLE, str(unavailable)) from unavailable

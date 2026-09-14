@@ -12,16 +12,18 @@
  * - **A rules answer is about the rules** -- but it is asked *with the board in
  *   the prompt*, so "can my creature block that one?" is answered about the
  *   creatures that were there. Once they are not, the answer is about a
- *   position nobody is in, exactly like stale turn advice. So it is cleared on
- *   a change too. The asymmetry that is left is smaller and real: turn advice
- *   drops a *late arrival* as well, because it would otherwise appear a minute
- *   after the board it describes.
+ *   position nobody is in, exactly like stale turn advice.
+ *
+ * So both behave the same way: cleared when the board moves, and an answer that
+ * arrives after the board moved is dropped rather than displayed. Clearing
+ * alone was not enough -- the panel went blank on the change and then a minute
+ * later the old answer wrote itself back in, which is worse than either.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Coach } from "./client";
-import { messageOf } from "./screens/Start";
+import { messageOf } from "./errors";
 import type { Asked, Coaching } from "./wire";
 
 /** A slow ask in progress, or its result, or why there is neither. */
@@ -86,7 +88,9 @@ export function useQuestions(
   const [asking, setAsking] = useState(false);
   const [problem, setProblem] = useState("");
 
+  const current = useRef(version);
   useEffect(() => {
+    current.current = version;
     setReply(null);
     setProblem("");
   }, [version]);
@@ -95,10 +99,19 @@ export function useQuestions(
     (question: string) => {
       setAsking(true);
       setProblem("");
+      const asked = current.current;
       coach
         .ask(sessionId, question, seat)
-        .then(setReply)
-        .catch((error: unknown) => { setProblem(messageOf(error)); })
+        .then((answer: Asked) => {
+          if (asked === current.current) {
+            setReply(answer);
+          }
+        })
+        .catch((error: unknown) => {
+          if (asked === current.current) {
+            setProblem(messageOf(error));
+          }
+        })
         .finally(() => { setAsking(false); });
     },
     [coach, seat, sessionId],

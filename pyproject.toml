@@ -164,7 +164,10 @@ reportMissingTypeStubs = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["tools", "tests", "tests/coach", "tests/api", "tests/rules", "tests/e2e"]
-addopts = "-q --strict-markers --strict-config"
+# `-p noclaude` loads the guard that stops any test starting the real
+# `claude` command. A plugin rather than a conftest: `tests/e2e` already
+# has one, and mypy refuses two modules named `conftest` on its path.
+addopts = "-q --strict-markers --strict-config -p noclaude"
 
 # ---------------------------------------------------------------- mutmut
 

@@ -52,3 +52,14 @@ def test_prose_lists_are_still_trimmed_rather_than_refused() -> None:
     got = parse(said(watch_out=["real", 7, ""], check_yourself=["Pacifism"]))
     assert got.watch_out == ("real",)
     assert got.check_yourself == ("Pacifism",)
+
+
+@pytest.mark.parametrize("bad", [42, ["abc"], {"id": "abc"}])
+def test_a_play_that_is_not_a_string_is_refused(bad: object) -> None:
+    """Empty means "play nothing", which is a real recommendation.
+
+    So turning a malformed value into empty does not lose information -- it
+    substitutes a different recommendation, and one that always passes.
+    """
+    with pytest.raises(ExplainerError, match="'play' was not"):
+        parse(said(play=bad))

@@ -92,9 +92,26 @@ def verify(answer: Answer, supplied: Sequence[Passage]) -> tuple[str, ...]:
 
 
 def _resolved(answer: Answer, supplied: Sequence[Passage]) -> Answer:
-    """The answer with each citation rewritten to the reference it names."""
-    known = {_names(passage.reference): passage.reference for passage in supplied}
-    cited = tuple(dict.fromkeys(known.get(_names(c), c) for c in answer.citations))
+    """The answer with each citation rewritten to the reference it names.
+
+    A key two supplied references share is dropped rather than resolved. The
+    normalisation is lossy by design -- it takes decoration off -- so it can in
+    principle map two of them together, and quietly picking one would rewrite a
+    citation into a rule the model did not name. Left as written, it either
+    matches something exactly or is reported.
+    """
+    known: dict[str, str] = {}
+    ambiguous: set[str] = set()
+    for passage in supplied:
+        key = _names(passage.reference)
+        if key in known and known[key] != passage.reference:
+            ambiguous.add(key)
+        known[key] = passage.reference
+    cited = tuple(
+        dict.fromkeys(
+            c if _names(c) in ambiguous else known.get(_names(c), c) for c in answer.citations
+        )
+    )
     return Answer(answer.answer, answer.in_short, cited, answer.unsure)
 
 
@@ -153,10 +170,14 @@ def refusal(problems: Sequence[str]) -> Answer:
     the part that was certainly true all along.
     """
     return Answer(
+        # Without "if there are any". The commonest refusal is an answer that
+        # cited nothing, and the commonest reason for *that* is that nothing
+        # was retrieved -- so the old wording pointed at rules below in exactly
+        # the case where there were none.
         answer=(
             "The answer did not stay inside the rules it was given, so it is not shown. "
-            "The rules below are the real ones; read those."
+            "Any rules listed below are the real ones; read those."
         ),
-        in_short="I could not answer that one safely. Let us read the rule together.",
+        in_short="I could not answer that one safely. Let us read the card together.",
         unsure="; ".join(problems),
     )

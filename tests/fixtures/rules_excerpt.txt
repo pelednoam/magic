@@ -21,8 +21,10 @@ Credits
 100. General
 
 100.1. These Magic rules apply to any Magic game with two or more players.
+Example: a game with three players is a multiplayer game.
 
 100.1a A two-player game is a game that begins with only two players.
+It may still use any of the options in section 8.
 
 509. Declare Blockers Step
 
@@ -45,6 +47,12 @@ Credits
 702.19b The controller of an attacking creature with trample first assigns damage to the creature(s) blocking it.
 
 903.12 Brawl Option
+
+8. Multiplayer Rules
+
+800. General
+
+800.1. A multiplayer game is a game that begins with more than two players.
 
 Glossary
 

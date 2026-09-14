@@ -8,7 +8,8 @@ it deserves to be somewhere you can find it.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import threading
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
@@ -30,6 +31,12 @@ if TYPE_CHECKING:
     from mtgcoach.rules.search import RuleIndex
 
 
+#: How many of the two slow routes may be in flight at once. The threadpool
+#: has ten workers by default and the tracker's own routes need some of them,
+#: so the slow ones get a minority of it.
+MAX_IN_FLIGHT = 3
+
+
 @dataclass(slots=True)
 class Server:
     """Everything the routes need, in one place they can be given in a test."""
@@ -44,6 +51,13 @@ class Server:
     #: route then says so, and everything else works exactly as before -- the
     #: tracker and the turn coach do not need the rules document.
     rules: RuleIndex | None
+    #: How many slow asks this server will run at once. Per-server rather than
+    #: per-module: everything else the routes need is here, two servers in one
+    #: process are two servers, and a module global made one test's saturated
+    #: limiter another test's mysterious 503.
+    in_flight: threading.BoundedSemaphore = field(
+        default_factory=lambda: threading.BoundedSemaphore(MAX_IN_FLIGHT)
+    )
 
 
 def session(server: Server, session_id: str) -> Session:

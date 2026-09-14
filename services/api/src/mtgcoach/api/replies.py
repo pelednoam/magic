@@ -58,7 +58,12 @@ def _decode(body: str) -> object:
         pass
     start, end = body.find("{"), body.rfind("}")
     if start < 0 or end <= start:
-        msg = f"the coach did not answer with an object: {body[:160]!r}"
+        # Deliberately without the body. This message reaches the client and
+        # the CORS policy is `*`; `body` is the CLI's raw stdout when the
+        # envelope could not be read, and a CLI that prints a usage or auth
+        # error there carries absolute paths and config locations with it.
+        # Quoting 160 bytes of it undid the stderr scrubbing in `claude.py`.
+        msg = "the coach did not answer with an object"
         raise ExplainerError(msg)
     try:
         return json.loads(body[start : end + 1])
@@ -90,10 +95,34 @@ def _unwrap(stdout: str) -> str:
     return result if isinstance(result, str) else stdout
 
 
-def text(payload: Mapping[str, object], field: str) -> str:
-    """A string field, empty when it is missing or the wrong type."""
+def prose(payload: Mapping[str, object], field: str) -> str:
+    """A string of prose, empty when it is missing or the wrong type.
+
+    For fields nothing is checked against: ``because``, ``in_short``,
+    ``answer``, ``unsure``. Use ``one`` for anything a checker will compare
+    against the engine.
+    """
     value = payload.get(field)
     return value if isinstance(value, str) else ""
+
+
+def one(payload: Mapping[str, object], field: str) -> str:
+    """A single identifier, or empty when the field is absent.
+
+    ``play`` is the only one, and it needs the same treatment as ``attack``:
+    empty means "play nothing", which is a real recommendation, so quietly
+    turning a malformed value into empty does not lose information -- it
+    substitutes a different recommendation, and one that always passes.
+
+    Raises:
+        MalformedFieldError: If the field is present and is not a string.
+    """
+    value = payload.get(field)
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise MalformedFieldError(field, value)
+    return value
 
 
 def words(payload: Mapping[str, object], field: str) -> tuple[str, ...]:

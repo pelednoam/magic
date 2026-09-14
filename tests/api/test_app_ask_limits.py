@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING
 from fastapi.testclient import TestClient
 
 from helpers_api import RULES, Answering, server
-from mtgcoach.api import thinking
+from mtgcoach.api import context
 from test_app_ask import GOOD, ask, new_game
 
 if TYPE_CHECKING:
@@ -107,7 +107,7 @@ def test_only_so_many_questions_run_at_once() -> None:
     subprocesses" into "a queue", which is the difference between a slow
     tracker and a laptop somebody has to reboot.
     """
-    started = threading.Barrier(thinking.MAX_IN_FLIGHT + 1, timeout=5)
+    started = threading.Barrier(context.MAX_IN_FLIGHT + 1, timeout=5)
     release = threading.Event()
 
     @dataclass(frozen=True, slots=True)
@@ -125,7 +125,7 @@ def test_only_so_many_questions_run_at_once() -> None:
         session_id = new_game(client)
         holding = [
             threading.Thread(target=lambda: ask(client, session_id))
-            for _ in range(thinking.MAX_IN_FLIGHT)
+            for _ in range(context.MAX_IN_FLIGHT)
         ]
         for worker in holding:
             worker.start()
