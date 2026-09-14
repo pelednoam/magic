@@ -54,6 +54,11 @@ UNBLOCKED = "unblocked creature"
 #: live, and it is why the entry adds two phrases rather than one.
 COMBAT_DAMAGE = "combat damage"
 
+#: Both apostrophes. A phone substitutes the typographic one (U+2019) by
+#: default, and the client here *is* a phone app -- so a pattern matching only
+#: the straight one silently never fires for the person it was written for.
+_APOSTROPHE = "['\u2019]?"
+
 #: Each entry: a question's polarity, and the rules' word for the other one.
 #:
 #: Note ``\btapped\b`` does not match inside "untapped" -- there is no word
@@ -73,12 +78,22 @@ PAIRS: tuple[tuple[re.Pattern[str], tuple[str, ...]], ...] = (
     ),
     # Nobody blocked it. The rules have one word for this and a person has
     # three.
+    #
+    # Every alternative here is a *negation*. The first version listed bare
+    # "is" and "was" among them, so "what happens when my creature is
+    # blocked?" -- a first-game question at least as common as its negative
+    # twin -- was steered to the rules for the opposite game state. Two
+    # reviewers found it independently.
     (
         re.compile(
-            r"\b(?:(?:is|was|isn'?t|wasn'?t|not|never|aren'?t)\s+blocked"
-            r"|no(?:body|\s*one|thing)\s+block(?:s|ed)?"
-            r"|does(?:n'?t)?\s+get\s+blocked"
-            r"|without\s+(?:being\s+)?blocked)\b",
+            rf"\b(?:"
+            rf"(?:is|was|are|were|does|did|do|has|have|ca|could|would)n{_APOSTROPHE}t"
+            rf"\s+(?:get\s+|been\s+)?blocked"
+            rf"|(?:is|was|are|were)\s+(?:not|never)\s+blocked"
+            rf"|(?:not|never)\s+blocked"
+            rf"|no(?:body|\s*one|thing)\s+block(?:s|ed)?"
+            rf"|without\s+(?:being\s+)?blocked"
+            rf")\b",
             re.IGNORECASE,
         ),
         (UNBLOCKED, COMBAT_DAMAGE),

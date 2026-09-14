@@ -13,6 +13,8 @@ these tests are mostly about what is *not* set aside.
 
 from __future__ import annotations
 
+import pytest
+
 from helpers_rules import PASSAGES
 from mtgcoach.rules.keywords import names_in, ordinary
 from mtgcoach.rules.terms import query
@@ -44,11 +46,36 @@ def test_a_number_after_the_word_makes_it_a_verb() -> None:
     assert ordinary("what happens when my hit points reach zero?", KEYWORDS) == {"reach"}
 
 
-def test_a_digit_after_the_word_counts_too() -> None:
-    assert ordinary("what happens when I reach 0 life?", KEYWORDS) == {"reach"}
+def test_a_digit_after_the_word_does_not_count() -> None:
+    """Seventy of the hundred and sixty keywords take a number.
+
+    Cards write it as a digit -- "Toxic 1", "Ward 2", "Discover 5" -- and so
+    does anybody quoting one, so "what does toxic 1 do?" lost its only
+    searchable word and retrieved nothing. A person writing English writes
+    "zero".
+    """
+    assert ordinary("what happens when I reach 0 life?", KEYWORDS) == frozenset()
+    assert ordinary("what does trample 2 do?", KEYWORDS) == frozenset()
 
 
-def test_a_subject_pronoun_before_the_word_makes_it_a_verb() -> None:
+def test_an_inflected_keyword_is_recognised() -> None:
+    """Inflections count.
+
+    The index is porter-stemmed, so "reaches" matches every passage titled
+    Reach -- and comparing the surface word against the heading missed it.
+    """
+    assert ordinary("what happens when my life reaches zero?", KEYWORDS) == {"reaches"}
+
+
+def test_a_subject_pronoun_before_the_word_is_not_a_signal() -> None:
+    """It was, and it emptied the query.
+
+    "Does it trample?" is a question about the ability; `does` and `it` are
+    noise words, so setting the keyword aside left nothing at all -- and an
+    empty query means "the rules cannot be looked up for this". The number
+    word catches every question the pronoun was written for anyway.
+    """
+    assert ordinary("does it trample?", KEYWORDS) == frozenset()
     assert ordinary("what happens if I reach zero life?", KEYWORDS) == {"reach"}
 
 
@@ -93,10 +120,14 @@ def test_the_word_stays_when_the_question_is_about_the_keyword() -> None:
     assert '"reach"' in query("what does reach do?", KEYWORDS)
 
 
-def test_a_question_that_is_only_a_keyword_used_as_a_verb_still_has_words() -> None:
-    """Removing the word must not empty the query.
+@pytest.mark.parametrize(
+    "question", ["my life points reach zero", "reach zero", "does it trample?", "trample zero"]
+)
+def test_setting_a_word_aside_never_empties_the_query(question: str) -> None:
+    """Setting a word aside may not leave nothing.
 
     An empty query means "the rules cannot be looked up for this", which is a
-    much stronger statement than "one of your words was ambiguous".
+    much stronger statement than "one of your words was ambiguous". A
+    collision ranks the wrong passage; no query ranks none.
     """
-    assert query("my life points reach zero", KEYWORDS) != ""
+    assert query(question, KEYWORDS) != ""

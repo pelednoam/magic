@@ -1,0 +1,10 @@
+{
+  "_comment": [
+    "Overrides for the vendored review agent, read by scripts/preflight/config.py.",
+    "Here rather than in that file because install.sh copies it over, so an edit",
+    "there is destroyed on the next re-vendor -- silently, leaving a coverage gate",
+    "that covers nothing. A reviewer caught exactly that happening here."
+  ],
+  "source_dirs": ["packages/", "services/", "tools/", "apps/"],
+  "test_dirs": ["tests/"]
+}

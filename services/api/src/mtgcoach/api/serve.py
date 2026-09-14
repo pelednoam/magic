@@ -20,11 +20,11 @@ from typing import TYPE_CHECKING
 
 import uvicorn
 
-from mtgcoach.api.access import token_at
 from mtgcoach.api.address import reachable
 from mtgcoach.api.app import create_app
 from mtgcoach.api.cards import build
 from mtgcoach.api.context import Claude
+from mtgcoach.api.tokenfile import token_at
 from mtgcoach.carddata.decks import load_set_decks
 from mtgcoach.carddata.paths import effects_path
 from mtgcoach.carddata.store import CardStore

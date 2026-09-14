@@ -40,7 +40,7 @@ def prose(payload: Mapping[str, object], field: str) -> str:
 
 
 def one(payload: Mapping[str, object], field: str) -> str:
-    """A single identifier, or empty when the field is absent.
+    """A single identifier. The key must be there; its value may be empty.
 
     ``play`` is the only one, and it needs the same treatment as ``attack``:
     empty means "play nothing", which is a real recommendation, so quietly

@@ -23,7 +23,12 @@ def test_a_wildcard_host_is_printed_as_this_machines_lan_address(
     wildcard: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Nobody can type "every interface" into a phone."""
-    monkeypatch.setattr("mtgcoach.api.address.lan_address", lambda: "192.168.1.42")
+
+    def found(_family: socket.AddressFamily) -> str:
+        """A plausible LAN address, whichever family was asked for."""
+        return "192.168.1.42"
+
+    monkeypatch.setattr("mtgcoach.api.address.lan_address", found)
     assert reachable(wildcard, 8000) == "http://192.168.1.42:8000"
 
 

@@ -17,7 +17,7 @@ from mtgcoach.rules.keywords import ordinary
 #: A word worth searching for. Apostrophes are kept inside a word ("player's")
 #: and everything else is a separator, which also means nothing a person types
 #: can reach FTS5 as syntax.
-_WORD = re.compile(r"[A-Za-z0-9]+(?:'[A-Za-z]+)?")
+_WORD = re.compile(r"[A-Za-z0-9]+(?:['\u2019][A-Za-z]+)?")
 
 #: Words that match most of the document and so rank nothing. Deliberately
 #: short: a stop list that grows starts deciding what a question is about.
@@ -107,10 +107,16 @@ def query(question: str, keywords: frozenset[str] = frozenset()) -> str:
     ``keywords.names_in``. Empty by default, which is no change at all.
     """
     words = [word.lower() for word in _WORD.findall(question)]
+    searchable = [word for word in words if word not in _NOISE and len(word) > 1]
     english = ordinary(question, keywords)
-    wanted = [
-        word for word in words if word not in _NOISE and len(word) > 1 and word not in english
-    ]
+    wanted = [word for word in searchable if word not in english]
+    if not wanted:
+        # Setting words aside may not leave nothing. "Does it trample?" is
+        # three words, two of them noise, so dropping the keyword left an empty
+        # query -- which `search` reads as "the rules cannot be looked up for
+        # this" and answers with no passages at all. A collision ranks the
+        # wrong passage; this ranks none.
+        wanted = searchable
     added = (*phrasing.also(question), *negation.spelled_out(question))
     return " OR ".join(f'"{term}"' for term in (*wanted, *added))
 

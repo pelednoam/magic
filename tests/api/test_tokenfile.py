@@ -1,0 +1,197 @@
+"""The token file: made once, kept to its owner, never followed through a link.
+
+The disk half of the token. `test_access_tokens` covers the wire half -- the
+header a request carries -- and the two have nothing in common, which is why
+the module was split in the first place.
+"""
+
+from __future__ import annotations
+
+import os
+import stat
+from typing import TYPE_CHECKING
+
+import pytest
+
+from mtgcoach.api.tokenfile import TokenPathError, new_token, token_at, usable
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+
+def test_a_fresh_token_is_not_guessable() -> None:
+    assert len(new_token()) >= 32
+    assert new_token() != new_token()
+
+
+def test_a_token_file_is_made_once_and_read_back(tmp_path: Path) -> None:
+    """Restarting the server must not invalidate the phone in somebody's hand."""
+    where = tmp_path / "token"
+    first = token_at(where)
+    assert token_at(where) == first
+
+
+def test_a_token_file_is_readable_only_by_its_owner(tmp_path: Path) -> None:
+    """Created with the permissions it needs, not fixed afterwards.
+
+    A token that was briefly world-readable was world-readable.
+    """
+    where = tmp_path / "token"
+    token_at(where)
+    assert stat.S_IMODE(where.stat().st_mode) == 0o600
+
+
+def test_a_directory_that_does_not_exist_yet_is_made(tmp_path: Path) -> None:
+    assert token_at(tmp_path / "nested" / "token")
+
+
+def test_an_empty_token_file_is_replaced(tmp_path: Path) -> None:
+    """A truncated write should not leave the server with no access control."""
+    where = tmp_path / "token"
+    where.write_text("   \n", encoding="utf-8")
+    assert token_at(where).strip()
+
+
+def test_an_existing_loose_file_is_tightened(tmp_path: Path) -> None:
+    """It can arrive from a git checkout, a backup, or a loose umask.
+
+    The `open` mode is ignored by the kernel for a file that already exists, so
+    the first version wrote a fresh token into somebody else's 0644 file and
+    left it 0644.
+    """
+    where = tmp_path / "token"
+    where.write_text("already-here\n", encoding="utf-8")
+    where.chmod(0o644)
+    assert token_at(where) == "already-here"
+    assert stat.S_IMODE(where.stat().st_mode) == 0o600
+
+
+def test_a_symlink_is_not_followed(tmp_path: Path) -> None:
+    """A symlink is not a token file.
+
+    One planted at `data/token` would otherwise have this write a token
+    wherever it pointed, and read one somebody else chose.
+    """
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.write_text("planted\n", encoding="utf-8")
+    link = tmp_path / "token"
+    link.symlink_to(elsewhere)
+    with pytest.raises(TokenPathError, match="is a symlink"):
+        token_at(link)
+    assert elsewhere.read_text(encoding="utf-8") == "planted\n", "the target is untouched"
+
+
+def test_a_second_server_reads_what_the_first_wrote(tmp_path: Path) -> None:
+    """`O_EXCL` settles the race: one creates, the other reads.
+
+    Without it both wrote different tokens over each other and a running app
+    was guarded by one while the operator was shown the other.
+    """
+    where = tmp_path / "token"
+    first = token_at(where)
+    assert token_at(where) == first
+
+
+def test_an_empty_file_is_written_over_rather_than_looped_on(tmp_path: Path) -> None:
+    """The exclusive create says the file is there; the read says it is empty.
+
+    The first version retried until one of those changed, which was never.
+    """
+    where = tmp_path / "token"
+    where.write_text("", encoding="utf-8")
+    assert token_at(where).strip()
+    assert stat.S_IMODE(where.stat().st_mode) == 0o600
+
+
+def test_a_directory_where_the_file_goes_is_not_silently_accepted(tmp_path: Path) -> None:
+    """It cannot be read and cannot be created, so it has to be an error."""
+    (tmp_path / "token").mkdir()
+    with pytest.raises(OSError, match="Is a directory"):
+        token_at(tmp_path / "token")
+
+
+@pytest.mark.parametrize(
+    "content",
+    ["����", "tok en", "tok\ten", "café-token", "\x00\x01\x02"],
+)
+def test_a_damaged_file_is_replaced_rather_than_becoming_the_token(
+    tmp_path: Path, content: str
+) -> None:
+    """A half-written or byte-damaged file used to become the live credential.
+
+    `_read` decodes with `errors="replace"`, so corrupt bytes come back as a
+    string of U+FFFD -- which is not empty, so it was accepted, printed, and
+    could not be sent in an `Authorization` header by any client. The server
+    ran with a token nobody could present.
+    """
+    where = tmp_path / "token"
+    where.write_bytes(content.encode("utf-8", errors="replace"))
+    made = token_at(where)
+    assert made != content
+    assert usable(made)
+    assert where.read_text(encoding="utf-8").strip() == made
+
+
+def test_a_short_token_somebody_chose_is_left_alone(tmp_path: Path) -> None:
+    """Not a strength check.
+
+    A short token is a weak one, but an operator who put it there chose it,
+    it is their LAN, and the server prints it at every start where they can
+    see it. Silently replacing a deliberate choice is a worse surprise than
+    the one this guards against.
+    """
+    where = tmp_path / "token"
+    where.write_text("hunter2\n", encoding="utf-8")
+    assert token_at(where) == "hunter2"
+
+
+def test_a_file_with_no_write_bit_is_tightened_rather_than_refused(tmp_path: Path) -> None:
+    """A 0400 token from a restrictive umask or a careful backup.
+
+    The lock needs `O_RDWR`, which such a file refuses outright -- so the
+    server would not start, contradicting the promise that a mode it can put
+    right gets put right.
+    """
+    where = tmp_path / "token"
+    where.write_text("already-here\n", encoding="utf-8")
+    where.chmod(0o400)
+    assert token_at(where) == "already-here"
+    assert stat.S_IMODE(where.stat().st_mode) == 0o600
+
+
+def test_a_token_is_written_whole_even_when_the_write_is_short(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`os.write` may write fewer bytes than it was given.
+
+    A short write would hand the running server the whole token and leave a
+    prefix on disk, so the next start -- and any other process -- would
+    disagree with it about what the credential is.
+    """
+    real = os.write
+
+    def grudging(handle: int, payload: bytes) -> int:
+        """One byte at a time, which is allowed and rarely exercised."""
+        return real(handle, payload[:1])
+
+    monkeypatch.setattr(os, "write", grudging)
+    where = tmp_path / "token"
+    made = token_at(where)
+    assert where.read_text(encoding="utf-8").strip() == made
+
+
+def test_a_file_that_cannot_be_opened_at_all_says_so(tmp_path: Path) -> None:
+    """A directory that will not take a new file.
+
+    Tightening the mode is the recovery for a file this user owns; there is
+    none for a path this user cannot write to at all, and errno prose says
+    nothing about what to do. The message names the path and asks who owns it.
+    """
+    where = tmp_path / "locked" / "token"
+    where.parent.mkdir()
+    where.parent.chmod(0o500)
+    try:
+        with pytest.raises(TokenPathError, match="cannot be opened for writing"):
+            token_at(where)
+    finally:
+        where.parent.chmod(0o700)

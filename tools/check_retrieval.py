@@ -61,11 +61,37 @@ def asked(path: Path) -> list[dict[str, object]]:
     if not isinstance(questions, list) or not questions:
         msg = f"{path} has no question list in it"
         raise ValueError(msg)
-    return [
-        cast("dict[str, object]", entry)
-        for entry in cast("list[object]", questions)
-        if isinstance(entry, dict)
-    ]
+    asking = cast("list[object]", questions)
+    return [_checked(entry, index, path) for index, entry in enumerate(asking, 1)]
+
+
+def _checked(entry: object, index: int, path: Path) -> dict[str, object]:
+    """One question, or a refusal naming which one.
+
+    Malformed entries used to be filtered out with ``isinstance(entry, dict)``
+    and the rest checked as though nothing were missing. A bad edit or a JSON
+    transform could therefore cost coverage in silence -- and an entry that was
+    only ``{"gap": "..."}`` was reported as an allowed gap, which is a way of
+    marking a question as known-broken without ever asking it.
+
+    Raises:
+        ValueError: If the entry is not a question.
+    """
+    if not isinstance(entry, dict):
+        # ValueError, not TypeError: the caller catches one thing for "the
+        # question file is wrong", and a bad JSON *value* is a content problem
+        # rather than somebody passing the wrong argument.
+        msg = f"{path} question {index} is {type(entry).__name__}, not an object"
+        raise ValueError(msg)  # noqa: TRY004 - a bad file, not a bad call
+    question = cast("dict[str, object]", entry)
+    if not str(question.get("ask", "")).strip():
+        msg = f"{path} question {index} has no 'ask'"
+        raise ValueError(msg)
+    wanted = question.get("any")
+    if not isinstance(wanted, list) or not wanted:
+        msg = f"{path} question {index} ({question['ask']!r}) has no 'any' references"
+        raise ValueError(msg)
+    return question
 
 
 def verdicts(index: RuleIndex, questions: list[dict[str, object]]) -> list[tuple[str, str, str]]:
@@ -121,6 +147,13 @@ def said(report: list[tuple[str, str, str]]) -> int:
     Public because the exit code is the whole contract with the gate, and a
     test that has to reach past an underscore to check it tends not to exist.
     """
+    if not report:
+        # A gate that asked nothing must not report a pass. "0/0 questions
+        # answered" and exit 0 is indistinguishable from a green run, and the
+        # ways to get here -- a filtered-away list, an empty file -- are all
+        # ways of losing the check without noticing.
+        print("== retrieval         FAILED: no questions were asked")
+        return 1
     missed = [(ask, detail) for state, ask, detail in report if state == "miss"]
     gaps = [ask for state, ask, _detail in report if state == "gap"]
     fixed = [ask for state, ask, _detail in report if state == "fixed"]

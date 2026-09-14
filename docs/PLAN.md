@@ -1031,8 +1031,15 @@ maps the paraphrase onto the whole phrase instead.
 **Retrieval is now measured rather than asserted.** `tools/check_retrieval.py` asks the installed
 rules 22 questions a person would actually type and checks an answering rule comes back in the top
 eight; the questions and their acceptable references are data, in `tools/retrieval_questions.json`.
-It went 18/22 → 21/22 across these two fixes with no regressions, and it is in the gate, so a
-change that drops a question fails the build instead of quietly making the coach worse.
+It went 18/22 → 21/22 across these two fixes with no regressions.
+
+*What it does and does not enforce.* It runs where the Comprehensive Rules are installed and
+**skips, loudly, where they are not** — which is every fresh checkout, and CI, because the
+document is Wizards' and deliberately not vendored. So it guards the machine the coach actually
+runs on, and on any other machine `== retrieval SKIPPED` is printed rather than a pass being
+implied. `tools/check_rules_phrasing.py` has exactly the same shape and the same limit. Neither
+can be made to run without the document, and vendoring a stale copy is the failure this project
+exists to avoid, so the honest statement is: a local gate run enforces it, a fresh clone cannot.
 
 That 22nd question is why the gap list exists, and it is what got fixed next.
 

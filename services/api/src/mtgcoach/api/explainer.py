@@ -78,10 +78,15 @@ def parse(stdout: str) -> Explanation:
     """
     explanation = _explanation(object_in(stdout))
     if not explanation.because and not explanation.in_short:
-        # Reached by the CLI's own error envelope, whose `result` is null: that
-        # decodes to a well-formed object with none of the fields in it. Advice
-        # with no words is not advice, and showing it blank would look like the
-        # coach had considered the board and had nothing to say.
+        # A reply that made a choice and said nothing about it. Advice with no
+        # words is not advice, and showing it blank would look like the coach
+        # had considered the board and had nothing to say.
+        #
+        # This used to say it was reached by the CLI's own null-result
+        # envelope. It is not, any more: that decodes to an object with no
+        # `play` in it, which `_explanation` now refuses first. The branch is
+        # still reachable -- `{"play": "", "attack": []}` -- and
+        # `test_an_answer_with_no_words_in_it_is_an_error` is that case.
         msg = "the coach's answer had no explanation in it"
         raise ExplainerError(msg)
     return explanation

@@ -16,16 +16,31 @@ wanted, that a player at 0 life loses, was nowhere.
 question that merely contains one, and dropping the wrong word is much worse
 than keeping it: "what about deathtouch?" with "deathtouch" dropped retrieves
 nothing at all. So the keyword reading is the default and stays the default,
-and a word is set aside only on *positive* evidence that it is being used as an
-ordinary verb:
+and a word is set aside only on one narrow signal -- a number *word* straight
+after it, as in "reach zero" or "reach twenty". A keyword is a noun; a number
+after it makes it a verb with an object.
 
-- something countable straight after it -- "reach zero", "reach 20". A keyword
-  is a noun; a number after it makes it a verb with an object.
-- a subject pronoun straight before it -- "I reach", "it reaches".
+Three things are deliberately *not* signals, each because a review found the
+question it breaks:
 
-Both are narrow on purpose. "The defender blocks" is not demoted, because "the
-defender" could be either and the question has "blocks" to find the rule with
-anyway; measured, it retrieves the right rule either way.
+- **A digit.** "Toxic 1", "Ward 2", "Discover 5": seventy of the hundred and
+  sixty keywords take a number, cards write it as a digit, and so does anybody
+  quoting one. "What does toxic 1 do?" lost its only searchable word and
+  retrieved nothing. A person writing English writes "zero", not "0".
+- **A subject pronoun before it.** "Does it trample?" and "can it exploit?" are
+  questions about the ability, and both came out as an empty query -- "does"
+  and "it" are noise words, so setting the keyword aside left nothing at all,
+  and an empty query means "the rules cannot be looked up for this". It also
+  bought nothing: every question it was written for is caught by the number
+  word anyway.
+- **Anything at all, if it would empty the query.** Kept as a backstop even
+  though no signal should now be able to: a collision that ranks the wrong
+  passage is a worse answer, but no query is no answer.
+
+Inflections count. The index is porter-stemmed, so "reaches" in a question
+matches every passage titled Reach -- which means "my life reaches zero" had
+exactly the collision this module exists to prevent, and the module did not
+notice, because it compared the surface word against the heading.
 
 **The list of keywords comes from the document, not from here.** There are 160
 and Wizards add several a year, so a list written out in this file would be
@@ -79,13 +94,8 @@ NUMBERS = frozenset(
     ]
 )
 
-#: Pronouns that make the next word a verb. "I reach", "it reaches".
-SUBJECTS = frozenset(
-    ["i", "we", "you", "they", "it", "he", "she", "who", "nobody", "everyone", "someone"]
-)
-
 #: A word, as ``terms`` cuts them, so both agree on what a word is.
-_WORD = re.compile(r"[a-z0-9]+(?:'[a-z]+)?")
+_WORD = re.compile(r"[a-z0-9]+(?:['\u2019][a-z]+)?")
 
 
 def names_in(passages: Iterable[Passage]) -> frozenset[str]:
@@ -105,26 +115,49 @@ def names_in(passages: Iterable[Passage]) -> frozenset[str]:
     )
 
 
+#: Endings the porter stemmer in the index collapses, shortest last so the
+#: longest match is tried first. Not a stemmer: enough to recognise that
+#: "reaches" is the word "reach", which is all this has to decide.
+_ENDINGS = ("ing", "es", "ed", "s", "d")
+
+
 def ordinary(question: str, keywords: frozenset[str]) -> frozenset[str]:
     """The keyword words this question uses as plain English, if any.
+
+    Returns the words *as the question spelled them*, so the caller can drop
+    exactly those -- "reaches", not "reach".
 
     Empty for almost every question, which is the point: this only fires on
     evidence, and the evidence is deliberately hard to produce by accident.
     """
     words = _WORD.findall(question.lower())
     return frozenset(
-        word for index, word in enumerate(words) if word in keywords and _is_verb(words, index)
+        word
+        for index, word in enumerate(words)
+        if _names_a_keyword(word, keywords) and _is_verb(words, index)
     )
+
+
+def _names_a_keyword(word: str, keywords: frozenset[str]) -> bool:
+    """Whether this word is a keyword's name, in any inflection.
+
+    The index is porter-stemmed, so "reaches" matches every passage titled
+    Reach -- and comparing the surface word against the heading missed exactly
+    that, leaving "my life reaches zero" with the collision this module exists
+    to prevent.
+    """
+    if word in keywords:
+        return True
+    return any(word.endswith(ending) and word[: -len(ending)] in keywords for ending in _ENDINGS)
 
 
 def _is_verb(words: list[str], index: int) -> bool:
     """Whether the word at ``index`` is being used as a verb.
 
-    Only the two signals in the module docstring. Widening this is how the
-    check starts dropping words from questions that were about the keyword all
-    along, so anything added here wants a measurement behind it --
-    ``tools/check_retrieval.py`` is where that measurement lives.
+    One signal, and the module docstring says what the rejected ones cost.
+    Widening this is how the check starts dropping words from questions that
+    were about the keyword all along, so anything added here wants a
+    measurement behind it -- ``tools/check_retrieval.py`` is that measurement.
     """
-    before = words[index - 1] if index else ""
     after = words[index + 1] if index + 1 < len(words) else ""
-    return after in NUMBERS or after.isdigit() or before in SUBJECTS
+    return after in NUMBERS

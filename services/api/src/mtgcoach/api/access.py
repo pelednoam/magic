@@ -18,32 +18,14 @@ carries both hands, and ``move_card`` will still move any card from any zone.
 code, and one shared secret does not change that -- a token per seat would, and
 is the obvious next step from here.
 
-The token lives in a file next to the card database so that restarting the
-server does not invalidate the phone in somebody's hand.
+This module is the wire half: the header a request carries and whether it
+matches. ``tokenfile`` is the disk half -- where the token comes from, and why
+restarting the server does not invalidate the phone in somebody's hand.
 """
 
 from __future__ import annotations
 
-import fcntl
-import os
 import secrets
-import stat
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from pathlib import Path
-
-#: How many random bytes. 32 is 256 bits, which is not going to be guessed on a
-#: home network or anywhere else.
-STRENGTH = 32
-
-#: Who may read the token file: its owner. The server runs as the person who
-#: started it, and everyone else on that laptop is not part of the game.
-OWNER_ONLY = 0o600
-
-#: How much to read at a time. A token is 43 characters, so this is the whole
-#: file in one call; the loop is there because `os.read` may return less.
-READ_CHUNK = 4096
 
 #: The scheme's prefix, as it appears in the header. Compared case-insensitively
 #: because RFC 7235 §2.1 makes the scheme name case-insensitive and several
@@ -59,97 +41,6 @@ SCHEME = "bearer "
 
 class MissingTokenError(ValueError):
     """A server was built without a token. There is no open mode."""
-
-
-class TokenPathError(ValueError):
-    """The token file is something a token file may not be."""
-
-
-def new_token() -> str:
-    """A fresh token."""
-    return secrets.token_urlsafe(STRENGTH)
-
-
-def token_at(path: Path) -> str:
-    """The token in this file, making one if there is none yet.
-
-    Everything happens under an exclusive ``flock`` on the file itself, which
-    is what makes two servers starting at the same instant agree. The version
-    before this one created exclusively and read on ``FileExistsError``, which
-    looked like it settled the race and did not: between one process creating
-    the file and writing to it, the other read it, found it empty, and wrote a
-    *different* token over the top. Both then answered requests with the token
-    they had in hand, one of which was no longer the one in the file. A lock
-    held across read-decide-write is the only shape without that window.
-
-    Two other things it does carefully:
-
-    - **Not through a symlink.** ``O_NOFOLLOW``, and a refusal up front so the
-      reason is legible. A symlink planted at ``data/token`` would otherwise
-      have this write a token wherever it pointed, and read one somebody else
-      chose.
-    - **Tightened if it arrived loose.** The mode argument to ``open`` applies
-      only when the call creates the file, so a 0644 file from a checkout, a
-      backup or a permissive umask stays 0644 unless something says otherwise.
-      Fixed rather than refused: the server can put it right, and refusing to
-      start would be worse for the person at the table.
-
-    Raises:
-        TokenPathError: If the path is a symlink.
-    """
-    if path.is_symlink():
-        # `O_NOFOLLOW` below refuses this too, but with `ELOOP` -- "Too many
-        # levels of symbolic links", which says nothing about what is wrong or
-        # what to do. The check is the message; the flag is the enforcement,
-        # and it is what holds if the link appears after this line.
-        msg = f"{path} is a symlink; a token file may not be one. Remove it."
-        raise TokenPathError(msg)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    handle = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, OWNER_ONLY)
-    try:
-        fcntl.flock(handle, fcntl.LOCK_EX)
-        return _settled(handle)
-    finally:
-        # Closing releases the lock. Explicit rather than `os.fdopen`, because
-        # a file object would close the descriptor on garbage collection at
-        # some later moment, and the lock has to be gone before this returns.
-        os.close(handle)
-
-
-def _settled(handle: int) -> str:
-    """The token, read or written, on a descriptor already locked.
-
-    Split out because the lock is the interesting part of ``token_at`` and this
-    is the boring part, and because a function that must only ever be called
-    under a lock is easier to see when it is one function.
-    """
-    if stat.S_IMODE(os.fstat(handle).st_mode) & ~OWNER_ONLY:
-        os.fchmod(handle, OWNER_ONLY)
-    found = _read(handle).strip()
-    if found:
-        return found
-    # Empty: either this call created it, or something else did and left it
-    # that way. Under the lock there is no third possibility and no need to
-    # look again.
-    token = new_token()
-    os.lseek(handle, 0, os.SEEK_SET)
-    os.truncate(handle, 0)
-    os.write(handle, (token + "\n").encode("utf-8"))
-    return token
-
-
-def _read(handle: int) -> str:
-    """Everything on this descriptor, from the start.
-
-    A token is 43 characters, so one read is the whole file -- but `os.read`
-    is allowed to return less than asked for, and a short read that silently
-    became "no token here" would write over a perfectly good one.
-    """
-    os.lseek(handle, 0, os.SEEK_SET)
-    chunks: list[bytes] = []
-    while chunk := os.read(handle, READ_CHUNK):
-        chunks.append(chunk)
-    return b"".join(chunks).decode("utf-8", errors="replace")
 
 
 def presented(header: str | None, query: str | None) -> str:

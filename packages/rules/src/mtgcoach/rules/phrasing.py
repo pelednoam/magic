@@ -27,14 +27,11 @@ being a *concept* a beginner has no rules-vocabulary for -- not a synonym, and
 not a word the document already explains.
 
 What this is *not* is a guarantee. An added phrase competes on bm25 like every
-other term, and it can lose. Verified live: "what happens when my hit points
-reach zero?" still retrieves the rules for **reach**, the keyword ability,
-because the question happens to contain the word and a keyword's own heading
-outranks a common phrase. That is a different weakness -- a word that is
-ordinary English and also a Magic keyword -- and this map does not address it.
-On the same question without the collision ("how many hit points do we start
-with?") the phrase wins and rule 103.4 comes back where nothing useful did
-before.
+other term, and it can lose. It lost, at first, to a different weakness
+entirely: "what happens when my hit points reach zero?" retrieved the rules for
+**reach**, the keyword ability, because the question contains the word and a
+keyword's heading outranks a common phrase. ``keywords`` addresses that one --
+this map does not, and the two are separate for that reason.
 
 Every target must actually occur in the Comprehensive Rules.
 ``tools/check_rules_phrasing.py`` checks that against the installed document,
@@ -74,16 +71,24 @@ PHRASES: tuple[tuple[re.Pattern[str], tuple[str, ...]], ...] = (
     # Summoning sickness, six ways. A child says "just played", a parent who
     # last played in 1998 says "came into play", and neither says the one
     # phrase that finds the rule.
+    #
+    # The leading lookahead is the scope. Without it "I just cast a sorcery"
+    # and "the artifact came into play" both asked about summoning sickness,
+    # which is a rule about creatures attacking and tapping -- so an irrelevant
+    # phrase went into a prompt that holds eight passages and pushed a relevant
+    # one out.
     (
         re.compile(
-            r"\b(?:"
+            r"(?=.*\b(?:creature|creatures|guy|guys|attacks?|attacked|attacking|attacker"
+            r"|blocks?|blocked|blocking|blocker|taps?|tapped|tapping|untapped)\b)"
+            r".*\b(?:"
             r"(?:came?|comes|coming) into play|"
             r"(?:just|only just|newly) (?:played|cast|summoned|arrived|came out)|"
             r"played (?:it |him |her |them )?this turn|"
             r"(?:entered|enters|came onto) the battlefield this turn|"
             r"(?:brand[- ])?new creature"
             r")\b",
-            re.IGNORECASE,
+            re.IGNORECASE | re.DOTALL,
         ),
         (SUMMONING_SICKNESS,),
     ),

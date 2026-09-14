@@ -74,7 +74,7 @@ block?"* is answered by rule 302.6, and 302.6 says "under its controller's contr
 since their most recent turn began" — so nothing matched and the answer was "the rules I was
 given don't talk about how new a creature is". `rules/phrasing.py` maps a few such paraphrases
 onto the rules' own wording; it is short on purpose, and a gate check keeps every phrase in it
-one the current document actually uses.
+one the current document actually uses (where the document is installed — see below).
 
 The mirror problem: Magic names its abilities with ordinary words, so a question can contain one
 without being about it. *"What happens when my hit points reach zero?"* used to return the rules
@@ -87,8 +87,11 @@ restricted, so *"can a tapped creature block?"* and 509.1a's *"must be untapped"
 all. `rules/negation.py` bridges the two polarities — deliberately narrowly, since "not X" → "unX"
 applied blindly turns "not less than" into a search for *unless*.
 
-`tools/check_retrieval.py` keeps all three honest: it asks the installed rules 28 questions a
-person would actually type and fails the gate if an answering rule stops coming back.
+`tools/check_retrieval.py` keeps all three honest: it asks the **installed** rules 28 questions a
+person would actually type and fails the gate if an answering rule stops coming back. On a machine
+without the rules — a fresh clone, or CI — it prints `SKIPPED` and passes, because the document is
+Wizards' and is deliberately not vendored. So it guards the laptop the coach runs on, and says so
+plainly anywhere else.
 
 Without it everything else works, the server says so at startup, and the app shows the
 question box as switched off rather than letting you type into it.
