@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 from starlette.websockets import WebSocketDisconnect
 
@@ -140,3 +141,29 @@ def test_the_real_disconnect_type_is_not_one_we_could_have_named() -> None:
     """Pinned, because it is why the original catch was wrong."""
     assert not issubclass(WebSocketDisconnect, OSError)
     assert not issubclass(WebSocketDisconnect, RuntimeError)
+
+
+@dataclass(slots=True)
+class Stalled:
+    """A watcher whose socket is open and never drains."""
+
+    async def send_json(self, data: Mapping[str, Json]) -> None:
+        """Never finish."""
+        assert data is not None
+        await asyncio.sleep(3600)
+
+
+def test_a_stalled_watcher_does_not_hold_up_the_game() -> None:
+    """Awaited without a bound, one phone in a tunnel freezes the laptop.
+
+    The send blocks forever, so every later watcher is starved *and* the HTTP
+    request that caused the broadcast never returns.
+    """
+    hub = Hub()
+    stuck, here = Stalled(), Client()
+    hub.join("g", stuck)
+    hub.join("g", here)
+    with patch("mtgcoach.api.hub.SEND_TIMEOUT", 0.01):
+        assert run(hub.broadcast("g", {"turn": 1})) == 1
+    assert here.heard == [{"turn": 1}]
+    assert hub.watchers("g") == (here,)

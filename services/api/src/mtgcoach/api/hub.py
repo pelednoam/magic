@@ -5,7 +5,7 @@ anything that can be sent a JSON object, so the fan-out logic -- which is the
 part with a bug in it, always -- is testable without a server, a client, or an
 event loop that has to be started and stopped.
 
-A send that fails drops that watcher and carries on. One phone going to sleep
+A send that fails *or stalls* drops that watcher and carries on. One phone going to sleep
 mid-turn must not stop the laptop being told what happened, and the alternative
 -- an exception escaping the broadcast -- would fail the *event* rather than the
 connection: the route returns 500 for a move the server already committed, the
@@ -18,6 +18,7 @@ watcher raised one of the two it did catch.
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol
 
@@ -25,6 +26,12 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from mtgcoach.api.views import Json
+
+
+#: How long one watcher gets to accept a message. A game update is a few
+#: kilobytes to a device in the same room; anything slower than this is a
+#: connection that has gone away without saying so.
+SEND_TIMEOUT = 5.0
 
 
 class Watcher(Protocol):
@@ -73,7 +80,12 @@ class Hub:
         heard = 0
         for watcher in self.watchers(session_id):
             try:
-                await watcher.send_json(message)
+                # Bounded, because a socket that is open but not being drained
+                # blocks forever: it would hold up every later watcher *and*
+                # the HTTP request that caused the broadcast, so one phone in a
+                # tunnel freezes the game for the person holding the laptop.
+                async with asyncio.timeout(SEND_TIMEOUT):
+                    await watcher.send_json(message)
             except Exception:  # noqa: BLE001 - see below
                 # Every failure to send means that connection is gone, and the
                 # exception types are not ours to enumerate: Starlette raises

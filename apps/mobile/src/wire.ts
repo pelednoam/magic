@@ -54,6 +54,12 @@ export interface Attacks {
   readonly plans: readonly Plan[];
   /** Empty when there are plans; otherwise why the section is empty. */
   readonly unavailable: string;
+  /**
+   * What is on the table that the numbers do not account for. Not a reason to
+   * hide the plans -- they are still the best available -- but the player has
+   * to read "four damage, lethal" as "unless the Pacifism says otherwise".
+   */
+  readonly caveats: readonly string[];
 }
 
 /** A trigger the player is about to miss. */
@@ -110,6 +116,12 @@ export interface GameState {
 
 /** What every route returns: the board, plus advice for both players. */
 export interface Snapshot {
+  /**
+   * How many events this game has seen. Monotonic, and the only ordering the
+   * client has: HTTP replies and socket broadcasts arrive in whatever order
+   * the network chooses, and without this an older one silently won.
+   */
+  readonly version: number;
   readonly state: GameState;
   readonly advice: Readonly<Record<string, Advice>>;
 }
@@ -122,3 +134,23 @@ export interface NewGame extends Snapshot {
 /** The two seats. The server names them, and this app only ever displays them. */
 export const YOU = "you";
 export const THEM = "them";
+
+/**
+ * Whether a decoded response is shaped like a snapshot.
+ *
+ * A cast is a claim, not a check: `JSON.parse(...) as Snapshot` accepted `null`
+ * and any object without `state`, and the crash arrived one render later at
+ * `snapshot.state.players`, far from the frame that caused it. This is the
+ * boundary, so this is where the claim gets tested.
+ */
+export function isSnapshot(value: unknown): value is Snapshot {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const body = value as { state?: unknown; advice?: unknown; version?: unknown };
+  return isObject(body.state) && isObject(body.advice) && typeof body.version === "number";
+}
+
+function isObject(value: unknown): boolean {
+  return typeof value === "object" && value !== null;
+}

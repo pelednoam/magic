@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from fastapi import FastAPI, HTTPException, WebSocket
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
 from mtgcoach.api import views
@@ -56,6 +57,18 @@ def create_app(catalogue: Catalogue, decks: Mapping[str, tuple[str, ...]]) -> Fa
     """
     server = Server(catalogue=catalogue, store=SessionStore(), hub=Hub(), decks=decks)
     app = FastAPI(title="Magic Coach", version="0.1.0")
+    # The web build is served by Metro on a different port, so every request
+    # from it is cross-origin and the browser blocks it before the route is
+    # ever reached -- a preflight returned 405 with no allow-origin header.
+    # Open, because this is a LAN server with no credentials and no auth: there
+    # is nothing here an origin check would protect, and pretending otherwise
+    # would be security theatre. See PLAN.md on identity for what that costs.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     _routes(app, server)
     return app
 
@@ -81,7 +94,13 @@ def _routes(app: FastAPI, server: Server) -> None:  # noqa: C901 - one route eac
         libraries = {
             PlayerId(name): _library(server, name, body.get(name, "")) for name in ("you", "them")
         }
-        session = server.store.create(libraries, PlayerId("you"))
+        try:
+            session = server.store.create(libraries, PlayerId("you"))
+        except ValueError as refused:
+            # A deck too short to draw an opening hand. `serve` drops cards the
+            # store does not have, so a partial import can advertise a deck of
+            # six -- which is a thing to say, not a stack trace.
+            raise HTTPException(HTTP_400_BAD_REQUEST, str(refused)) from refused
         return {"session_id": session.session_id, **_snapshot(server, session)}
 
     @app.get("/games/{session_id}", response_model=None)
@@ -165,6 +184,10 @@ def _snapshot(server: Server, session: Session) -> dict[str, Json]:
     the attacker needs the attack advice.
     """
     return {
+        # How many events this game has seen. The client uses it to ignore a
+        # stale reply: an HTTP response and a broadcast race, and without an
+        # ordering the older of the two could permanently roll the board back.
+        "version": len(session.events),
         "state": views.state(session.state, server.catalogue.name),
         "advice": {
             str(player): views.report(advise(session.state, player, server.catalogue))

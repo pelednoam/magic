@@ -4,7 +4,8 @@ The mana solver takes ``ManaSource``s; the game state holds ``Permanent``s. This
 is the step between, and it is where two rules that beginners lose games to get
 applied: a tapped land makes nothing, and a land that arrived this turn is fine
 but a *creature* that did is not (CR 302.6 -- summoning sickness stops a ``{T}``
-cost, which is why Llanowar Elves does nothing the turn you play it).
+cost, which is why Llanowar Elves does nothing the turn you play it, and why
+haste has to be checked: the same rule exempts it).
 """
 
 from __future__ import annotations
@@ -75,7 +76,12 @@ def _payable(ability: ActivatedAbility, permanent: Permanent, card: CardFacts) -
     """
     if ability.cost.mana or ability.cost.sacrifice_self:
         return False
-    return not (ability.cost.tap and permanent.summoning_sick and card.is_creature)
+    if not (ability.cost.tap and permanent.summoning_sick and card.is_creature):
+        return True
+    # CR 302.6 exempts haste from both halves of summoning sickness: a hasty
+    # creature can attack and can pay a {T} cost the turn it arrives. Ignoring
+    # that told a player their hasty mana creature made nothing.
+    return card.has("Haste")
 
 
 def colours_in(mana: str) -> frozenset[str]:

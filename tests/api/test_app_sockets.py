@@ -7,18 +7,17 @@
 # everything it returns is narrowed by ``wire``, so no test past here works with
 # an unknown type.
 
-"""The HTTP and WebSocket surface, driven by a real client.
+"""Watching a game over a socket, driven by a real client.
 
-Thin as the module is, the things that can be wrong here are the ones a unit
-test cannot see: status codes, the shape on the wire, and whether a second
-client watching actually hears anything.
+The part a unit test cannot see: whether a second client watching a game
+actually hears about an event it did not send.
 """
 
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from helpers_api import CATALOGUE, server
+from helpers_api import CATALOGUE, DECKS, server
 from mtgcoach.api.app import create_app
 from wire import decoded, flag, named, number, obj, rows
 
@@ -132,34 +131,66 @@ def test_undo_on_a_game_that_does_not_exist() -> None:
         assert client.post("/games/nope/undo").status_code == HTTP_NOT_FOUND
 
 
-def test_every_snapshot_says_how_far_the_game_has_got() -> None:
-    """The client's only ordering: HTTP replies and broadcasts race."""
+def test_a_watcher_is_sent_the_board_on_connecting() -> None:
     with TestClient(server()) as client:
         session_id = _new_game(client)
-        first = decoded(client.get(f"/games/{session_id}").json())
-        assert number(first, "version") == 0
-        after = decoded(
+        with client.websocket_connect(f"/games/{session_id}/watch") as socket:
+            first = decoded(socket.receive_json())
+            assert number(first, "state", "turn") == 1
+
+
+def test_a_watcher_hears_about_an_event_someone_else_sent() -> None:
+    """The whole point of the server: one game, two views."""
+    with TestClient(server()) as client:
+        session_id = _new_game(client)
+        with client.websocket_connect(f"/games/{session_id}/watch") as socket:
+            socket.receive_json()
+            client.post(
+                f"/games/{session_id}/events",
+                json={"type": "change_life", "player": "you", "amount": -4},
+            )
+            update = decoded(socket.receive_json())
+            assert number(update, "state", "players", "you", "life") == 16
+
+
+def test_a_watcher_hears_about_an_undo_too() -> None:
+    with TestClient(server()) as client:
+        session_id = _new_game(client)
+        client.post(
+            f"/games/{session_id}/events",
+            json={"type": "change_life", "player": "you", "amount": -4},
+        )
+        with client.websocket_connect(f"/games/{session_id}/watch") as socket:
+            socket.receive_json()
+            client.post(f"/games/{session_id}/undo")
+            undone = decoded(socket.receive_json())
+            assert number(undone, "state", "players", "you", "life") == 20
+
+
+def test_watching_a_game_that_does_not_exist_closes_the_socket() -> None:
+    """With a code the client can act on, rather than an empty stream."""
+    with TestClient(server()) as client, client.websocket_connect("/games/nope/watch") as socket:
+        message = socket.receive()
+        assert message["type"] == "websocket.close"
+        assert message["code"] == WS_NO_SUCH_GAME
+
+
+def test_a_client_that_sends_a_message_is_simply_kept_alive() -> None:
+    """The socket is one-way by design; a client ping should not kill it."""
+    with TestClient(server()) as client:
+        session_id = _new_game(client)
+        with client.websocket_connect(f"/games/{session_id}/watch") as socket:
+            socket.receive_json()
+            socket.send_text("ping")
             client.post(
                 f"/games/{session_id}/events",
                 json={"type": "change_life", "player": "you", "amount": -1},
-            ).json()
-        )
-        assert number(after, "version") == 1
-        undone = decoded(client.post(f"/games/{session_id}/undo").json())
-        assert number(undone, "version") == 0
+            )
+            after = decoded(socket.receive_json())
+            assert number(after, "state", "players", "you", "life") == 19
 
 
-def test_a_deck_too_short_to_deal_is_a_bad_request() -> None:
-    """A partial import can advertise a deck of six. That is a thing to say."""
-    short = create_app(CATALOGUE, {"tiny": ("Forest",) * 3})
-    with TestClient(short) as client:
-        response = client.post("/games", json={"you": "tiny", "them": "tiny"})
-        assert response.status_code == HTTP_BAD_REQUEST
-        assert "opening hand" in response.json()["detail"]
-
-
-def test_the_browser_build_is_allowed_to_talk_to_the_server() -> None:
-    """It is served from another port, so every request is cross-origin."""
-    with TestClient(server()) as client:
-        response = client.get("/decks", headers={"Origin": "http://localhost:8081"})
-        assert response.headers.get("access-control-allow-origin") == "*"
+def test_a_server_with_no_decks_still_starts() -> None:
+    with TestClient(create_app(CATALOGUE, {})) as client:
+        assert client.get("/decks").json() == {"decks": []}
+        assert DECKS

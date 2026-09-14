@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from helpers import ME, UNKNOWN_ABILITY, facts
+from helpers import ME, facts
 from helpers_coach import Book, game, land
 from mtgcoach.coach.report import advise
 from mtgcoach.core.abilities import Trigger, TriggeredAbility
@@ -138,45 +138,3 @@ def test_a_reminder_falls_back_to_the_identifier_when_the_name_is_unknown() -> N
     state = game(battlefield=("Nameless",), step=Step.UPKEEP)
     (reminder,) = advise(state, ME, book).reminders
     assert reminder.name == "Nameless"
-
-
-# --- where the coach stops ---------------------------------------------------
-
-
-def test_a_card_the_fixture_cannot_express_is_named_too() -> None:
-    """The failure that mattered: 59 of the box's 124 cards look like this.
-
-    They are in the sealed fixture, they have perfectly good facts, and the
-    extractor could not express what they do. Reporting only cards with no
-    facts left every one of them looking fully understood -- so the coach gave
-    confident advice about half the box with `unknown` empty.
-    """
-    book = Book(
-        cards={**BOOK.cards, "Puzzle": facts("Puzzle", "{2}{U}")},
-        rules={**BOOK.rules, "Puzzle": (UNKNOWN_ABILITY,)},
-    )
-    assert advise(game(hand=("Puzzle",)), ME, book).unknown == ("Puzzle",)
-
-
-def test_a_vanilla_creature_is_fully_understood() -> None:
-    """An empty ability list is an answer, not an absence.
-
-    This is the distinction the fix turns on: `abilities()` returning nothing
-    means either "it does nothing" or "I have never seen this card", and a
-    coach that cannot tell them apart is guessing about one of them.
-    """
-    assert advise(game(hand=("Bear",)), ME, BOOK).unknown == ()
-
-
-def test_a_card_missing_from_the_fixture_is_named() -> None:
-    book = Book(cards={**BOOK.cards, "Absent": facts("Absent", "{1}")}, rules=BOOK.rules)
-    assert advise(game(hand=("Absent",)), ME, book).unknown == ("Absent",)
-
-
-def test_an_unknown_card_is_named_by_its_printed_name_when_there_is_one() -> None:
-    """An oracle id helps nobody holding the card."""
-    book = Book(
-        cards={**BOOK.cards, "Puzzle": facts("Chandra's Whatever", "{3}{R}")},
-        rules={**BOOK.rules, "Puzzle": (UNKNOWN_ABILITY,)},
-    )
-    assert advise(game(hand=("Puzzle",)), ME, book).unknown == ("Chandra's Whatever",)

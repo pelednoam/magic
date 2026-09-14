@@ -12,6 +12,7 @@ import {
   stepName,
   turnLine,
 } from "../src/format";
+import { isSnapshot } from "../src/wire";
 import type { Permanent, Plan, Player } from "../src/wire";
 
 const board: Player = {
@@ -135,5 +136,31 @@ describe("permanent notes", () => {
   it("says both when both", () => {
     const stuck = { ...(board.battlefield[2] as Permanent), tapped: true };
     expect(permanentNote(stuck)).toBe("tapped · just arrived");
+  });
+});
+
+describe("a response is not a snapshot because we said so", () => {
+  it("accepts the real shape", () => {
+    expect(isSnapshot({ version: 0, state: {}, advice: {} })).toBe(true);
+  });
+
+  it("rejects null, which a cast used to let through", () => {
+    expect(isSnapshot(null)).toBe(false);
+  });
+
+  it("rejects an object with no board", () => {
+    expect(isSnapshot({ version: 0, advice: {} })).toBe(false);
+  });
+
+  it("rejects a string", () => {
+    expect(isSnapshot("ok")).toBe(false);
+  });
+
+  it("rejects a board that is not an object", () => {
+    expect(isSnapshot({ version: 0, state: "none", advice: {} })).toBe(false);
+  });
+
+  it("rejects a snapshot with no version, because ordering depends on it", () => {
+    expect(isSnapshot({ state: {}, advice: {} })).toBe(false);
   });
 });

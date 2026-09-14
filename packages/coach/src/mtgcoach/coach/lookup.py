@@ -35,6 +35,15 @@ class CardLookup(Protocol):
         """The card's modelled abilities, empty when there are none or it is unknown."""
         ...
 
+    def name(self, oracle_id: OracleId) -> str:
+        """The printed name, falling back to the identifier when unknown.
+
+        The fallback is deliberate: a raw identifier tells the player something
+        true -- this is a card the coach cannot name -- which is better than an
+        empty space they will read as a bug.
+        """
+        ...
+
     def modelled(self, oracle_id: OracleId) -> bool:
         """Whether the engine can speak for this card completely.
 

@@ -28,7 +28,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from helpers_api import server
-from wire import decoded, named, rows
+from wire import decoded, named, rows, text
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -89,6 +89,10 @@ def sent() -> frozenset[str]:
         body = act(
             type="move_card", player="you", instance_id=bell["instance_id"], to="battlefield"
         )
+        # On to a main phase, because a land drop is only legal there and the
+        # server now refuses what the coach refuses.
+        while text(body, "state", "step") != "precombat_main":
+            body = act(type="advance_step")
         # Two Forests: one played and tapped, one left up so a spell in hand
         # comes back with a payment on it.
         forests = [c for c in rows(body, "state", "players", "you", "hand") if _is(c, "Forest")]

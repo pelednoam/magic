@@ -18,6 +18,7 @@ import type { Coach } from "../client";
 import { turnLine } from "../format";
 import { colour, space, text } from "../theme";
 import type { NewGame, Permanent, Playable, Snapshot } from "../wire";
+import { isSnapshot } from "../wire";
 import { THEM, YOU } from "../wire";
 
 import { messageOf } from "./Start";
@@ -25,6 +26,18 @@ import { messageOf } from "./Start";
 export function Game({ coach, game }: { readonly coach: Coach; readonly game: NewGame }) {
   const [snapshot, setSnapshot] = useState<Snapshot>(game);
   const [problem, setProblem] = useState("");
+
+  /**
+   * Take a snapshot only if it is not older than the one on screen.
+   *
+   * Both an HTTP reply and a socket broadcast call this, and they race. Without
+   * the check a reply that overtook a newer one rolled the board back
+   * permanently -- an undo would appear to un-happen, and the next event would
+   * be sent against a board the server had already moved past.
+   */
+  const accept = useCallback((update: Snapshot) => {
+    setSnapshot((shown) => (update.version >= shown.version ? update : shown));
+  }, []);
 
   // The socket is the other device's changes arriving. Our own come back from
   // the request that caused them, so there is one path for each and neither
@@ -34,31 +47,33 @@ export function Game({ coach, game }: { readonly coach: Coach; readonly game: Ne
     const socket = new WebSocket(coach.watchUrl(game.session_id));
     socket.onopen = () => { setWatching(true); };
     socket.onmessage = (message: MessageEvent<string>) => {
-      try {
-        setSnapshot(JSON.parse(message.data) as Snapshot);
-      } catch {
-        // A frame we cannot read is a broken server, not a broken game. The
-        // board on screen is still the last one the server confirmed.
-        setWatching(false);
+      const update: unknown = parse(message.data);
+      if (isSnapshot(update)) {
+        accept(update);
+        return;
       }
+      // A frame we cannot read is a broken server, not a broken game. The
+      // board on screen is still the last one the server confirmed, and saying
+      // so beats crashing one render later inside `snapshot.state.players`.
+      setWatching(false);
     };
     // A board that has stopped updating must not keep looking live: the other
     // device's plays would simply stop appearing, with nothing to say so.
     socket.onclose = () => { setWatching(false); };
     socket.onerror = () => { setWatching(false); };
     return () => { socket.close(); };
-  }, [coach, game.session_id]);
+  }, [accept, coach, game.session_id]);
 
   const act = useCallback(
     async (event: Record<string, unknown>): Promise<void> => {
       setProblem("");
       try {
-        setSnapshot(await coach.event(game.session_id, event));
+        accept(await coach.event(game.session_id, event));
       } catch (error: unknown) {
         setProblem(messageOf(error));
       }
     },
-    [coach, game.session_id],
+    [accept, coach, game.session_id],
   );
 
   const mine = snapshot.state.players[YOU];
@@ -116,7 +131,7 @@ export function Game({ coach, game }: { readonly coach: Coach; readonly game: Ne
             setProblem("");
             coach
               .undo(game.session_id)
-              .then(setSnapshot)
+              .then(accept)
               .catch((error: unknown) => { setProblem(messageOf(error)); });
           }}
         />
@@ -163,3 +178,12 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
+
+/** JSON, or undefined. A frame that is not JSON is not an exception here. */
+function parse(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return undefined;
+  }
+}

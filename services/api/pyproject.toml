@@ -11,7 +11,11 @@ dependencies = [
     # FastAPI: `app.py` imports starlette directly for its status codes, and
     # `serve.py` imports uvicorn to run.
     "starlette>=0.40",
-    "uvicorn>=0.32",
+    # `[standard]` for the websocket implementation. Plain uvicorn has none,
+    # so `serve.py` would start, answer HTTP, and refuse every socket -- which
+    # the tests could not catch, because Starlette's TestClient runs its own
+    # in-process websocket and never touches the server's.
+    "uvicorn[standard]>=0.32",
 ]
 
 [build-system]

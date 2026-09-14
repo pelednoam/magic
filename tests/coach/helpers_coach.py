@@ -41,6 +41,11 @@ class Book:
         """The card's modelled abilities, empty when it has none."""
         return self.rules.get(str(oracle_id), ())
 
+    def name(self, oracle_id: OracleId) -> str:
+        """The printed name, or the identifier when the book has no card."""
+        card = self.cards.get(str(oracle_id))
+        return card.name if card is not None else str(oracle_id)
+
     def modelled(self, oracle_id: OracleId) -> bool:
         """Whether the book covers this card, all the way down."""
         abilities = self.rules.get(str(oracle_id))

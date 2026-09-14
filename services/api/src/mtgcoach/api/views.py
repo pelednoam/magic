@@ -80,6 +80,7 @@ def attacks(options: Attacks) -> dict[str, Json]:
     """The attacks worth making, or the sentence saying why there are none."""
     return {
         "unavailable": options.unavailable,
+        "caveats": list(options.caveats),
         "plans": [plan(option) for option in options.plans],
     }
 

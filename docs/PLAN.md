@@ -973,6 +973,15 @@ A field the app has never heard of is a blank space in the UI; a field the app e
 longer gets is the same bug mirrored. Neither raises anything at runtime, which is exactly why
 it needs a test.
 
+**Static abilities, and what the combat numbers are worth.** Seven cards in the box change
+combat from the battlefield, and they split three ways. A restriction on the card *itself*
+(Vampire Interloper's "can't block") is applied: such a creature is left out of the side it
+cannot join. A restriction that needs an attachment (Pacifism) and a modifier (Goblin
+Oriflamme's anthem, an Equipment's +2/+1) cannot be — `Permanent` has no attachments and the
+combat model has no "affects other creatures" — so they are **disclosed**, by name, next to the
+numbers. "Four damage, lethal" has to be readable as "unless the Pacifism says otherwise", and
+a confident wrong number is the worst thing this project can produce.
+
 **Two things this cannot do yet, which the app has to say out loud.** `core` has no event for
 *casting a spell* — the `Event` union is untap/draw/land/tap/move/life — so the coach can tell
 you a spell is affordable and the tracker cannot record you casting it. `Playable.is_land` is on
@@ -986,6 +995,22 @@ kitchen table with one screen that is the intended shape, but it means the serve
 exposed beyond the LAN, and §3's "can't see your opponent's hand" is currently enforced by the
 room rather than the code. Both close together, when a session knows which player a connection
 belongs to.
+
+**The server may not contradict its own coach.** `guard.py` asks `legality.why_not_play_land`
+rather than re-deciding. It used to check only that the card was a land, and the reducer checks
+only hand membership and the land drop — so nothing checked *timing*, and the API accepted a
+land played during the untap step while the advice in the very same response read "you can only
+play lands in a main phase".
+
+**Every refusal is a sentence, never an exception.** The solver refuses a board it cannot answer
+for exactly; the coach turns that into a reason on a card. Letting one escape made the whole
+snapshot a 500 — and because the API records an event *before* building the advice, a single
+accepted event could leave a game that could never be read again.
+
+**Snapshots are versioned.** An HTTP reply and a socket broadcast race, and without an ordering
+the older of the two silently won: an undo could appear to un-happen, and the next event would
+be sent against a board the server had already moved past. Every snapshot carries the event
+count, and the client takes an update only if it is not older than the one on screen.
 
 **A package the original tree did not have.** `packages/coach` was added in M5. The four
 solvers each answer a narrow question; something has to assemble them into the one a player

@@ -10,6 +10,12 @@ model -- those are named in ``unknown``, so the player knows exactly where the
 coach stops rather than being quietly told "no". And it will not swallow a
 refusal from the engine: if the board is too large to search exactly, the attack
 section says so instead of showing a guess.
+
+It also will not *raise* one. Every refusal the engine makes becomes a sentence
+in a report -- a reason on a card, or ``Attacks.unavailable``. Letting one
+escape turned the whole snapshot into a 500, and since the API records an event
+before building the advice, a single accepted event could leave a game that
+could never be read again.
 """
 
 from __future__ import annotations
@@ -129,8 +135,16 @@ def _verdict(
     if facts.is_land:
         reasons = why_not_play_land(state, player_id, facts)
         return Playable(card.instance_id, facts.name, is_land=True, reasons=reasons)
-    reasons = why_not_cast(state, player_id, facts, sources)
-    best = payments(facts.cost, sources) if not reasons else ()
+    try:
+        reasons = why_not_cast(state, player_id, facts, sources)
+        best = payments(facts.cost, sources) if not reasons else ()
+    except ValueError as refusal:
+        # The solver refuses a board it cannot answer for exactly -- too many
+        # untapped sources, or two sharing an identity. That is a *reason*
+        # here, not an error: letting it escape made the whole snapshot a 500,
+        # and because the event is recorded before the advice is built, one
+        # accepted event left the game permanently unreadable.
+        return Playable(card.instance_id, facts.name, reasons=(str(refusal),))
     return Playable(
         card.instance_id,
         facts.name,
@@ -151,7 +165,11 @@ def _unknown(state: GameState, player_id: PlayerId, lookup: CardLookup) -> tuple
     """
     player = state.player(player_id)
     seen = [c.oracle_id for c in player.hand]
-    seen += [p.card.oracle_id for p in player.battlefield]
+    # Every battlefield, not just this player's. An opposing creature the coach
+    # cannot identify is left out of combat silently, so the attack advisor
+    # reported exact damage and "no blockers" against a board it could not see.
+    # Their battlefield is public; their *hand* is not, and is not looked at.
+    seen += [p.card.oracle_id for other in state.players.values() for p in other.battlefield]
     return tuple(sorted({_name(lookup, o) for o in seen if not _spoken_for(lookup, o)}))
 
 

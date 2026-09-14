@@ -19,6 +19,7 @@ from mtgcoach.core.cards import CardInstance
 from mtgcoach.core.events import AdvanceStep, PlayLand
 from mtgcoach.core.ids import InstanceId, OracleId
 from mtgcoach.core.state import GameState, start_game
+from mtgcoach.core.steps import Step
 
 BOOK = Book(
     cards={
@@ -32,10 +33,11 @@ def _holding(oracle: str) -> tuple[CardInstance, ...]:
     return (CardInstance(InstanceId("card"), OracleId(oracle)),)
 
 
-def _game(oracle: str) -> GameState:
+def _game(oracle: str, step: Step = Step.PRECOMBAT_MAIN) -> GameState:
+    """A game with one card in hand, in a step where a land could be played."""
     state = start_game({ME: deck("m"), YOU: deck("y")}, ME)
     mine = replace(state.player(ME), hand=_holding(oracle))
-    return replace(state, players={**state.players, ME: mine})
+    return replace(state, players={**state.players, ME: mine}, step=step)
 
 
 def test_a_land_may_be_played_as_a_land() -> None:
@@ -44,8 +46,36 @@ def test_a_land_may_be_played_as_a_land() -> None:
 
 def test_a_creature_may_not() -> None:
     """CR 305.1. Otherwise the tracker keeps a Grizzly Bears as a land all game."""
-    with pytest.raises(BadEventError, match="Grizzly Bears is not a land"):
+    with pytest.raises(BadEventError, match="is not a land"):
         check(PlayLand(ME, InstanceId("card")), _game("Bear"), BOOK)
+
+
+def test_a_land_may_not_be_played_outside_a_main_phase() -> None:
+    """The server must not accept what the coach in the same breath refuses.
+
+    It did: `play_land` during the untap step returned 200 while the advice in
+    the very same response read "you can only play lands in a main phase".
+    """
+    with pytest.raises(BadEventError, match="only play lands in a main phase"):
+        check(PlayLand(ME, InstanceId("card")), _game("Forest", Step.UNTAP), BOOK)
+
+
+def test_a_land_may_not_be_played_on_the_opponents_turn() -> None:
+    state = replace(_game("Forest"), active_player=YOU)
+    with pytest.raises(BadEventError, match="your own turn"):
+        check(PlayLand(ME, InstanceId("card")), state, BOOK)
+
+
+def test_a_second_land_is_refused_by_the_server_too() -> None:
+    """The reducer catches this as well; the point is that they agree."""
+    state = _game("Forest")
+    spent = replace(state.player(ME), hand=state.player(ME).hand, lands_played_this_turn=1)
+    with pytest.raises(BadEventError, match="already played a land"):
+        check(
+            PlayLand(ME, InstanceId("card")),
+            replace(state, players={**state.players, ME: spent}),
+            BOOK,
+        )
 
 
 def test_an_unmodelled_card_is_allowed_through() -> None:

@@ -16,16 +16,23 @@ import type { Attacks as AttackOptions } from "../wire";
 import { Panel } from "./Panel";
 
 export function Attacks({ attacks }: { readonly attacks: AttackOptions }) {
+  const caveats = attacks.caveats.map((caveat) => (
+    <Text key={caveat} style={styles.caveat}>
+      {caveat}
+    </Text>
+  ));
   if (attacks.unavailable !== "") {
     return (
       <Panel title="Attacking">
         <Text style={styles.unavailable}>{attacks.unavailable}</Text>
+        {caveats}
       </Panel>
     );
   }
   const best = attacks.plans.slice(0, 4);
   return (
     <Panel title="Attacking" note={`${attacks.plans.length} options`}>
+      {caveats}
       {best.map((plan, index) => (
         <View
           // Keyed by identity, not name: two Grizzly Bears is the ordinary
@@ -53,4 +60,5 @@ const styles = StyleSheet.create({
   detail: { color: colour.quiet, fontSize: text.small, marginTop: space.tight },
   lethal: { color: colour.warn, fontSize: text.small, fontWeight: "700", marginTop: space.tight },
   unavailable: { color: colour.quiet, fontSize: text.body },
+  caveat: { color: colour.warn, fontSize: text.small, marginBottom: space.small },
 });
