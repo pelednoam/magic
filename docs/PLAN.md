@@ -6,11 +6,12 @@ or at the board, and get a clear answer to *"what can I do this turn, and what s
 **Status:** M0–M4 merged to `main`. The engine is done: 780 tests, 100% line and branch, with
 **52% of the Beginner Box fully modelled** and eleven keywords implemented. M4 took four rounds
 of ensemble review, with every finding fixed by hand; the fourth found nothing blocking in the
-engine. M5 is complete on `m5-tracker`: `packages/coach` (the turn report), `services/api` (the
-authoritative game over HTTP and a WebSocket) and `apps/mobile` (the Expo tracker) are built
-and green — 916 Python tests at 100% line and branch, 29 TypeScript tests, and an end-to-end
-suite driving a real turn over real HTTP against the real card store and the real sealed
-fixture. Ensemble review next, then M6. See §10.
+engine. M0–M5 merged to `main`. The tracker works end to end: `packages/coach` turns the four solvers
+into a turn report, `services/api` holds the authoritative game over HTTP and a WebSocket, and
+`apps/mobile` is a two-seat Expo client for Android, tablet and the browser. 948 Python tests
+at 100% line and branch, 38 TypeScript tests, and an end-to-end suite driving a real turn
+against the real card store and the real sealed fixture. Two rounds of ensemble review on M5,
+with every finding fixed by hand. M6 — the Claude coach and rules Q&A — is next; see §10.
 
 ---
 
