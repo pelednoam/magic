@@ -96,14 +96,18 @@ def _unwrap(stdout: str) -> str:
 
 
 def prose(payload: Mapping[str, object], field: str) -> str:
-    """A string of prose, empty when it is missing or the wrong type.
+    """A string of prose, empty when it is missing, the wrong type, or blank.
 
     For fields nothing is checked against: ``because``, ``in_short``,
     ``answer``, ``unsure``. Use ``one`` for anything a checker will compare
     against the engine.
+
+    Stripped, so that a field holding a space is empty rather than substantive.
+    The "did it say anything at all" checks downstream are truthiness tests,
+    and ``" "`` passed them while putting a blank line on the screen.
     """
     value = payload.get(field)
-    return value if isinstance(value, str) else ""
+    return value.strip() if isinstance(value, str) else ""
 
 
 def one(payload: Mapping[str, object], field: str) -> str:

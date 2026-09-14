@@ -60,6 +60,17 @@ And the client half of the safety story now has tests: `tests/hooks.test.tsx` re
 hooks into a real DOM and pins the rule that an answer arriving after the board moved is
 dropped rather than displayed.
 
+A third round found one critical — and it was the same bug wearing a different hat. Stopping
+the no-decision *shortcut* passing over a firing trigger left the other path open: the model
+was asked, said "pass the turn", and nothing in `verify` required it to mention the trigger
+either. `checks.triggers` closes it. The rest of that round was smaller but the same flavour
+of honest: "attack with nobody" was exempt from the options check (the one piece of combat
+advice a beginner hears most often, and nothing checked it), a slow answer was not bound to
+the revision it described, and a card with rules text was described to the model as though it
+were vanilla.
+
+Three rounds, twenty-three findings fixed by hand; the critical count went 8, 5, 1.
+
 ---
 
 ## 1. The central design decision

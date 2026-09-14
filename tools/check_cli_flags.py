@@ -19,6 +19,7 @@ environment, and a machine without the CLI cannot run the coach anyway.
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import sys
@@ -69,12 +70,17 @@ def help_text(executable: str = "claude") -> str:
 def missing(text: str) -> list[str]:
     """Every flag the help text does not mention, plus the tools sentence.
 
-    Whitespace is normalised first: the help is wrapped to the terminal, so the
-    sentence about an empty ``--tools`` is split across lines and a plain
-    substring search never found it.
+    Flags are matched as whole words, because a substring search for ``-p``
+    finds it inside ``--print`` -- so the check would have passed on a CLI that
+    had dropped the short flag entirely.
+
+    The sentence about an empty ``--tools`` is matched against whitespace-
+    normalised text instead: the help is wrapped to the terminal, so it arrives
+    split across lines.
     """
+    words = set(re.split(r"[\s,|]+", text))
+    absent = [flag for flag in REQUIRED if flag not in words]
     flat = " ".join(text.split())
-    absent = [flag for flag in REQUIRED if flag not in flat]
     if EMPTIES_TOOLS not in flat:
         absent.append(f"the documented meaning of an empty --tools ({EMPTIES_TOOLS!r})")
     return absent

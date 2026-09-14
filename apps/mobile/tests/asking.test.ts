@@ -21,6 +21,7 @@ const ASKED: Asked = {
     unsure: "",
   },
   cited: true,
+  version: 0,
   rules: [
     { reference: "702.19b", title: "Trample", text: "The controller of an attacking creature…" },
   ],

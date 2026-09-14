@@ -11,19 +11,16 @@ import pytest
 
 from helpers import ME, UNKNOWN_ABILITY, facts
 from helpers_coach import Book, game, land
-from mtgcoach.coach.advice import (
-    SHOWN_ATTACKS,
-    Explanation,
-    offered,
-    refusal,
-    trusted,
-    verify,
-)
+from mtgcoach.coach.advice import Explanation, refusal, trusted, verify
+from mtgcoach.coach.checks import SHOWN_ATTACKS, offered
 from mtgcoach.coach.report import TurnReport, advise
+from mtgcoach.core.abilities import Trigger, TriggeredAbility
 from mtgcoach.core.steps import Step
+from mtgcoach.core.vocabulary import TriggerEvent
 
 FOREST, FOREST_RULES = land("Forest", "{G}")
 BEAR = facts("Grizzly Bears", "{1}{G}", power=2, toughness=2, creature=True)
+RINGS = TriggeredAbility(Trigger(TriggerEvent.BEGINNING_OF_UPKEEP), ())
 BOOK = Book(
     cards={"Forest": FOREST, "Bear": BEAR},
     rules={"Forest": FOREST_RULES, "Bear": ()},

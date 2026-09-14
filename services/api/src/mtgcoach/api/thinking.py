@@ -28,10 +28,8 @@ from starlette.status import HTTP_400_BAD_REQUEST, HTTP_503_SERVICE_UNAVAILABLE
 
 from mtgcoach.api.asking import answered
 from mtgcoach.api.coaching import coached
-from mtgcoach.api.context import session
+from mtgcoach.api.context import position, session
 from mtgcoach.coach.advice import ExplainerError
-from mtgcoach.coach.report import advise
-from mtgcoach.coach.table import table
 from mtgcoach.core.ids import PlayerId
 
 if TYPE_CHECKING:
@@ -85,7 +83,7 @@ def routes(app: FastAPI, server: Server) -> None:
             # next to the subprocess, but it is not free, and a limit that only
             # covers the cheap half of a request is not a limit.
             with _one_at_a_time(server):
-                return coached(server.explainer, advise(game.state, player, server.catalogue))
+                return coached(server.explainer, position(server, game, player))
         except ExplainerError as unavailable:
             # Not a server fault and not fatal: the deterministic panel is
             # already on screen and already right. 503 says "try again", which
@@ -113,9 +111,8 @@ def routes(app: FastAPI, server: Server) -> None:
             )
         try:
             with _one_at_a_time(server):
-                report = advise(game.state, player, server.catalogue)
-                board = table(game.state, player, server.catalogue)
-                return answered(server.asker, server.rules, question, report, board)
+                asked = position(server, game, player, board=True)
+                return answered(server.asker, server.rules, question, asked)
         except ExplainerError as unavailable:
             raise HTTPException(HTTP_503_SERVICE_UNAVAILABLE, str(unavailable)) from unavailable
 

@@ -23,6 +23,7 @@ const ANSWER: Coaching = {
     check_yourself: [],
   },
   trusted: true,
+  version: 0,
 };
 
 function replying(status: number, body: unknown): typeof fetch {

@@ -24,9 +24,8 @@ from mtgcoach.rules.answer import refusal, settle
 from mtgcoach.rules.question import ask as briefing_for
 
 if TYPE_CHECKING:
+    from mtgcoach.api.context import Position
     from mtgcoach.api.views import Json
-    from mtgcoach.coach.report import TurnReport
-    from mtgcoach.coach.table import Table
     from mtgcoach.rules.answer import Answer, Asker
     from mtgcoach.rules.search import RuleIndex
 
@@ -35,8 +34,7 @@ def answered(
     asker: Asker,
     index: RuleIndex,
     question: str,
-    report: TurnReport,
-    board: Table | None = None,
+    position: Position,
 ) -> dict[str, Json]:
     """One question's answer, marked with whether it stayed inside the rules given.
 
@@ -44,7 +42,7 @@ def answered(
         ExplainerError: If no answer could be got at all.
     """
     passages = index.search(question)
-    briefing = briefing_for(question, passages, report, board)
+    briefing = briefing_for(question, passages, position.report, position.board)
     said, problems = settle(asker.ask(question, briefing), passages)
     return {
         "answer": _answer(refusal(problems) if problems else said),
@@ -53,6 +51,10 @@ def answered(
         # answer is right about what those rules say. The turn coach's
         # `trusted` is a stronger claim and keeps its stronger word.
         "cited": not problems,
+        # Which board this was asked over; see `coaching.coached`. A rules
+        # question carries the battlefield in its prompt, so its answer goes
+        # stale the same way turn advice does.
+        "version": position.revision,
         # The passages it was given, whether or not it cited them. The player
         # can then read the rule themselves, which is the point of retrieving
         # it -- and is the part of the answer that is certainly true.

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from mtgcoach.coach.advice import SHOWN_ATTACKS
+from mtgcoach.coach.checks import SHOWN_ATTACKS
 
 if TYPE_CHECKING:
     from mtgcoach.coach.report import TurnReport

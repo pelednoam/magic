@@ -23,6 +23,7 @@ export const ADVICE = {
     check_yourself: [],
   },
   trusted: true,
+  version: 0,
 } satisfies Coaching;
 
 const ANSWER = {
@@ -32,11 +33,13 @@ const ANSWER = {
   unsure: "",
 } satisfies Asked["answer"];
 
-export const ASKED = { answer: ANSWER, cited: true, rules: [] } satisfies Asked;
+export const ASKED = { answer: ANSWER, cited: true, rules: [], version: 0 } satisfies Asked;
 
 /** A `Coach` whose one slow call the test resolves by hand. */
 export function deferred<T>(): {
   readonly coach: Coach;
+  /** The same promise the stand-in returns, for a test wiring two of them. */
+  readonly pending: Promise<T>;
   readonly settle: (value: T) => Promise<void>;
   readonly fail: (error: Error) => Promise<void>;
 } {
@@ -52,6 +55,7 @@ export function deferred<T>(): {
   } as unknown as Coach;
   return {
     coach,
+    pending,
     settle: async (value: T) => {
       await act(async () => {
         resolve(value);
@@ -104,3 +108,18 @@ export function mounted<T>(
 
 /** Every root a test mounted, so the suite can unmount them afterwards. */
 export const roots: { unmount: () => void }[] = [];
+
+
+/**
+ * Let every pending promise settle, inside `act`.
+ *
+ * A `finally` from an earlier request lands one microtask after the thing that
+ * triggered it, so without this React warns that a state update happened
+ * outside `act` -- and a gate that prints warnings on a green run teaches
+ * everyone to ignore it.
+ */
+export async function settled(): Promise<void> {
+  await act(async () => {
+    await Promise.resolve();
+  });
+}

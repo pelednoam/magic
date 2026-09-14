@@ -47,6 +47,15 @@ export interface Coaching {
    * is the one failure this whole layer exists to prevent.
    */
   readonly trusted: boolean;
+  /**
+   * Which board this is about.
+   *
+   * Answering takes a minute, which is long enough for somebody to play a
+   * card. Comparing this against the snapshot on screen is how a late answer
+   * is recognised — the alternative was the client remembering the version it
+   * *had* when it asked, which is close enough in practice and still a guess.
+   */
+  readonly version: number;
 }
 
 /**
@@ -90,6 +99,8 @@ export interface Asked {
    */
   readonly cited: boolean;
   readonly rules: readonly RuleText[];
+  /** Which board this was asked over; see `Coaching.version`. */
+  readonly version: number;
 }
 
 /**
@@ -101,7 +112,11 @@ export interface Asked {
  */
 export function isCoaching(value: unknown): value is Coaching {
   const body = asObject(value);
-  if (body === null || typeof body["trusted"] !== "boolean") {
+  if (
+    body === null ||
+    typeof body["trusted"] !== "boolean" ||
+    typeof body["version"] !== "number"
+  ) {
     return false;
   }
   const explanation = asObject(body["explanation"]);
@@ -121,7 +136,12 @@ export function isCoaching(value: unknown): value is Coaching {
 /** Whether a decoded response is shaped like a rules answer. */
 export function isAsked(value: unknown): value is Asked {
   const body = asObject(value);
-  if (body === null || typeof body["cited"] !== "boolean" || !Array.isArray(body["rules"])) {
+  if (
+    body === null ||
+    typeof body["cited"] !== "boolean" ||
+    typeof body["version"] !== "number" ||
+    !Array.isArray(body["rules"])
+  ) {
     return false;
   }
   const answer = asObject(body["answer"]);

@@ -38,6 +38,13 @@ class Thing:
     keywords: tuple[str, ...] = ()
     #: Set when the engine cannot read the card. Passed on rather than hidden.
     unreadable: bool = False
+    #: Set when the card has abilities beyond its keywords. Their text is not
+    #: here -- this is a board summary, not a card database -- but their
+    #: *existence* is, because a creature listed as "Bear, 2/2" and nothing
+    #: else reads as vanilla, and answering a rules question about it as if it
+    #: were vanilla is the confident wrong answer this project is built around
+    #: avoiding.
+    has_abilities: bool = False
 
     def described(self) -> str:
         """One line, as a person would read it out."""
@@ -50,6 +57,8 @@ class Thing:
         if self.summoning_sick:
             parts.append("summoning sick")
 
+        if self.has_abilities:
+            parts.append("has rules text not shown here -- read the card before relying on it")
         if self.unreadable:
             parts.append("THE ENGINE CANNOT READ THIS CARD -- say so rather than guessing")
         return ", ".join(parts)
@@ -106,4 +115,5 @@ def _thing(permanent: Permanent, lookup: CardLookup) -> Thing:
         toughness=facts.toughness,
         keywords=tuple(sorted(facts.keywords)),
         unreadable=not lookup.modelled(permanent.card.oracle_id),
+        has_abilities=bool(lookup.abilities(permanent.card.oracle_id)),
     )

@@ -115,3 +115,22 @@ def test_a_player_who_is_not_in_the_game_is_refused() -> None:
 
     with pytest.raises(IllegalEventError):
         table(game(), PlayerId("nobody"), BOOK)
+
+
+def test_a_card_with_rules_text_says_it_has_some() -> None:
+    """A creature listed as "Bear, 2/2" and nothing else reads as vanilla.
+
+    Its text is not here -- this is a board summary, not a card database -- but
+    answering a rules question about a card as if it were vanilla is exactly
+    the confident wrong answer the whole design is built around avoiding.
+    """
+    book = Book(cards={"Forest": FOREST}, rules={"Forest": FOREST_RULES})
+    (thing,) = table(game(battlefield=("Forest",)), ME, book).yours
+    assert thing.has_abilities
+    assert "read the card" in thing.described()
+
+
+def test_a_vanilla_creature_says_nothing_extra() -> None:
+    (bear,) = table(game(battlefield=("Bear",)), ME, BOOK).yours
+    assert not bear.has_abilities
+    assert bear.described() == "Grizzly Bears, 2/2"

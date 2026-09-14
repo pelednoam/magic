@@ -18,6 +18,7 @@ from starlette.status import HTTP_404_NOT_FOUND
 from mtgcoach.api import views
 from mtgcoach.api.sessions import SessionStore, UnknownSessionError
 from mtgcoach.coach.report import advise
+from mtgcoach.coach.table import table
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -27,6 +28,9 @@ if TYPE_CHECKING:
     from mtgcoach.api.sessions import Session
     from mtgcoach.api.views import Json
     from mtgcoach.coach.advice import Explainer
+    from mtgcoach.coach.report import TurnReport
+    from mtgcoach.coach.table import Table
+    from mtgcoach.core.ids import PlayerId
     from mtgcoach.rules.answer import Asker
     from mtgcoach.rules.search import RuleIndex
 
@@ -57,6 +61,32 @@ class Server:
     #: limiter another test's mysterious 503.
     in_flight: threading.BoundedSemaphore = field(
         default_factory=lambda: threading.BoundedSemaphore(MAX_IN_FLIGHT)
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class Position:
+    """The board a slow answer is about, and which revision that was.
+
+    Both slow routes need all of it and one of them needed six arguments to
+    say so. Carrying the revision alongside the report is also the point of the
+    thing: an answer that takes a minute has to come back saying which board it
+    was about, or the client is left guessing.
+    """
+
+    report: TurnReport
+    revision: int
+    #: Only the rules route needs the battlefield; the turn coach's report
+    #: already names every creature that matters.
+    board: Table | None = None
+
+
+def position(server: Server, game: Session, player: PlayerId, *, board: bool = False) -> Position:
+    """Work out the board, once, for one of the slow routes."""
+    return Position(
+        report=advise(game.state, player, server.catalogue),
+        revision=game.revision,
+        board=table(game.state, player, server.catalogue) if board else None,
     )
 
 

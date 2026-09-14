@@ -168,12 +168,17 @@ class Cli:
 def _kill_group(process: subprocess.Popen[str]) -> None:
     """End the command and everything it started.
 
-    Best effort on purpose: the group is already gone in the ordinary case, and
-    a failure to kill something that has exited is not worth turning a finished
-    answer into an error.
+    The group is signalled whether or not the direct process is still running.
+    Skipping it when the parent had exited was the original bug wearing a
+    different hat: ``claude`` is a Node process that spawns more, and a parent
+    that has returned says nothing about its children -- which would then sit
+    there holding the quota with nobody waiting on them.
+
+    Best effort otherwise: an ``ESRCH`` here means the group is already gone,
+    which is the ordinary case and not worth turning a finished answer into an
+    error over.
     """
-    if process.poll() is None:
-        with suppress(OSError):
-            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+    with suppress(OSError):
+        os.killpg(os.getpgid(process.pid), signal.SIGKILL)
     with suppress(OSError, ValueError):
         process.wait(timeout=5)

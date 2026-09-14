@@ -34,3 +34,9 @@ data/sets/*/proposals.json
 apps/*/node_modules/
 apps/*/.expo/
 apps/*/dist/
+
+# Claude Code's own per-session state. Machine- and process-specific: a lock
+# naming one laptop's pid is meaningless anywhere else, and it arrived here by
+# being written into the working tree while a commit was being made.
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
