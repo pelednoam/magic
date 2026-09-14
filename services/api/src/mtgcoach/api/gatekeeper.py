@@ -59,8 +59,14 @@ class Gatekeeper:
             await self._app(scope, receive, send)
 
     async def _http(self, scope: Scope, receive: Receive, send: Send) -> None:
-        """One HTTP request."""
-        if scope.get("method") == PREFLIGHT or self._carries(scope):
+        """One HTTP request.
+
+        The header only. The query string is the socket's escape hatch and
+        nothing else's: accepting it here would invite a token into URLs that
+        reach access logs, proxies and browser history, for no gain -- an HTTP
+        client can always set a header.
+        """
+        if scope.get("method") == PREFLIGHT or self._carries(scope, query=False):
             await self._app(scope, receive, send)
             return
         refused = JSONResponse({"detail": REFUSAL}, status_code=HTTP_401_UNAUTHORIZED)
@@ -77,16 +83,17 @@ class Gatekeeper:
         before it ever opens a socket, so a missing token has already produced
         a 401 with a sentence on it.
         """
-        if self._carries(scope):
+        if self._carries(scope, query=True):
             await self._app(scope, receive, send)
             return
         socket = WebSocket(scope, receive=receive, send=send)
         await socket.close(code=WS_1008_POLICY_VIOLATION, reason=REFUSAL)
 
-    def _carries(self, scope: Scope) -> bool:
+    def _carries(self, scope: Scope, *, query: bool) -> bool:
         """Whether this connection presented the token."""
         header = Headers(scope=scope).get("authorization")
-        return allowed(presented(header, _query_token(scope)), self._token)
+        found = presented(header, _query_token(scope) if query else None)
+        return allowed(found, self._token)
 
 
 def _query_token(scope: Scope) -> str:

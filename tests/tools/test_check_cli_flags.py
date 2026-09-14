@@ -23,6 +23,7 @@ GOOD = """
   -p, --print
   --model <model>
   --output-format <format>
+  --restricted
   --strict-mcp-config
   --tools <tools...>   Specify the list of available tools from the
                        built-in set. Use "" to disable all

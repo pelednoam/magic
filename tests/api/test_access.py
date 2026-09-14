@@ -163,3 +163,13 @@ def test_a_server_cannot_be_built_without_a_token() -> None:
     """
     with pytest.raises(MissingTokenError, match="no open mode"):
         create_app(CATALOGUE, DECKS, "", Claude(NoCoach(), NoAnswers()))
+
+
+def test_an_http_request_may_not_use_the_query_string() -> None:
+    """That is the socket's escape hatch and nothing else's.
+
+    Accepting it here would invite a token into URLs that reach access logs,
+    proxies and browser history, for no gain: an HTTP client can always set a
+    header.
+    """
+    assert _unguarded().get(f"/decks?token={TOKEN}").status_code == HTTP_UNAUTHORIZED

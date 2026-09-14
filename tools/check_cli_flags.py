@@ -31,6 +31,7 @@ from typing import Final
 #: has no dependency on the workspace being installed.
 REQUIRED: Final[tuple[str, ...]] = (
     "--tools",
+    "--restricted",
     "--strict-mcp-config",
     "--output-format",
     "--model",
