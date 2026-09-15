@@ -125,56 +125,6 @@ def triggers_at(
     )
 
 
-def arrivals(
-    battlefield: Sequence[Permanent],
-    abilities: Callable[[OracleId], Sequence[Ability]],
-    names: Callable[[OracleId], str],
-    turn: int,
-) -> tuple[Reminder, ...]:
-    """Every arrival trigger that fired *this turn*.
-
-    Two shapes, and they are not the same permanent:
-
-    - **"When this enters"** -- the permanent with the ability is the one that
-      arrived, so it is reported when it is itself newly here.
-    - **"Whenever another creature enters"** -- the ability is on a permanent
-      that was already here, and something *else* arriving is what fired it. So
-      it is reported when any other permanent arrived this turn.
-
-    **Exactly this turn.** The first version used ``summoning_sick``, which is
-    cleared at the controller's untap step rather than at end of turn -- so a
-    creature played on your turn was still flagged through the opponent's, and
-    the panel claimed a trigger had fired when it had fired a turn ago. That is
-    a reminder teaching something false, which is worse than no reminder. The
-    permanent records the turn it arrived on and this compares it.
-
-    Unlike ``triggers_at`` this takes no ``your_turn``: a permanent can arrive
-    on either player's turn, and whose turn it is says nothing about whether
-    its arrival trigger fired.
-    """
-    fresh = {
-        permanent.instance_id for permanent in battlefield if permanent.entered_on_turn == turn
-    }
-    if not fresh:
-        return ()
-    return tuple(
-        Reminder(permanent.instance_id, names(permanent.card.oracle_id), ability.trigger.event)
-        for permanent in battlefield
-        for ability in abilities(permanent.card.oracle_id)
-        if isinstance(ability, TriggeredAbility)
-        if _arrived_for(ability.trigger.event, permanent.instance_id, fresh)
-    )
-
-
-def _arrived_for(event: TriggerEvent, instance_id: InstanceId, fresh: set[InstanceId]) -> bool:
-    """Whether this arrival trigger has something to fire on."""
-    if event is TriggerEvent.ENTERS:
-        return instance_id in fresh
-    if event is TriggerEvent.ANOTHER_CREATURE_ENTERS:
-        return bool(fresh - {instance_id})
-    return False
-
-
 def every_event_is_classified() -> bool:
     """Whether each trigger event is clock-, arrival- or event-driven.
 

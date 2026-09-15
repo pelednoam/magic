@@ -33,7 +33,15 @@ const ANSWER = {
   unsure: "",
 } satisfies Asked["answer"];
 
-export const ASKED = { answer: ANSWER, cited: true, matched: true, rules: [], version: 0 } satisfies Asked;
+export const ASKED = {
+  answer: ANSWER,
+  cited: true,
+  grounded: true,
+  unchecked: ["Nothing here has read the cited rules and decided that it follows."],
+  matched: true,
+  rules: [],
+  version: 0,
+} satisfies Asked;
 
 /** A `Coach` whose one slow call the test resolves by hand. */
 export function deferred<T>(): {

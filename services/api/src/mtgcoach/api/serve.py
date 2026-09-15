@@ -80,9 +80,9 @@ def assemble(db: Path, data_root: Path, set_code: SetCode) -> Serving:
         catalogue = build(cards, effects_path(data_root, set_code))
         names = {card.name: card.oracle_id for card in cards}
 
-    decks = {deck.key: _library(deck, names) for deck in load_set_decks(data_root, set_code)}
+    decks = {deck.key: library(deck, names) for deck in load_set_decks(data_root, set_code)}
     token = token_at(data_root / TOKEN_PATH)
-    app = create_app(catalogue, decks, token, Claude(rules=_rules(data_root)))
+    app = create_app(catalogue, decks, token, Claude(rules=_rules(data_root)), data_root)
     return Serving(app=app, token=token)
 
 
@@ -111,8 +111,14 @@ def _rules(data_root: Path) -> RuleIndex | None:
         return None
 
 
-def _library(deck: Decklist, names: Mapping[str, OracleId]) -> tuple[str, ...]:
+def library(deck: Decklist, names: Mapping[str, OracleId]) -> tuple[str, ...]:
     """One decklist as the oracle ids to deal, in order.
+
+    Public because it makes a rules-visible decision of its own and now has a
+    test to itself; see ``tests/api/test_serve_decks.py``. It was private, and
+    the only thing exercising the dropped-card branch was the card fixture
+    being too small to cover a decklist -- which stopped being true when that
+    fixture grew to the whole box.
 
     A card the store does not have is dropped rather than dealt as a blank. The
     decklists are verified against the store by `mtgcoach decks verify`, so this

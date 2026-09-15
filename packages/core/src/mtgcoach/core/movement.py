@@ -3,6 +3,13 @@
 Every movement is remove-then-add, so the number of cards a player owns cannot
 change no matter which event moved them. That is what makes the conservation
 property in the test suite a real invariant rather than a hopeful assertion.
+
+Only a player's *own* zones. The stack is shared and ordered and lives on
+``GameState``; putting a card there is casting it, which needs a controller and
+a payment, so it is ``casting.cast`` rather than a move. This module used to
+have an arm for it, back when the stack was a field on ``PlayerState``, and
+that arm was how a caller could have moved a card onto the stack without
+casting it.
 """
 
 from __future__ import annotations

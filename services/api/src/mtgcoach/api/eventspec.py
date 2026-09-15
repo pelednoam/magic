@@ -1,44 +1,82 @@
-"""Turning a client's JSON into an engine event, or saying why not.
+"""Turning a client's JSON into an engine event, and back again.
 
 The boundary where untrusted input becomes a typed ``Event``. Everything past
 here is checked by the type system; nothing before it is, so this is where the
-checking has to be explicit and complete.
+checking has to be explicit and complete. ``eventfields`` does the checking of
+each field; this module says which fields each event has.
 
 It is also where one hole in ``core`` gets closed. ``PlayLand``'s own docstring
 says the reducer cannot tell whether the card is a land -- ``core`` holds no
 card data by design, so "until then a caller can play any card in hand as its
 land for the turn". This layer *has* card data. So the check lives here, which
 is the first point that can make it.
+
+The two directions are a round trip, and ``test_eventspec`` asserts it over one
+of every event. That property is what a recorded game rests on: a journal keeps
+the event log, and the replay route rebuilds any moment from it with nothing
+but ``core.reduce.replay``. If the two halves disagreed about a single field,
+the board a child is shown stepping through a game would not be the board that
+was played -- silently, because both halves would still be valid JSON.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, assert_never
 
+from mtgcoach.api.eventfields import (
+    BadEventError,
+    flag,
+    instance,
+    instances,
+    player,
+    text,
+    whole,
+    zone,
+)
 from mtgcoach.core.events import (
     AdvanceStep,
+    CastSpell,
     ChangeLife,
     DrawCard,
     MoveCard,
+    PassPriority,
     PlayLand,
+    ResolveSpell,
     SetTapped,
 )
-from mtgcoach.core.ids import InstanceId, PlayerId
-from mtgcoach.core.zones import ZoneName
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Callable, Mapping
 
+    from mtgcoach.api.views import Json
     from mtgcoach.core.events import Event
+    from mtgcoach.core.reduce import Moving
 
-
-class BadEventError(ValueError):
-    """The client sent something that is not an event this engine accepts.
-
-    A ``ValueError`` with a sentence in it, because the sentence goes back over
-    the wire. "unknown event type 'atack'" is a bug report; a 422 with a schema
-    dump is a puzzle.
-    """
+#: Every event a client may send, by the name it sends it under.
+#:
+#: A table rather than a chain of ``if``s, so the set of names the wire accepts
+#: is one object that can be read at a glance -- and asserted against, which is
+#: what stops a new event reaching the engine without the app ever hearing of it.
+BUILDERS: Mapping[str, Callable[[Mapping[str, object]], Event]] = {
+    "advance_step": lambda _: AdvanceStep(),
+    # Carries the seat, because a pass is an action one player takes. Without
+    # it one device could pass for the other and the window this event exists
+    # to open would be the window it closed.
+    "pass_priority": lambda payload: PassPriority(player(payload)),
+    "draw_card": lambda payload: DrawCard(player(payload)),
+    "play_land": lambda payload: PlayLand(player(payload), instance(payload)),
+    "cast_spell": lambda payload: CastSpell(
+        player(payload), instance(payload), instances(payload, "payment")
+    ),
+    "resolve_spell": lambda payload: ResolveSpell(
+        player(payload), instance(payload), zone(payload)
+    ),
+    "set_tapped": lambda payload: SetTapped(
+        player(payload), instance(payload), tapped=flag(payload, "tapped")
+    ),
+    "move_card": lambda payload: MoveCard(player(payload), instance(payload), zone(payload)),
+    "change_life": lambda payload: ChangeLife(player(payload), whole(payload, "amount")),
+}
 
 
 def parse(payload: Mapping[str, object]) -> Event:
@@ -47,74 +85,65 @@ def parse(payload: Mapping[str, object]) -> Event:
     Raises:
         BadEventError: If the type is unknown or a field is missing or ill-typed.
     """
-    kind = _text(payload, "type")
-    if kind == "advance_step":
-        return AdvanceStep()
-    if kind == "draw_card":
-        return DrawCard(PlayerId(_text(payload, "player")))
-    if kind == "play_land":
-        return PlayLand(PlayerId(_text(payload, "player")), _instance(payload))
-    if kind == "set_tapped":
-        return SetTapped(
-            PlayerId(_text(payload, "player")),
-            _instance(payload),
-            tapped=_flag(payload, "tapped"),
-        )
-    if kind == "move_card":
-        return MoveCard(PlayerId(_text(payload, "player")), _instance(payload), _zone(payload))
-    if kind == "change_life":
-        return ChangeLife(PlayerId(_text(payload, "player")), _whole(payload, "amount"))
-    msg = f"unknown event type {kind!r}"
-    raise BadEventError(msg)
-
-
-def _instance(payload: Mapping[str, object]) -> InstanceId:
-    """The card this event is about."""
-    return InstanceId(_text(payload, "instance_id"))
-
-
-def _text(payload: Mapping[str, object], field: str) -> str:
-    """A required string field."""
-    value = payload.get(field)
-    if not isinstance(value, str) or not value:
-        msg = f"{field!r} must be a non-empty string"
+    kind = text(payload, "type")
+    build = BUILDERS.get(kind)
+    if build is None:
+        known = ", ".join(sorted(BUILDERS))
+        msg = f"unknown event type {kind!r}; expected one of {known}"
         raise BadEventError(msg)
-    return value
+    return build(payload)
 
 
-def _flag(payload: Mapping[str, object], field: str) -> bool:
-    """A required boolean field.
+def written(event: Event) -> dict[str, Json]:
+    """One event as the JSON object ``parse`` would read back.
 
-    Checked for ``bool`` specifically, not truthiness: JSON's ``0`` and ``""``
-    are not "untapped", they are a client that got the field wrong, and silently
-    reading them as false would tap the wrong permanent.
+    Closed with ``assert_never``, so a new member of ``Event`` is a type error
+    here until it is written down -- which is what makes a forgotten event a
+    failing build rather than a game that replays wrong.
     """
-    value = payload.get(field)
-    if not isinstance(value, bool):
-        msg = f"{field!r} must be true or false"
-        raise BadEventError(msg)
-    return value
+    match event:
+        case AdvanceStep():
+            return {"type": "advance_step"}
+        case PassPriority(seat):
+            return {"type": "pass_priority", "player": str(seat)}
+        case DrawCard(seat):
+            return {"type": "draw_card", "player": str(seat)}
+        case PlayLand() | CastSpell() | ResolveSpell() | MoveCard():
+            return _moved(event)
+        case SetTapped(seat, instance_id, tapped):
+            return {
+                "type": "set_tapped",
+                "player": str(seat),
+                "instance_id": str(instance_id),
+                "tapped": tapped,
+            }
+        case ChangeLife(seat, amount):
+            return {"type": "change_life", "player": str(seat), "amount": amount}
+    assert_never(event)
 
 
-def _whole(payload: Mapping[str, object], field: str) -> int:
-    """A required integer field.
+def _moved(event: Moving) -> dict[str, Json]:
+    """The four events that take a card from one zone to another.
 
-    ``bool`` is excluded because it is an ``int`` in Python and not one in any
-    other sense: ``{"amount": true}`` would otherwise gain a player one life.
+    Split the same way ``reduce`` splits them, and for the same reason: one
+    match may not branch this many times. Both halves stay ``assert_never``-
+    closed over their own part of ``Event``.
     """
-    value = payload.get(field)
-    if isinstance(value, bool) or not isinstance(value, int):
-        msg = f"{field!r} must be a whole number"
-        raise BadEventError(msg)
-    return value
+    match event:
+        case PlayLand(seat, instance_id):
+            return _card("play_land", seat, instance_id)
+        case CastSpell(seat, instance_id, payment):
+            return {
+                **_card("cast_spell", seat, instance_id),
+                "payment": [str(one) for one in payment],
+            }
+        case ResolveSpell(seat, instance_id, to):
+            return {**_card("resolve_spell", seat, instance_id), "to": str(to)}
+        case MoveCard(seat, instance_id, to):
+            return {**_card("move_card", seat, instance_id), "to": str(to)}
+    assert_never(event)
 
 
-def _zone(payload: Mapping[str, object]) -> ZoneName:
-    """The zone a card is moving to."""
-    name = _text(payload, "to")
-    try:
-        return ZoneName(name)
-    except ValueError as exc:
-        allowed = ", ".join(sorted(zone.value for zone in ZoneName))
-        msg = f"unknown zone {name!r}; expected one of {allowed}"
-        raise BadEventError(msg) from exc
+def _card(kind: str, seat: object, instance_id: object) -> dict[str, Json]:
+    """The three fields every card movement carries."""
+    return {"type": kind, "player": str(seat), "instance_id": str(instance_id)}

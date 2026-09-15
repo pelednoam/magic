@@ -58,8 +58,14 @@ Model every mana ability this way; the mana solver reads them.
 - A target is ALWAYS an object, never a string. "this creature" is
   {"kinds":["self"]}, not "self".
 - "who" is a plain string: "you" or "opponent", never an object.
-- An Aura's "enchanted creature gets +2/+1" is a static_modifier whose affects is
-{"kinds":["self"]} -- the Aura modifies what it is attached to.
+- An Aura's or Equipment's "enchanted creature"/"equipped creature" is
+{"kinds":["enchanted"]}, NEVER {"kinds":["self"]}. `self` is the permanent the
+ability is printed on -- the Aura itself. Saying `self` for Pacifism's
+"enchanted creature can't attack or block" made the engine restrict the
+*enchantment*, which could not attack anyway, and silently dropped the warning
+that combat was ignoring it. So: "enchanted creature gets +2/+1" is a
+static_modifier affecting {"kinds":["enchanted"]}; "when THIS enters" is a
+trigger whose subject is {"kinds":["self"]}.
 - Emit one object for EVERY card you are given, even a vanilla creature with no rules text:
 give it an empty abilities list. Never omit a card.
 - deal_damage takes an optional "source": omit it (or null) when the card

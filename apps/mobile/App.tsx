@@ -1,8 +1,9 @@
 /**
- * The whole app: pick decks, then track a game.
+ * The whole app: pick decks and track a game, or walk one that already happened.
  *
- * No router. There are two screens and one transition between them, and a
- * navigation library would be more code than the thing it navigates.
+ * Still no router. Three screens and two ways between them, and a navigation
+ * library would be more code than the thing it navigates. `Replays` owns the
+ * lists inside itself for the same reason.
  */
 
 import { useState } from "react";
@@ -11,6 +12,7 @@ import { StatusBar } from "expo-status-bar";
 
 import { Coach } from "./src/client";
 import { Game } from "./src/screens/Game";
+import { Replays } from "./src/screens/Replays";
 import { Start } from "./src/screens/Start";
 import { colour } from "./src/theme";
 import type { NewGame } from "./src/wire";
@@ -39,21 +41,30 @@ export default function App() {
   // Which side of the table this device is. The first device takes "you"; a
   // device that joins an existing game takes the other seat.
   const [seat, setSeat] = useState(YOU);
+  // Whether the replay lists are open. Not a screen a game can be in, so it is
+  // its own flag rather than another value of `game`.
+  const [browsing, setBrowsing] = useState(false);
+
+  const begin = (started: NewGame, taken: string) => {
+    setSeat(taken);
+    setGame(started);
+    setBrowsing(false);
+  };
 
   return (
     <SafeAreaView style={styles.screen}>
       <StatusBar style="light" />
-      {game === null ? (
+      {game !== null ? (
+        <Game coach={coach} game={game} seat={seat} />
+      ) : browsing ? (
+        <Replays coach={coach} onPlay={begin} onLeave={() => { setBrowsing(false); }} />
+      ) : (
         <Start
           coach={coach}
-          onStarted={(started, taken) => {
-            setSeat(taken);
-            setGame(started);
-          }}
+          onStarted={begin}
+          onReplays={() => { setBrowsing(true); }}
           onToken={(token) => { setCoach(coach.withToken(token)); }}
         />
-      ) : (
-        <Game coach={coach} game={game} seat={seat} />
       )}
     </SafeAreaView>
   );

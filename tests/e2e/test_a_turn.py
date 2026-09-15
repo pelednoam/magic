@@ -23,6 +23,7 @@ from snapshot import (
     refuse,
     send,
     start,
+    stepped,
     undo,
     verdicts,
     zone,
@@ -40,7 +41,7 @@ def _to_main(client: TestClient, session_id: str) -> dict[str, object]:
     """Walk from the start of the game to the first main phase."""
     body = look(client, session_id)
     for _ in range(STEPS_TO_MAIN):
-        body = send(client, session_id, type="advance_step")
+        body = stepped(client, session_id)
     assert text(body, "state", "step") == "precombat_main"
     return body
 

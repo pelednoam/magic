@@ -15,14 +15,17 @@ from typing import TYPE_CHECKING
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from helpers import ME, YOU, deck
+from helpers import ME, YOU, all_pass, deck
 from mtgcoach.core.errors import IllegalEventError
 from mtgcoach.core.events import (
     AdvanceStep,
+    CastSpell,
     ChangeLife,
     DrawCard,
     MoveCard,
+    PassPriority,
     PlayLand,
+    ResolveSpell,
     SetTapped,
 )
 from mtgcoach.core.reduce import apply, replay
@@ -55,11 +58,15 @@ def _event_strategy(state: GameState) -> st.SearchStrategy[Event]:
     players = st.sampled_from(list(state.players))
     choices: list[st.SearchStrategy[Event]] = [
         st.just(AdvanceStep()),
+        # From either seat, on purpose: a pass by the player who does not hold
+        # priority has to be refused, and the refusal path has to preserve the
+        # invariants like every other.
+        st.builds(PassPriority, players),
         st.builds(DrawCard, players),
         st.builds(ChangeLife, players, st.integers(-LIFE_SWING, LIFE_SWING)),
     ]
     for player_id, player in state.players.items():
-        owned = [card.instance_id for card in player.cards()]
+        owned = [card.instance_id for card in state.cards_of(player_id)]
         if owned:
             choices.append(
                 st.builds(
@@ -70,11 +77,20 @@ def _event_strategy(state: GameState) -> st.SearchStrategy[Event]:
                 )
             )
         if player.hand:
+            in_hand = st.sampled_from([c.instance_id for c in player.hand])
+            choices.append(st.builds(PlayLand, st.just(player_id), in_hand))
+            # No payment: the reducer does not know what a spell costs, so a
+            # free cast is legal there and `api.guard` is what refuses it.
+            # Casting is what puts anything on the stack, so without this the
+            # stack invariants above would never see a non-empty one.
+            choices.append(st.builds(CastSpell, st.just(player_id), in_hand))
+        if state.stack:
             choices.append(
                 st.builds(
-                    PlayLand,
+                    ResolveSpell,
                     st.just(player_id),
-                    st.sampled_from([c.instance_id for c in player.hand]),
+                    st.sampled_from([one.instance_id for one in state.stack]),
+                    st.sampled_from(list(ZoneName)),
                 )
             )
         if player.battlefield:
@@ -113,6 +129,10 @@ def test_invariants_hold_over_arbitrary_play(data: st.DataObject) -> None:
 
         assert state == before, "apply must not mutate its input"
         assert len(list(nxt.cards())) == total_cards, "cards were created or destroyed"
+        for one in nxt.stack:
+            assert one.card in list(nxt.cards_of(one.controller)), (
+                "a spell on the stack must still count among its controller's cards"
+            )
         assert nxt.turn >= state.turn, "the turn counter must not run backwards"
         if nxt.turn != state.turn:
             assert nxt.active_player != state.active_player, (
@@ -134,14 +154,23 @@ def test_a_full_cycle_from_any_step_advances_exactly_one_turn(offset: int) -> No
     """Whichever step you start from, twelve advances is one turn, not two."""
     state = _new_game()
     for _ in range(offset):
-        state = apply(state, AdvanceStep())
+        state = _ended(state)
 
     start_turn, start_player = state.turn, state.active_player
     for _ in range(len(TURN_ORDER)):
-        state = apply(state, AdvanceStep())
+        state = _ended(state)
 
     assert state.turn == start_turn + 1
     assert state.active_player != start_player
+
+
+def _ended(state: GameState) -> GameState:
+    """End the current step the way CR 500.2 ends it: all pass, then advance.
+
+    A bare ``AdvanceStep`` is refused now, and a property test that reached for
+    one was leaning on the very gap this engine has closed.
+    """
+    return apply(all_pass(state), AdvanceStep())
 
 
 @settings(max_examples=25, deadline=None)

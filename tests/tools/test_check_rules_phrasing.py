@@ -38,6 +38,20 @@ will block. The chosen creatures must be untapped.
 
 510.1b. An unblocked creature assigns its combat damage to the player or
 planeswalker it's attacking.
+
+121.4. A player who attempts to draw a card from a library with no cards in it
+loses the game the next time a player would receive priority.
+
+115.2. Only permanents are legal targets for spells and abilities.
+
+601.2c The player announces their choice of an appropriate object or player for
+each target the spell requires.
+
+700.4. The term dies means "is put into a graveyard from the battlefield."
+
+704.5g. If a creature has toughness greater than 0 and the total damage marked
+on it is greater than or equal to its toughness, that creature has been dealt
+lethal damage and is destroyed.
 """
 
 

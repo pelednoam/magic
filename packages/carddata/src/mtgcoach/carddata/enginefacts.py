@@ -61,6 +61,7 @@ def facts_for(card: Card, face_index: int = 0) -> CardFacts:
         is_land=types.is_land,
         is_creature=types.is_creature,
         is_instant_speed=types.is_instant_speed,
+        is_permanent=types.is_permanent,
         power=_stat(face.power),
         toughness=_stat(face.toughness),
         keywords=card.keywords,

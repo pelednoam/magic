@@ -80,6 +80,28 @@ It may still use any of the options in section 8.
 
 702.19b The controller of an attacking creature with trample first assigns damage to the creature(s) blocking it.
 
+121. Drawing a Card
+
+121.4. A player who attempts to draw a card from a library with no cards in it loses the game the next time a player would receive priority. (This is a state-based action. See rule 704.)
+
+115. Targeting
+
+115.2. Only permanents are legal targets for spells and abilities, unless a spell or ability (a) specifies that it can target an object in another zone or a player, or (b) targets an object that can’t exist on the battlefield, such as a spell or ability. See also rule 115.4.
+6. Spells, Abilities, and Effects
+
+601. Casting Spells
+
+601.2c The player announces their choice of an appropriate object or player for each target the spell requires. A spell may require some targets only if an alternative or additional cost (such as a kicker cost) or a particular mode was chosen for it; otherwise, the spell is cast as though it did not require those targets. Similarly, a spell may require alternative targets only if an alternative or additional cost was chosen for it. If the spell has a variable number of targets, the player announces how many targets they will choose before they announce those targets. In some cases, the number of targets will be defined by the spell’s text. Once the number of targets the spell has is determined, that number doesn’t change, even if the information used to determine the number of targets does. The same target can’t be chosen multiple times for any one instance of the word “target” on the spell. However, if the spell uses the word “target” in multiple places, the same object or player can be chosen once for each instance of the word “target” (as long as it fits the targeting criteria). If any effects say that an object or player must be chosen as a target, the player chooses targets so that they obey the maximum possible number of such effects without violating any rules or effects that say that an object or player can’t be chosen as a target. The chosen objects and/or players each become a target of that spell. (Any abilities that trigger when those objects and/or players become the target of a spell trigger at this point; they’ll wait to be put on the stack until the spell has finished being cast.)
+
+7. Additional Rules
+
+700. General
+
+700.4. The term dies means “is put into a graveyard from the battlefield.”
+
+704. State-Based Actions
+
+704.5g If a creature has toughness greater than 0, it has damage marked on it, and the total damage marked on it is greater than or equal to its toughness, that creature has been dealt lethal damage and is destroyed. Regeneration can replace this event.
 903.12 Brawl Option
 
 8. Multiplayer Rules
@@ -102,6 +124,9 @@ Informal term for a player’s inability to attack with a creature or to activat
 Trample
 A keyword ability that modifies how a creature assigns combat damage.
 See rule 702.19, "Trample."
+
+Lethal Damage
+An amount of damage greater than or equal to a creature’s toughness. See rules 120.4a, 120.6, 510.1, and 704.5g.
 
 Credits
 

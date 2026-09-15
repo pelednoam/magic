@@ -42,6 +42,15 @@ CATALOGUE = Catalogue(
     cards={"Forest": FOREST, "Bear": BEAR, "Growth": GROWTH, "Bell": BELL},
     # An entry, even an empty one, is the fixture saying "I know this card".
     rules={"Forest": (taps_for("{G}"),), "Bell": (RINGS,), "Bear": (), "Growth": ()},
+    # What each card says, as printed. Here because the rules question route
+    # quotes it into the prompt and the answer checks are grounded in it -- a
+    # catalogue with no text would leave both untested through the route, which
+    # is the one path an answer can reach a client through.
+    texts={
+        "Forest": "({T}: Add {G}.)",
+        "Growth": "Target creature gets +3/+3 until end of turn.",
+        "Bell": "At the beginning of your upkeep, ring the bell.",
+    },
 )
 
 #: The opening seven are the first seven, so this is what a test will be
@@ -148,13 +157,15 @@ def server(
     explainer: Explainer | None = None,
     asker: Asker | None = None,
     rules: RuleIndex | None = None,
+    data_root: Path | None = None,
 ) -> FastAPI:
     """An app with the small catalogue and two identical decks.
 
     Both models default to the ones that refuse, so no test can accidentally
     spawn a real ``claude``. ``rules`` defaults to *absent*, which is the state
     a server without the Comprehensive Rules installed is in -- a test that
-    wants the question box working asks for ``RULES``.
+    wants the question box working asks for ``RULES``. ``data_root`` defaults
+    to absent too, which is a server with no journals to replay.
     """
     return create_app(
         CATALOGUE,
@@ -165,6 +176,7 @@ def server(
             asker=asker if asker is not None else NoAnswers(),
             rules=rules,
         ),
+        data_root=data_root,
     )
 
 

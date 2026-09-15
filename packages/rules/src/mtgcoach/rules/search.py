@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Self
 
 from mtgcoach.rules.corpus import Kind, Passage
 from mtgcoach.rules.keywords import NONE, Keywords, keywords_in
+from mtgcoach.rules.pointing import pointed_at
 from mtgcoach.rules.terms import query, references_in
 
 if TYPE_CHECKING:
@@ -61,6 +62,17 @@ class RuleIndex:
         # this lock is: queries are sub-millisecond, so holding it costs
         # nothing next to the subprocess it is about to wait on.
         self._lock = threading.Lock()
+
+    @property
+    def keywords(self) -> Keywords:
+        """The ability names this document defines.
+
+        Read off the passages by ``build`` and exposed because the answer
+        checks need them too: ``grounding`` cannot tell an ability claim from
+        ordinary English without the list, and a list written out anywhere but
+        the document would be wrong by the next set.
+        """
+        return self._keywords
 
     @classmethod
     def build(cls, passages: Iterable[Passage], path: str = ":memory:") -> Self:
@@ -112,6 +124,15 @@ class RuleIndex:
         particular; asking for it by number is both cheaper and correct, and it
         is the one case where a question says precisely what it wants.
 
+        Then a slot or two for whatever the *paraphrase* map pointed at, found
+        by searching for its phrases alone. A phrase in that map is chosen
+        because it is the rules' own wording for the question, so a match on it
+        is far better evidence than a match on "cast" or "creature" -- and in
+        an OR query of common words it loses anyway, because bm25 normalises by
+        length and the rules that answer a beginner's question are long.
+        "Can I cast Giant Growth without a creature?" put the phrase for
+        CR 601.2c in the query, matched it, and ranked it ninth of eight.
+
         Empty when the question has no searchable words in it, which is a real
         answer -- "what?" is not a question the rules can be looked up for, and
         returning the eight highest-ranked passages for nothing would be worse
@@ -121,8 +142,10 @@ class RuleIndex:
         wanted = query(question, self._keywords)
         if not wanted:
             return named
-        found = [p for p in self._matching(wanted, limit) if p not in named]
-        return (*named, *found)[:limit]
+        pointed = pointed_at(self._matching, question, limit, len(named))
+        kept = (*named, *pointed)
+        found = [p for p in self._matching(wanted, limit) if p not in kept]
+        return (*kept, *found)[:limit]
 
     def _matching(self, wanted: str, limit: int) -> tuple[Passage, ...]:
         """The passages an FTS5 query matches, best first."""

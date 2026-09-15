@@ -15,7 +15,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  gate:
+  # The Python half of `tools/gate.sh`. Each check is its own step so a failure
+  # names itself in the UI rather than hiding inside a shell script's output --
+  # which is why this is not simply `./tools/gate.sh`.
+  python:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,8 +30,6 @@ jobs:
       - run: uv python install 3.12
       - run: uv sync --all-groups
 
-      # Each gate is its own step so a failure names itself in the UI rather
-      # than hiding inside a shell script's output.
       - name: ruff check
         run: uv run ruff check --output-format=github .
 
@@ -41,6 +42,19 @@ jobs:
       - name: coverage opt-outs inside the allowlist
         run: uv run python tools/check_pragma_allowlist.py
 
+      # The guard on this file. `tools/gate.sh` is what the README calls the
+      # full gate; this asserts the workflow runs every command in it. The two
+      # drifted once and nothing noticed, because nothing was looking.
+      - name: CI runs the whole gate
+        run: uv run python tools/check_ci_covers_gate.py
+
+      # Three gates the workflow used to omit while the README called it the
+      # full gate. The CLI-flag check is the one that matters most here: it
+      # guards the flags this project passes to `claude`, and the coach stops
+      # working entirely when one of them is dropped upstream.
+      - name: claude CLI flags still exist
+        run: uv run python tools/check_cli_flags.py
+
       - name: mypy --strict
         run: uv run mypy
 
@@ -49,3 +63,83 @@ jobs:
 
       - name: pytest with 100% branch coverage
         run: uv run pytest --cov --cov-branch --cov-report=term-missing
+
+  # The app, in its own job because it needs Node rather than Python. It used
+  # to be omitted altogether, so a change to the mobile action flow -- the
+  # events the app sends when you tap a card -- could pass CI with nothing
+  # having typechecked it.
+  app:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      # `ci`, not `install`: the lockfile is the input, and a workflow that
+      # resolved its own dependency versions would be testing a tree nobody
+      # has.
+      - run: npm ci
+
+      - name: tsc --noEmit
+        run: npx --no-install tsc --noEmit
+
+      - name: vitest
+        run: npx --no-install vitest run --reporter=dot
+
+  # The rules checks, which need the Comprehensive Rules on disk. Wizards
+  # revise them with every set and they are deliberately not vendored, so this
+  # job fetches the document and says which one it got.
+  #
+  # Its own job, and `continue-on-error`, because it depends on a third party's
+  # web page: a Wizards outage must not turn the whole gate red. What it must
+  # not do is *silently* count as a pass -- `tools/gate.sh` prints "SKIPPED"
+  # locally, and this prints a failed job beside two green ones.
+  rules:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: uv python install 3.12
+      - run: uv sync --all-groups
+
+      - name: fetch the Comprehensive Rules
+        run: |
+          mkdir -p data/rules
+          url=$(
+            curl -fsSL --max-time 60 https://magic.wizards.com/en/rules \
+            | grep -oiE 'https://[^"]*MagicCompRules[^"]*\.txt' \
+            | head -1
+          )
+          if [ -z "$url" ]; then
+            echo "::error::no MagicCompRules .txt link found on magic.wizards.com/en/rules"
+            echo "The page's markup changed, or it is unreachable. The rules"
+            echo "checks below have NOT run. Fetch the document by hand and"
+            echo "compare, per README."
+            exit 1
+          fi
+          echo "Fetched: $url"
+          # The filename has a space in it ("MagicCompRules 20260819.txt"), and
+          # curl rejects an unencoded one outright -- "URL rejected: Malformed
+          # input to a URL function". Found by running this by hand.
+          curl -fsSL --max-time 120 --path-as-is -o data/rules/comprehensive.txt \
+            -- "${url// /%20}"
+          echo "$url" > data/rules/SOURCE
+          wc -l data/rules/comprehensive.txt
+
+      - name: rules phrasing
+        run: uv run python tools/check_rules_phrasing.py
+
+      - name: rules retrieval benchmark
+        run: uv run python tools/check_retrieval.py

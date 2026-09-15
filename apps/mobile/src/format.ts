@@ -113,3 +113,39 @@ export function planFor(
 function key(ids: readonly string[]): string {
   return [...ids].sort().join("|");
 }
+
+/**
+ * Where in a game a replayed moment is, in words.
+ *
+ * "Turn 1, attacking" rather than "turn 1 declare_attackers". The step ids are
+ * the rules' own names and exactly right; they are not what you say out loud.
+ * A step this does not know keeps its real name rather than being guessed at,
+ * because a wrong word here would teach a wrong rule.
+ */
+export function placeOf(turn: number, step: string): string {
+  return `Turn ${turn}, ${PLAINLY[step] ?? step}`;
+}
+
+/** The steps a decision is ever asked at, said the way a person says them. */
+const PLAINLY: Readonly<Record<string, string>> = {
+  upkeep: "upkeep",
+  draw: "the draw",
+  precombat_main: "before combat",
+  begin_combat: "start of combat",
+  declare_attackers: "attacking",
+  declare_blockers: "blocking",
+  combat_damage: "damage",
+  end_combat: "end of combat",
+  postcombat_main: "after combat",
+  end_step: "end of turn",
+};
+
+/**
+ * Which board this is, and whose decision the moment was.
+ *
+ * Marking the seat that was asked is the difference between "a board" and "the
+ * board somebody was looking at when they chose".
+ */
+export function seatName(seat: string, named: string, deciding: string): string {
+  return seat === deciding ? `${named} — choosing here` : named;
+}

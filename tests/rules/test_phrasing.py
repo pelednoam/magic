@@ -18,14 +18,9 @@ from __future__ import annotations
 import pytest
 
 from helpers_rules import PASSAGES
-from mtgcoach.rules.phrasing import (
-    LIFE_TOTAL,
-    OUT_OF_LIFE,
-    SUMMONING_SICKNESS,
-    TARGETS,
-    also,
-)
+from mtgcoach.rules.phrasing import TARGETS, also
 from mtgcoach.rules.terms import query
+from mtgcoach.rules.wording import LIFE_TOTAL, OUT_OF_LIFE, SUMMONING_SICKNESS
 
 
 @pytest.mark.parametrize(

@@ -11,11 +11,19 @@ a rewrite. See [`docs/PLAN.md`](docs/PLAN.md) for the full design.
 **M0–M6 merged.** The engine, the tracker, the two-seat server
 and the Expo app all work. The turn coach and the rules question box are the newest parts.
 
-The two checks are deliberately different strengths, and the wire says which you are getting.
+The checks are deliberately different strengths, and the wire says which you are getting.
 A turn recommendation is `trusted`: it is a choice among options the engine enumerated, and
-the engine agrees with it. A rules answer is only `cited`: every rule it named was one the
-server retrieved for it. Nothing reads that rule and checks the claim against it — so the
-retrieved rules are printed under every answer, and they are the part that is certainly true.
+the engine agrees with it. A rules answer gets two weaker verdicts, and neither is `correct`.
+`cited` means every rule it named was one the server retrieved for it. `grounded` means the
+words a rules claim cannot be paraphrased around — the arithmetic, and the keyword abilities
+it attributes to something — appear in the evidence the prompt carried: the retrieved
+passages, and the printed text of the cards in play. "Trample doubles all damage [702.19b]"
+is cited and not grounded, and is not shown.
+
+Nothing reads the cited rule and decides that the answer *follows* from it; that needs a
+second model, and two models agreeing is not a proof either. So every reply also carries
+`unchecked`, which says that in the server's own words, and the retrieved rules are printed
+under every answer — they are the part that is certainly true.
 
 ## Running it
 
@@ -68,9 +76,22 @@ which is the only way bad advice shows up, since it compounds. That run reports 
 answers survived the engine's checks.
 
 A seed reproduces a deal exactly but not the coach, so a coached run writes a **journal** — every
-briefing, every answer, every verdict — and `--replay` plays it back: the identical game in a
-second instead of twenty minutes, and a way to ask what a change to the engine does to a game the
-coach already played. [docs/SELFPLAY.md](docs/SELFPLAY.md) has the whole thing.
+briefing, every answer, every verdict, and the game itself as the events it applied. `--replay`
+plays it back: the identical game in a second instead of twenty minutes, and a way to ask what a
+change to the engine does to a game the coach already played.
+[docs/SELFPLAY.md](docs/SELFPLAY.md) has the whole thing.
+
+## Walking a game that was played
+
+Start the server with a `--data` directory holding journals and the app grows a third screen:
+pick a run, pick a game, and step through it one decision at a time — the board, what the coach
+said, and the engine's objections beside it where it refused. "Ask about this" turns that moment
+into a real game on the server, so the question box and the coach both answer about *that*
+position rather than one like it.
+
+Nothing is re-asked to build it. Each moment is the recorded events folded over the opening
+board — `core` and nothing else — so what is on screen is what happened in the game, which is
+what it has to be for somebody to learn the rules from it.
 
 `sets fetch` is the only command that touches the network. It asks Scryfall for one set —
 771 printings for Foundations, five requests — and writes them to a file, so re-importing
@@ -111,9 +132,10 @@ applied blindly turns "not less than" into a search for *unless*.
 
 `tools/check_retrieval.py` keeps all three honest: it asks the **installed** rules 28 questions a
 person would actually type and fails the gate if an answering rule stops coming back. On a machine
-without the rules — a fresh clone, or CI — it prints `SKIPPED` and passes, because the document is
-Wizards' and is deliberately not vendored. So it guards the laptop the coach runs on, and says so
-plainly anywhere else.
+without the rules it prints `SKIPPED` and passes, because the document is Wizards' and is
+deliberately not vendored — so it guards the laptop the coach runs on, and says so plainly
+anywhere else. CI fetches the document itself and records which revision it got, because a missing
+corpus must not quietly count as a rules-quality pass.
 
 Without it everything else works, the server says so at startup, and the app shows the
 question box as switched off rather than letting you type into it.
@@ -132,11 +154,22 @@ uv run pyright          # second type check
 uv run pre-commit install
 ```
 
-All gates at once, exactly as CI runs them:
+All gates at once:
 
 ```bash
 uv run tools/gate.sh
 ```
+
+CI runs every one of them. That was not true — the workflow omitted the CLI-flag check, both rules
+checks, the TypeScript typecheck and the whole mobile test suite, so a change to the events the app
+sends when you tap a card could go green with nothing having typechecked it. Nothing noticed,
+because nothing was looking, so `tools/check_ci_covers_gate.py` now looks: it reads both
+definitions and fails when the workflow runs less than the gate. The one-way comparison is
+deliberate — CI may do more (it fetches the rules), and a workflow forbidden from adding a check
+would be a worse workflow.
+
+The app's checks need `node_modules`. `tools/gate.sh` says so and stops rather than reporting "all
+gates passed" having silently checked no TypeScript; `SKIP_APP=1` accepts that trade explicitly.
 
 ## Layout
 

@@ -153,3 +153,25 @@ export function useQuestions(
   );
   return useSlowAsk<Asked, [string]>(send, version, `${sessionId}/${seat}`);
 }
+
+/**
+ * A token for "is this reply still the one being waited for".
+ *
+ * Every call returns a predicate that stays true until the next call. A screen
+ * takes one before each slow request and drops the reply if it is false by the
+ * time it arrives.
+ *
+ * The same rule the two hooks above apply to a board that moved, in the shape
+ * a screen with several slow calls needs: choosing a game and then going back
+ * left a fetch in flight that put the screen back where it had just left, a
+ * second after leaving. Calling this with no request to follow is the way to
+ * say "whatever is in flight, I no longer want it".
+ */
+export function useLatest(): () => () => boolean {
+  const wanted = useRef(0);
+  return useCallback(() => {
+    wanted.current += 1;
+    const mine = wanted.current;
+    return () => mine === wanted.current;
+  }, []);
+}

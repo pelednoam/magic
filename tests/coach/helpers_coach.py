@@ -6,8 +6,10 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from helpers import ME, YOU, facts
+from mtgcoach.core import priority
 from mtgcoach.core.abilities import Ability, ActivatedAbility, unmodelled_reasons
 from mtgcoach.core.cards import CardInstance
+from mtgcoach.core.carrying import not_carried_out as _not_carried_out
 from mtgcoach.core.effects import ProduceMana
 from mtgcoach.core.facts import CardFacts
 from mtgcoach.core.ids import InstanceId, OracleId
@@ -32,6 +34,10 @@ class Book:
 
     cards: Mapping[str, CardFacts] = field(default_factory=dict[str, CardFacts])
     rules: Mapping[str, tuple[Ability, ...]] = field(default_factory=dict[str, tuple[Ability, ...]])
+    #: What each card says, as printed. Defaulted empty, which is the honest
+    #: answer for a book that has not been given any: a card with no text on
+    #: file is reported as having none rather than as having none printed.
+    texts: Mapping[str, str] = field(default_factory=dict[str, str])
 
     def facts(self, oracle_id: OracleId) -> CardFacts | None:
         """The engine's view of the card, or None when it is not in the book."""
@@ -40,6 +46,10 @@ class Book:
     def abilities(self, oracle_id: OracleId) -> Sequence[Ability]:
         """The card's modelled abilities, empty when it has none."""
         return self.rules.get(str(oracle_id), ())
+
+    def text(self, oracle_id: OracleId) -> str:
+        """The card's printed rules text, or empty when the book has none."""
+        return self.texts.get(str(oracle_id), "")
 
     def name(self, oracle_id: OracleId) -> str:
         """The printed name, or the identifier when the book has no card."""
@@ -52,6 +62,18 @@ class Book:
         if abilities is None:
             return False
         return not any(unmodelled_reasons(ability) for ability in abilities)
+
+    def not_carried_out(self, oracle_id: OracleId) -> tuple[str, ...]:
+        """What the engine will not do if this card is played.
+
+        The same two answers the real catalogue gives, and for the same reason
+        -- a book that reported every unreviewed card as fully handled would
+        make the disclosure tests pass while disclosing nothing.
+        """
+        abilities = self.rules.get(str(oracle_id))
+        if abilities is None:
+            return ("anything it does -- this card has not been reviewed",)
+        return _not_carried_out(abilities)
 
 
 def land(name: str, mana: str) -> tuple[CardFacts, tuple[Ability, ...]]:
@@ -83,7 +105,12 @@ def game(
     active: str = "me",
     life: int = 20,
 ) -> GameState:
-    """A two-player game, written as the two boards you can see."""
+    """A two-player game, written as the two boards you can see.
+
+    Priority is handed out the way entering the step hands it out (CR 117.3a),
+    because a board with nobody able to act is a board where every card in hand
+    comes back with one reason and it is not the one the test is about.
+    """
     mine = PlayerState(
         library=(),
         hand=tuple(instance(o, str(i)) for i, o in enumerate(hand)),
@@ -99,9 +126,11 @@ def game(
         exile=(),
         life=life,
     )
-    return GameState(
-        turn=1,
-        active_player=ME if active == "me" else YOU,
-        step=step,
-        players={ME: mine, YOU: yours},
+    return priority.begins(
+        GameState(
+            turn=1,
+            active_player=ME if active == "me" else YOU,
+            step=step,
+            players={ME: mine, YOU: yours},
+        )
     )

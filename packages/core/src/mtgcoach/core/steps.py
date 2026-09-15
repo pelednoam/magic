@@ -89,3 +89,14 @@ _NO_PRIORITY: Final[frozenset[Step]] = frozenset({Step.UNTAP, Step.CLEANUP})
 def has_priority(step: Step) -> bool:
     """Whether players receive priority during ``step``."""
     return step not in _NO_PRIORITY
+
+
+def named(step: Step) -> str:
+    """The step, as a player would say it.
+
+    Here rather than in ``legality``, which is where it was: ``priority`` needs
+    the same words to refuse an event with, and a server that refuses in one
+    wording while the advice in the same response uses another is exactly the
+    contradiction ``guard`` exists to prevent.
+    """
+    return f"{step.value.replace('_', ' ')} step"

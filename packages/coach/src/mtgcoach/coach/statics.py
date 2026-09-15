@@ -13,6 +13,14 @@ They split three ways, and the split is what this module is for:
 - **Restrictions that need an attachment.** Pacifism says "enchanted creature
   can't attack or block", and ``Permanent`` has no attachments -- the engine
   cannot know which creature it is on. Not applicable, and *disclosed*.
+
+  This is the group the shipped fixture used to escape. It said ``self`` for
+  "enchanted creature", on a stated convention, and ``self`` here means the
+  card carrying the ability -- so Pacifism read as a restriction on Pacifism,
+  landed in the first group as something the engine could apply, and was
+  exempted from the caveat. Combat advice ignored the Pacifism on the table and
+  said nothing about doing so. ``TargetKind.ENCHANTED`` exists to make the two
+  impossible to confuse, and ``test_statics_shipped`` asks the real card.
 - **Modifiers.** Goblin Oriflamme's +1/+0 to attackers, an Equipment's +2/+1.
   Both need either attachments or an "affects other creatures" rule the combat
   model does not have. Not applicable, and disclosed.
@@ -83,11 +91,16 @@ def _unapplied(abilities: Sequence[Ability]) -> str:
     """Why this card's static abilities are not in the numbers, if they are not."""
     if any(isinstance(ability, StaticModifier) for ability in abilities):
         return "its power/toughness change is not in these numbers"
-    attached = [
+    restrictions = [
         ability
         for ability in abilities
         if isinstance(ability, StaticRestriction) and TargetKind.SELF not in ability.affects.kinds
     ]
-    if attached:
+    if any(TargetKind.ENCHANTED in ability.affects.kinds for ability in restrictions):
+        # Named as an attachment because that is what a player sees on the
+        # table: a card lying across another one. "Restricts another
+        # permanent" is true and does not tell them which.
+        return "what it is attached to cannot attack or block, and the engine cannot see which card"
+    if restrictions:
         return "it restricts another permanent, which the engine cannot track yet"
     return ""

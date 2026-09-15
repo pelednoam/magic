@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from wire import by_name, decoded, named, obj, rows, text
+from wire import by_name, decoded, named, obj, rows, text, words
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
@@ -38,6 +38,25 @@ def send(client: TestClient, session_id: str, **event: object) -> dict[str, obje
     response = client.post(f"/games/{session_id}/events", json=event)
     assert response.status_code == HTTP_OK, response.text
     return decoded(response.json())
+
+
+def stepped(client: TestClient, session_id: str) -> dict[str, object]:
+    """End the current step the way CR 500.2 ends it, and enter the next.
+
+    Everybody passes first. Every walk in these tests used to be a bare
+    ``advance_step`` and the server used to accept one, which is the half of
+    CR 500.2 the rule itself warns against: a step does not end because the
+    stack happens to be empty, it ends because each player has had the chance
+    to add something to it and declined.
+
+    Who still has to pass comes from the board the server just sent, in the
+    order it sent them -- no test works it out for itself, because working it
+    out is the engine's job.
+    """
+    body = look(client, session_id)
+    for seat in words(body, "state", "yet_to_pass"):
+        send(client, session_id, type="pass_priority", player=seat)
+    return send(client, session_id, type="advance_step")
 
 
 def look(client: TestClient, session_id: str) -> dict[str, object]:

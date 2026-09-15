@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 from fastapi import HTTPException
 from starlette.status import HTTP_404_NOT_FOUND
 
-from mtgcoach.api import views
+from mtgcoach.api import boardview, views
 from mtgcoach.api.rationing import Rationed
 from mtgcoach.api.sessions import SessionStore, UnknownSessionError
 from mtgcoach.coach.report import advise
@@ -22,6 +22,7 @@ from mtgcoach.coach.table import table
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+    from pathlib import Path
 
     from mtgcoach.api.cards import Catalogue
     from mtgcoach.api.hub import Hub
@@ -68,6 +69,10 @@ class Server:
     #: route then says so, and everything else works exactly as before -- the
     #: tracker and the turn coach do not need the rules document.
     rules: RuleIndex | None
+    #: Where this server's data lives, so the replay routes can find the
+    #: self-play journals under it. A server built by a test has no data root
+    #: and simply has no replays, which is the honest answer for one.
+    data_root: Path | None = None
     #: How often and how many at once the slow routes may be asked. Per-server
     #: rather than per-module: everything else the routes need is here, two
     #: servers in one process are two servers, and a module global made one
@@ -129,7 +134,7 @@ def snapshot(server: Server, game: Session) -> dict[str, Json]:
         # box, let somebody type a question, and only then say the feature was
         # off. A flag costs one boolean and moves that sentence to the top.
         "rules_available": server.rules is not None,
-        "state": views.state(game.state, server.catalogue.name),
+        "state": boardview.state(game.state, server.catalogue),
         "advice": {
             str(player): views.report(advise(game.state, player, server.catalogue))
             for player in game.state.players

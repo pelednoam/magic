@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 from mtgcoach.carddata.enginefacts import UnmodellableCardError, facts_for
 from mtgcoach.carddata.sealed import load
 from mtgcoach.core.abilities import unmodelled_reasons
+from mtgcoach.core.carrying import not_carried_out
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
@@ -42,6 +43,11 @@ class Catalogue:
     rules: Mapping[str, tuple[Ability, ...]] = field(
         default_factory=dict[str, tuple["Ability", ...]]
     )
+    #: What each card actually says, verbatim from the printing. A third
+    #: mapping rather than a field on ``CardFacts``, because ``core`` reasons
+    #: about cards and must not be handed prose it would be tempted to parse --
+    #: this is here to be quoted into a prompt and nowhere else.
+    texts: Mapping[str, str] = field(default_factory=dict[str, str])
 
     def facts(self, oracle_id: OracleId) -> CardFacts | None:
         """The engine's view of the card, or None when it is not known."""
@@ -64,6 +70,36 @@ class Catalogue:
             return False
         return not any(unmodelled_reasons(ability) for ability in abilities)
 
+    def not_carried_out(self, oracle_id: OracleId) -> tuple[str, ...]:
+        """What the engine will not do if this card is played, in words.
+
+        A different question from ``modelled``, which asks whether the card's
+        behaviour is *described*. Giant Growth's +3/+3 is described, counts
+        towards the 52% figure, and nothing carries it out -- so the tracker
+        accepts the cast and no toughness changes, and every number it shows
+        afterwards is computed from a board that is wrong by three points.
+
+        Asked here rather than of the abilities alone because only this knows
+        the difference between a card reviewed and found to have no abilities
+        (a vanilla creature, which carries out fine) and a card never reviewed
+        at all (about which nothing is known). They are both an empty list.
+        """
+        abilities = self.rules.get(str(oracle_id))
+        if abilities is None:
+            return ("anything it does -- this card has not been reviewed",)
+        return not_carried_out(abilities)
+
+    def text(self, oracle_id: OracleId) -> str:
+        """The card's printed rules text, or empty when the store has no card.
+
+        Empty is not the same as "this card does nothing": Aegis Turtle really
+        has no rules text, and a card absent from the store has none on file
+        here. ``modelled`` is what tells those apart, and the prompt prints
+        both -- the text when there is some, and the fact that there is none
+        when there is not.
+        """
+        return self.texts.get(str(oracle_id), "")
+
     def name(self, oracle_id: OracleId) -> str:
         """The printed name, falling back to the identifier when unknown.
 
@@ -78,12 +114,17 @@ class Catalogue:
 def build(cards: Iterable[Card], effects: Path | None = None) -> Catalogue:
     """Index a set's cards, and the reviewed abilities for them if there are any.
 
-    A card whose cost the parser refuses is left out rather than approximated.
-    It is then simply a card the coach cannot speak for, which is a state the
-    whole system already handles, and the alternative is a mispriced spell.
+    A card whose cost the parser refuses is left out of ``cards`` rather than
+    approximated. It is then simply a card the coach cannot speak for, which is
+    a state the whole system already handles, and the alternative is a
+    mispriced spell. Its *text* is kept even so: what the coach cannot reason
+    about, a player can still read.
     """
+    # Listed once: ``cards`` may be a generator, and it is now read twice --
+    # for the facts and for the printed text.
+    listed = list(cards)
     facts: dict[str, CardFacts] = {}
-    for card in cards:
+    for card in listed:
         try:
             facts[str(card.oracle_id)] = facts_for(card)
         except UnmodellableCardError:
@@ -91,4 +132,21 @@ def build(cards: Iterable[Card], effects: Path | None = None) -> Catalogue:
     rules: dict[str, tuple[Ability, ...]] = {}
     if effects is not None and effects.exists():
         rules = {str(c.oracle_id): tuple(c.abilities) for c in load(effects)}
-    return Catalogue(cards=facts, rules=rules)
+    # Keyed off ``cards`` rather than ``facts``: a card whose cost the parser
+    # refused is one the coach cannot reason about, and its text is exactly
+    # what a player asking about it needs to see.
+    texts = {str(card.oracle_id): _printed(card) for card in listed}
+    return Catalogue(cards=facts, rules=rules, texts=texts)
+
+
+def _printed(card: Card) -> str:
+    """One card's rules text, with each face named when it has more than one.
+
+    A transform or adventure card has no top-level text at all -- both halves
+    live on the faces -- so a prompt built from the front face alone would
+    quote half a card and look complete. Naming the faces is what makes the
+    two halves readable as two halves.
+    """
+    if not card.is_multifaced:
+        return card.front.oracle_text
+    return "\n".join(f"{face.name}: {face.oracle_text}" for face in card.faces)

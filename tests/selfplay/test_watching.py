@@ -13,6 +13,10 @@ from typing import cast
 import pytest
 from helpers_selfplay import THEM, YOU, game
 
+from mtgcoach.core import priority
+from mtgcoach.core.cards import CardInstance
+from mtgcoach.core.ids import InstanceId, OracleId, PlayerId
+from mtgcoach.core.stack import StackObject
 from mtgcoach.core.steps import Step
 from mtgcoach.selfplay.watching import broken
 
@@ -93,6 +97,71 @@ def test_a_step_that_is_not_a_step_is_caught() -> None:
 
 
 def test_every_real_step_is_accepted() -> None:
+    """Through ``begins``, because a step now implies who may act in it.
+
+    Dropping a state into a step and leaving ``priority`` alone is broken, and
+    rightly so: a step that hands out priority and gave it to nobody is a game
+    where no event is legal and no step can end. CR 117.3a is what hands it
+    out, and ``begins`` is that rule.
+    """
     state = game()
     for step in Step:
-        assert list(broken(state, replace(state, step=step))) == []
+        moved = priority.begins(replace(state, step=step))
+        assert list(broken(state, moved)) == []
+
+
+def test_a_step_that_gives_priority_to_nobody_is_caught() -> None:
+    """The invariant the test above would otherwise have hidden.
+
+    Every other step in the turn hands priority to the active player
+    (CR 117.3a). One that handed it to nobody, with nobody having passed, is a
+    game that has stopped: nothing can be cast, nothing can resolve, and no
+    step can end.
+    """
+    stuck = replace(game(), step=Step.UPKEEP, priority=None, passed=())
+    assert any("nobody holds priority" in wrong for wrong in broken(stuck, stuck))
+
+
+def test_priority_in_a_step_that_hands_out_none_is_caught() -> None:
+    """CR 502.4: no player receives priority during the untap step."""
+    state = priority.begins(replace(game(), step=Step.PRECOMBAT_MAIN))
+    wrong = replace(state, step=Step.UNTAP)
+    assert any("holds priority during the untap step" in one for one in broken(state, wrong))
+
+
+def test_a_holder_who_is_not_playing_is_caught() -> None:
+    """A seat nobody can ever act from, which is the game simply stopping."""
+    state = priority.begins(replace(game(), step=Step.PRECOMBAT_MAIN))
+    wrong = replace(state, priority=PlayerId("nobody"))
+    assert any("is not in the game" in one for one in broken(state, wrong))
+
+
+def test_passing_twice_in_succession_is_caught() -> None:
+    """CR 117.4: a pass counts only in succession with the ones beside it.
+
+    A duplicate would mean the game counted two passes where one player had
+    acted in between -- and the top of the stack would resolve with somebody
+    never having had the chance to answer it.
+    """
+    state = priority.begins(replace(game(), step=Step.PRECOMBAT_MAIN))
+    wrong = replace(state, passed=(YOU, YOU))
+    assert any("passing twice" in one for one in broken(state, wrong))
+
+
+def test_more_passes_than_players_is_caught() -> None:
+    state = priority.begins(replace(game(), step=Step.PRECOMBAT_MAIN))
+    wrong = replace(state, passed=(YOU, THEM, PlayerId("ghost")))
+    assert any("passes from 2 players" in one for one in broken(state, wrong))
+
+
+def test_a_spell_controlled_by_nobody_in_the_game_is_caught() -> None:
+    """A shared stack has to say whose each object is (CR 405.4).
+
+    One belonging to a seat that is not playing is a card that can never
+    resolve and can never be counted -- the conservation check would not see
+    it under either player.
+    """
+    state = priority.begins(replace(game(), step=Step.PRECOMBAT_MAIN))
+    card = CardInstance(InstanceId("orphan"), OracleId("Forest"))
+    wrong = replace(state, stack=(StackObject(card, PlayerId("ghost")),))
+    assert any("controlled by nobody" in one for one in broken(state, wrong))

@@ -15,7 +15,17 @@ from mtgcoach.carddata.scryfall import cards_in
 from mtgcoach.core.ids import OracleId
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
+#: How many cards the Beginner Box has, and how many of them the sealed
+#: fixture understands all the way down. Written out so a re-seal that changes
+#: either number has to say so here.
+BOX = 124
+MODELLED = 65
+
 PLAYABLE = FIXTURES / "scryfall_fdn_playable.json"
+
+#: Eight unedited Scryfall objects, including the transform and adventure cards
+#: whose text lives only on their faces. See ``carddata.test_scryfall``.
+SAMPLE = FIXTURES / "scryfall_fdn_sample.json"
 EFFECTS = Path(__file__).resolve().parents[2] / "data" / "sets" / "FDN" / "effects.json"
 
 FOREST = OracleId("b34bb2dc-c1af-4d77-b0b3-a0fb342a5fc6")
@@ -70,7 +80,19 @@ def test_an_empty_catalogue_is_usable() -> None:
 
 
 def test_a_card_the_fixture_cannot_express_is_not_modelled() -> None:
-    """59 of the box's 124 cards are exactly this: identified, not understood."""
+    """Identified, and not understood -- which is most of the box.
+
+    This used to assert the opposite: that no card in the fixture was in that
+    state, because the fixture held seven cards chosen to avoid it. That made
+    the assertion about the *choice of fixture* rather than about ``modelled``,
+    and it also meant the fixture could not deal a single one of the box's ten
+    decks -- so three self-play tests failed on every CI run while passing on
+    any machine with the real import. Nobody looked, because the workflow was
+    red for other reasons too; see ``tools/check_ci_covers_gate.py``.
+
+    The fixture is the whole box now, so the split it documents can be
+    asserted: 65 cards understood all the way down, 59 identified and not.
+    """
     catalogue = build(cards_in(PLAYABLE), EFFECTS)
     unexpressible = [
         oracle_id
@@ -78,7 +100,9 @@ def test_a_card_the_fixture_cannot_express_is_not_modelled() -> None:
         if not catalogue.modelled(OracleId(oracle_id)) and catalogue.abilities(OracleId(oracle_id))
     ]
     assert catalogue.modelled(FOREST), "a land with a mana ability is understood"
-    assert unexpressible == [], "this small fixture was chosen to be fully modelled"
+    assert unexpressible, "the flag distinguishes nothing if every card passes it"
+    assert len(catalogue.cards) == BOX
+    assert len(catalogue.cards) - len(unexpressible) == MODELLED
 
 
 def test_a_card_absent_from_the_fixture_is_not_modelled() -> None:
@@ -94,3 +118,32 @@ def test_a_vanilla_card_in_the_fixture_is_modelled() -> None:
 
 def test_a_card_with_an_unmodelled_ability_is_not() -> None:
     assert not Catalogue(rules={"odd": (UNKNOWN_ABILITY,)}).modelled(OracleId("odd"))
+
+
+def test_a_cards_printed_text_is_carried_for_quoting() -> None:
+    """R07: the text was in the store all along and never reached a prompt."""
+    catalogue = build(cards_in(PLAYABLE), EFFECTS)
+    assert "{T}: Add {G}." in catalogue.text(FOREST)
+
+
+def test_a_card_the_store_has_never_seen_has_no_text_on_file() -> None:
+    """Empty, not raising: the coach's lookups report absence, they do not fail."""
+    assert build(cards_in(PLAYABLE)).text(OracleId("nope")) == ""
+
+
+def test_a_transform_cards_text_names_both_faces() -> None:
+    """Half a card quoted verbatim looks like a whole card.
+
+    A transform card has no top-level text at all -- both halves live on the
+    faces -- so a prompt built from the front alone would quote one half and
+    read as complete, which is the confident-wrong-answer shape this project
+    exists to avoid. The fixture is unedited Scryfall JSON, because a
+    hand-built two-faced card could not catch a wrong assumption about the
+    real shape.
+    """
+    cards = list(cards_in(SAMPLE))
+    two = next(card for card in cards if card.is_multifaced)
+    said = build(cards).text(two.oracle_id)
+    for face in two.faces:
+        assert f"{face.name}:" in said
+    assert two.faces[1].oracle_text in said

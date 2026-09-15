@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from driving import stepped
 from helpers import facts
 from helpers_api import BEAR, FOREST, TOKEN, Canned, NoAnswers, server, talking
 from helpers_coach import taps_for
@@ -62,7 +63,7 @@ def _land_in_hand(client: TestClient, session_id: str) -> str:
         playable = [card for card in hand if flag(card, "playable")]
         if playable:
             return text(playable[0], "instance_id")
-        client.post(f"/games/{session_id}/events", json={"type": "advance_step"})
+        stepped(client, session_id)
     msg = "nothing became playable"
     raise AssertionError(msg)
 

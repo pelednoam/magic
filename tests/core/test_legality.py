@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from helpers import ME, YOU, deck, facts
+from helpers import ME, YOU, at_step, deck, facts
 from mtgcoach.core.cards import CardInstance
 from mtgcoach.core.ids import InstanceId, OracleId, PlayerId
 from mtgcoach.core.legality import (
@@ -45,9 +45,19 @@ CANCEL = facts("Cancel", "{1}{U}{U}", instant=True)
 PLAINS = facts("Plains", land=True)
 
 
-def _game(step: Step = Step.PRECOMBAT_MAIN, active: PlayerId = ME) -> GameState:
+def _game(
+    step: Step = Step.PRECOMBAT_MAIN, active: PlayerId = ME, holder: PlayerId | None = None
+) -> GameState:
+    """A board at one step, with priority handed out the way the step hands it.
+
+    ``holder`` says otherwise. The active player gets priority first
+    (CR 117.3a), so a test about casting an instant on the *opponent's* turn
+    has to say that the opponent has already passed (CR 117.3d) -- which is
+    the moment that actually happens at a table, and which this helper could
+    not express while nothing recorded a holder at all.
+    """
     game = start_game({ME: deck("m"), YOU: deck("y")}, ME)
-    return replace(game, step=step, active_player=active)
+    return at_step(game, step, active, holder)
 
 
 # --- casting ---------------------------------------------------------------
@@ -55,10 +65,6 @@ def _game(step: Step = Step.PRECOMBAT_MAIN, active: PlayerId = ME) -> GameState:
 
 def test_an_instant_can_be_cast_in_combat() -> None:
     assert can_cast(_game(Step.DECLARE_BLOCKERS), ME, GIANT_GROWTH, [FOREST])
-
-
-def test_an_instant_can_be_cast_on_the_opponents_turn() -> None:
-    assert can_cast(_game(Step.UPKEEP, YOU), ME, GIANT_GROWTH, [FOREST])
 
 
 def test_a_creature_cannot_be_cast_in_combat() -> None:

@@ -22,7 +22,12 @@ export function Hand({
 }: {
   readonly cards: readonly Playable[];
   readonly board: Player;
-  readonly onPlay: (card: Playable) => void;
+  /**
+   * What to do when a card is tapped. Absent means nothing can be played --
+   * a finished game, where the server refuses every event, so offering the
+   * tap would produce a refusal for no reason the player could see.
+   */
+  readonly onPlay?: ((card: Playable) => void) | undefined;
 }) {
   const ready = cards.filter((card) => card.playable).length;
   return (
@@ -45,14 +50,14 @@ function HandCard({
 }: {
   readonly card: Playable;
   readonly board: Player;
-  readonly onPlay: (card: Playable) => void;
+  readonly onPlay?: ((card: Playable) => void) | undefined;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${card.name}, ${card.playable ? "playable" : "not playable"}`}
-      disabled={!trackable(card)}
-      onPress={() => { onPlay(card); }}
+      disabled={!card.playable || onPlay === undefined}
+      onPress={() => { onPlay?.(card); }}
       style={[styles.card, card.playable ? styles.can : styles.cannot]}
     >
       <View style={styles.row}>
@@ -61,14 +66,17 @@ function HandCard({
           {card.playable ? "can play" : "cannot"}
         </Text>
       </View>
-      {card.playable && !card.is_land ? (
-        <Text style={styles.caveat}>
-          The tracker cannot record casting a spell yet — play it on the table.
-        </Text>
-      ) : null}
       {card.reasons.map((reason) => (
         <Text key={reason} style={styles.reason}>
           {reason}
+        </Text>
+      ))}
+      {/* Not a reason you cannot play it. A warning that the tracker will not
+          show what happens when you do, so the board on screen will be behind
+          the board on the table until you fix it by hand. */}
+      {card.not_carried_out.map((undone) => (
+        <Text key={undone} style={styles.undone}>
+          {`The tracker will not apply ${undone} — do it on the table.`}
         </Text>
       ))}
       {card.payment === null ? null : (
@@ -78,17 +86,6 @@ function HandCard({
       )}
     </Pressable>
   );
-}
-
-/**
- * Whether tapping this card can actually do anything.
- *
- * Only a land drop is an event the engine has. A spell the coach says you can
- * afford is still true and still worth showing -- it just cannot be *recorded*,
- * so the card says so rather than sending a request the server will refuse.
- */
-function trackable(card: Playable): boolean {
-  return card.playable && card.is_land;
 }
 
 const styles = StyleSheet.create({
@@ -106,7 +103,7 @@ const styles = StyleSheet.create({
   yes: { color: colour.yes, fontSize: text.small },
   no: { color: colour.no, fontSize: text.small },
   reason: { color: colour.quiet, fontSize: text.small, marginTop: space.tight },
+  undone: { color: colour.warn, fontSize: text.small, marginTop: space.tight },
   payment: { color: colour.accent, fontSize: text.small, marginTop: space.tight },
-  caveat: { color: colour.warn, fontSize: text.small, marginTop: space.tight },
   empty: { color: colour.quiet, fontSize: text.body },
 });

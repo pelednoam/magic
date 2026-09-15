@@ -8,24 +8,29 @@ fixture cannot reach.
 from __future__ import annotations
 
 import itertools
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 from mtgcoach.carddata.extraction import Confidence, ExtractionResult, Proposal
+from mtgcoach.core import priority
 from mtgcoach.core.abilities import ActivatedAbility, UnmodeledAbility
 from mtgcoach.core.cards import CardInstance
 from mtgcoach.core.combat.model import Creature
 from mtgcoach.core.effects import ProduceMana
+from mtgcoach.core.events import AdvanceStep, PassPriority
 from mtgcoach.core.facts import CardFacts
 from mtgcoach.core.ids import InstanceId, OracleId, PlayerId
 from mtgcoach.core.manacost import parse
 from mtgcoach.core.permanents import Permanent
+from mtgcoach.core.reduce import apply
 from mtgcoach.core.vocabulary import AbilityCost
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from mtgcoach.carddata.cards import Card
+    from mtgcoach.core.state import GameState
+    from mtgcoach.core.steps import Step
 
 ME = PlayerId("me")
 YOU = PlayerId("you")
@@ -82,8 +87,16 @@ def facts(
     creature: bool = False,
     land: bool = False,
     instant: bool = False,
+    permanent: bool | None = None,
 ) -> CardFacts:
-    """Card facts for a rules test, named so failures read like the board."""
+    """Card facts for a rules test, named so failures read like the board.
+
+    ``permanent`` defaults to what the other flags imply: a land or a creature
+    stays on the battlefield (CR 110.1) and anything else here does not. Spelled
+    out rather than left to the caller because a fixture that forgot it made a
+    Grizzly Bears resolve into the graveyard -- which is the fixture lying about
+    the rules, and the one thing no fixture in this project may do.
+    """
     return CardFacts(
         oracle_id=OracleId(name),
         name=name,
@@ -91,6 +104,7 @@ def facts(
         is_land=land,
         is_creature=creature,
         is_instant_speed=instant,
+        is_permanent=(land or creature) if permanent is None else permanent,
         power=power,
         toughness=toughness,
         keywords=frozenset(keywords),
@@ -113,3 +127,52 @@ def creature(name: str, power: int, toughness: int, *keywords: str) -> Creature:
         Permanent(CardInstance(instance, OracleId(name))).settle(),
         facts(name, "", *keywords, power=power, toughness=toughness, creature=True),
     )
+
+
+def at_step(
+    state: GameState,
+    step: Step,
+    active: PlayerId | None = None,
+    holder: PlayerId | None = None,
+) -> GameState:
+    """The same board, at ``step``, with priority handed out as it would be.
+
+    Every test that used to write ``replace(game, step=...)`` needs this now:
+    the step no longer tells you who may act. ``GameState.priority`` defaults
+    to None because a game begins in the untap step, where that is the right
+    answer -- so a board dropped into a main phase by hand has nobody able to
+    do anything until somebody hands priority out, and ``turn.advance`` is what
+    does it in a game that is really played (CR 117.3a).
+
+    ``holder`` overrides who holds it, for the one case a test cannot reach
+    otherwise: the *nonactive* player holding priority, which is the state the
+    moment the active player passes (CR 117.3d) and the only way anybody casts
+    an instant on somebody else's turn.
+    """
+    whose = active if active is not None else state.active_player
+    handed = priority.begins(replace(state, step=step, active_player=whose))
+    return handed if holder is None else replace(handed, priority=holder)
+
+
+def all_pass(state: GameState) -> GameState:
+    """Every player who still can, passes (CR 117.3d).
+
+    What it takes to make the top of the stack resolve, or the step end
+    (CR 117.4). Written out rather than folded into ``stepped`` because half
+    the tests want to stop here: this is the state a resolution is legal from,
+    and the state a *second* spell can still be cast in.
+    """
+    for player in priority.yet_to_pass(state):
+        state = apply(state, PassPriority(player))
+    return state
+
+
+def stepped(state: GameState) -> GameState:
+    """End this step the way CR 500.2 says it ends: all pass, then it ends.
+
+    A bare ``AdvanceStep`` is refused now, and that refusal is the finding this
+    helper exists because of: a step does not end because the stack happens to
+    be empty, it ends because each player has had the chance to add to it and
+    declined.
+    """
+    return apply(all_pass(state), AdvanceStep())

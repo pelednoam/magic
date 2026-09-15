@@ -42,13 +42,22 @@ class PlayerState:
     graveyard: tuple[CardInstance, ...]
     exile: tuple[CardInstance, ...]
     life: int = STARTING_LIFE
+    #: Whether this player has tried to draw from an empty library (CR 121.3).
+    #: The attempt does not fail -- it loses the game the next time a player
+    #: would receive priority, which is a different thing and a reachable one.
+    #: Never cleared: having tried once is permanent.
+    drew_from_empty: bool = False
     lands_played_this_turn: int = 0
 
     def cards(self) -> Iterator[CardInstance]:
-        """Every card this player owns, in every zone.
+        """Every card this player owns, in one of *their own* zones.
 
-        The basis of the conservation invariant: no event may change how many
-        cards this yields.
+        Not the whole of what they own: a spell they have cast is on the shared
+        stack and is not here. ``GameState.cards_of`` is the one that answers
+        the conservation question -- no event may change how many cards *it*
+        yields for a player -- and it composes this with the stack. Splitting
+        them is what the single ordered stack cost, and the invariant it buys
+        back is stronger, because it now spans a zone two players share.
         """
         yield from self.library
         yield from self.hand

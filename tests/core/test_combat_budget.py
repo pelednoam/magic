@@ -23,7 +23,8 @@ from mtgcoach.core.combat.budget import (
     check_plan_size,
     resolutions_for,
 )
-from mtgcoach.core.combat.search import best_defence, plans
+from mtgcoach.core.combat.defending import best_defence
+from mtgcoach.core.combat.search import plans
 
 if TYPE_CHECKING:
     from mtgcoach.core.combat.model import Creature
@@ -37,6 +38,14 @@ SLOWEST_ALLOWED_SECONDS = 30.0
 #: A board small enough to time in a unit test, used to measure the per-combat
 #: cost that the budget is calibrated against.
 CALIBRATION = (4, 4)
+
+#: How many times to measure, keeping the fastest. A wall clock in a unit suite
+#: measures the machine's load as much as the code's cost, and the whole suite
+#: under coverage is exactly when it is most loaded -- this test failed once in
+#: a full run and passed every time on its own, which is a false alarm about
+#: the one thing it exists to raise a true alarm about. The fastest of several
+#: runs is the machine's capability; the slowest is the neighbours.
+SAMPLES = 5
 
 
 def _some(count: int, prefix: str) -> list[Creature]:
@@ -113,12 +122,25 @@ def test_no_board_the_budget_admits_can_hang() -> None:
     Timing the worst allowed board directly would put a three-second case in a
     unit suite; timing a small one and multiplying makes the same claim, and
     fails just as loudly if resolving a combat gets much more expensive.
+
+    The *fastest* of several runs, because a single wall-clock reading in a
+    unit suite measures the machine's load as much as the code's cost. This
+    failed once in a full run under coverage and passed every time on its own,
+    which is the failure mode that teaches people to ignore a red test.
     """
     attackers, blockers = CALIBRATION
-    start = time.perf_counter()
-    plans(_some(attackers, "a"), _some(blockers, "b"), 20)
-    per_combat = (time.perf_counter() - start) / resolutions_for(attackers, blockers)
+    board = (_some(attackers, "a"), _some(blockers, "b"))
+    fastest = min(_timed(board) for _ in range(SAMPLES))
+    per_combat = fastest / resolutions_for(attackers, blockers)
     assert per_combat * MAX_RESOLUTIONS < SLOWEST_ALLOWED_SECONDS
+
+
+def _timed(board: tuple[list[Creature], list[Creature]]) -> float:
+    """How long one search of this board takes."""
+    attackers, blockers = board
+    start = time.perf_counter()
+    plans(attackers, blockers, 20)
+    return time.perf_counter() - start
 
 
 def test_the_refusal_is_a_value_error() -> None:

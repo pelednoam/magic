@@ -17,9 +17,10 @@ from mtgcoach.carddata.scryfall import cards_in
 from mtgcoach.carddata.store import CardStore
 from mtgcoach.coach.advice import ExplainerError, Explanation
 from mtgcoach.core.ids import PlayerId, SetCode
-from mtgcoach.selfplay import cli
-from mtgcoach.selfplay.cli import Run, main, season
+from mtgcoach.selfplay import running
+from mtgcoach.selfplay.cli import main
 from mtgcoach.selfplay.records import Game
+from mtgcoach.selfplay.running import Run, season
 
 CLEAN = Game(seed=1, decks=("elves", "goblins"), turns=20, winner=PlayerId("you"), ending="life")
 
@@ -54,12 +55,16 @@ FDN = SetCode("FDN")
 def _full(tmp_path: Path) -> Path:
     """A card database the box decklists can actually be dealt from.
 
-    The real one, when it is there: the whole point of a season is playing the
-    decks somebody owns, and the small fixture covers only part of them.
+    Built from the fixture, always. It used to prefer the real import when one
+    was present, because the fixture held seven cards and could not deal a
+    single deck -- so these tests passed on a machine with the import and
+    failed on every CI run, which is the worst arrangement of the two. The
+    fixture is the whole box now.
+
+    Always, rather than when-absent, for a second reason: a branch that is
+    taken only on a machine with a local import is a branch no single run can
+    cover, and this project requires every one of them.
     """
-    real = DATA / "cards.sqlite3"
-    if real.is_file():
-        return real
     db = tmp_path / "cards.sqlite3"
     with CardStore.open(str(db)) as store:
         store.add((card, FDN) for card in cards_in(PLAYABLE))
@@ -120,7 +125,7 @@ def test_a_season_with_the_coach_asks_the_coach(tmp_path: Path) -> None:
             msg = "not now"
             raise ExplainerError(msg)
 
-    with mock.patch.object(cli, "ClaudeCliExplainer", return_value=Counting()):
+    with mock.patch.object(running, "ClaudeCliExplainer", return_value=Counting()):
         run = season(Run(db=db, data_root=DATA, set_code=FDN, games=1, seed=0, coach=True))
     assert asked, "the coach was never asked"
     assert run.coaching, "and its score was never kept"
@@ -147,7 +152,7 @@ def test_a_season_can_be_replayed_from_a_journal(tmp_path: Path) -> None:
             card = str(playable[0].instance_id) if playable else ""
             return Explanation(play=card, because="the first", in_short="the first")
 
-    with mock.patch.object(cli, "ClaudeCliExplainer", return_value=Deciding()):
+    with mock.patch.object(running, "ClaudeCliExplainer", return_value=Deciding()):
         first = season(
             Run(
                 db=db,

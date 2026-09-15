@@ -6,6 +6,7 @@ echo "== ruff check"          && uv run ruff check .
 echo "== ruff format --check" && uv run ruff format --check .
 echo "== file length"         && uv run python tools/check_file_length.py
 echo "== coverage opt-outs"   && uv run python tools/check_pragma_allowlist.py
+echo "== CI runs this gate"  && uv run python tools/check_ci_covers_gate.py
 echo "== claude CLI flags"    && uv run python tools/check_cli_flags.py
 echo "== rules phrasing"     && uv run python tools/check_rules_phrasing.py
 echo "== retrieval"         && uv run python tools/check_retrieval.py

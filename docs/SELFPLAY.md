@@ -34,15 +34,32 @@ chose, which is exactly when an invariant that holds in every fixture stops hold
 
 ## What it cannot test, and why
 
-**The engine has no event for casting a spell.** `Playable`'s own docstring says so — the stack
-arrives with it. So the harness does exactly what the app's user does: taps the lands the payment
-names, then moves the card onto the battlefield. And combat applies the engine's own `Outcome`
-(damage, then deaths, then lifelink) rather than a second rules implementation written to check
-the first. **Where the engine is the authority, the engine is asked.** A harness that invented its
-own rules would be testing itself.
+The harness does exactly what the app's user does, and nothing cleverer: casts the card onto
+the stack paying for it in one action, passes with both seats, lets it resolve. Combat applies the engine's own
+`Outcome` (damage, then deaths, then lifelink) rather than a second rules implementation written
+to check the first. **Where the engine is the authority, the engine is asked.** A harness that
+invented its own rules would be testing itself.
 
-The consequence: this exercises zones, mana, legality, the step walker, the trigger scanner and
-the combat simulator. It does not exercise spell resolution, because there is none yet.
+**No agent can answer a spell, and the harness passes for both seats.** The engine has priority
+now, so a spell resolves because every player passed in succession (CR 117.4): the harness sends
+`CastSpell`, then `PassPriority` from each seat, then `ResolveSpell`, and ending a step is the
+same two passes followed by `AdvanceStep` (CR 500.2). The passes go through the real reducer and
+into the log, so a self-play game's log is a log a person could have produced at the table.
+
+But *deciding* to pass is the harness's own policy, not a rule it discovered. A `Move` names a
+card to play or an attack to make; there is no "answer that spell" to name, so passing is the
+only thing either seat could truthfully be said to do. `applying.cast_and_resolve` and
+`passing.ending` are the two places that say so, and they are the two lines that change the day
+an agent learns to hold a trick.
+
+What a season therefore exercises: zones including the shared stack, priority and passing, mana,
+legality, the step walker, the trigger scanner, the combat simulator, and spell resolution. The
+200-game season after the shared stack landed applied 61,100 events and cast 3,485 spells with
+nothing broken — and the card conservation check is *per player* over a zone the two players
+share, so a spell mis-attributed on the stack, or dropped while resolving out of order, changes
+a count that is checked on every one of those events. `watching` also checks that priority
+belongs to somebody in the game, to nobody in the untap and cleanup steps, and to somebody in
+every other one, and that no player passes twice in succession.
 
 ## Re-running a season
 
@@ -172,17 +189,70 @@ Journals are not committed — they hold the full briefing for every decision an
 Keep the ones that found something; the command that produced each is in the table above, and the
 `.log` beside it has the summary that run printed.
 
-## What the journal is for next
+## What the journal is also for: stepping through a game
 
-A journal is a played game with every board and every piece of advice in it, keyed by turn, step
-and player. That is exactly what a **step-through replay** needs — walk a game one decision at a
-time in the UI, so a child can see what happened and ask about it. The engine half is done: a
-journal already replays deterministically. What is missing is a route that serves one as an
-ordered list of moments and a screen with forward and back. See §10 of PLAN.md.
+A coached journal is what the **step-through replay** reads. The app lists the journals a server
+has, then the games in one, then walks a game a decision at a time — board, what the coach said,
+and the engine's objections when it refused. See §10 of PLAN.md for the routes and the screens.
 
-Two properties make it teaching rather than logging, and the data already has both: every position
-can be re-asked, because the board is right there; and the advice recorded is the advice that was
-*checked*, so what he reads was true when it was shown.
+For that to work a journal has to hold the *game* as well as the decisions, and it does: at the
+end of each game the harness appends one more line — the libraries it was dealt and every event it
+applied, in order. Rebuilding a moment is then `start_game` plus `reduce.replay`, which is `core`
+and nothing else. Nothing is re-asked, so the board shown is the board that was played.
+
+```
+{"seed": 100, "game": "19f9751d…", "turn": 7, "step": "declare_attackers", ...}
+{"seed": 100, "game": "19f9751d…", "turn": 7, "step": "postcombat_main",  ...}
+{"kind": "game", "seed": 100, "game": "19f9751d…", "libraries": {…}, "events": […]}
+```
+
+`game` is what joins a game's decisions to its recording, and it is the only
+thing that does so exactly. A **seed** says which *deal* — run the same season
+twice into one journal and it repeats. **Position in the file** is defeated by a
+run killed mid-game with another appended after it: the orphans then sit just
+before somebody else's recording. Only an id made once per game separates them,
+and what it prevents is one game's coaching printed beside another game's board,
+with nothing on screen saying so. Journals written before the id exists fall
+back to position and seed.
+
+**The recording is written last**, because the event log is not known until then. A run killed
+mid-game therefore keeps its decisions and loses its recording, which is the right way round: the
+decisions are what the coach said and cannot be produced again, and the recording can be, by
+replaying them. It does mean such a journal cannot be *shown* — `GET /replays/{name}` answers 404
+saying so, rather than showing an empty screen.
+
+**A journal recorded before priority arrived cannot be walked at all.** The
+engine refuses a bare `AdvanceStep` now -- CR 500.2 needs an empty stack *and*
+both players passing -- and that is what every log recorded earlier is made of.
+`replays._replay` catches the refusal and skips that game, so the route answers
+404 rather than showing a board the events did not produce; the failure is
+safe, and the journal is still dead. Re-run it with `--replay`, which needs no
+model, and the new journal walks.
+
+Expect the re-run to report disagreements where the first run reported none.
+That is the point of it: an answer the coach gave before R02 and R03 landed did
+not disclose what the engine now insists is disclosed, and `--replay` is how
+you find out which of last night's advice today's engine would refuse.
+
+`data/selfplay/overnight.jsonl` is in exactly that state: it was launched before the harness
+learned to record games, so it has games of advice and no boards to hang them on. Re-run it with
+`--replay` to get a journal that can be walked:
+
+```bash
+uv run python -m mtgcoach.selfplay --games 12 --seed 100 \
+  --replay data/selfplay/overnight.jsonl --journal data/selfplay/walkable.jsonl
+```
+
+That replays the recorded answers rather than asking Claude again, so it costs seconds rather than
+hours, and it writes a full journal of its own: the same advice, a recording of each game, and
+**today's verdict on each answer**. The verdict is the run's own rather than the old journal's on
+purpose — the new journal describes the game that just happened, and if the engine has grown
+stricter since, a move that was played the first time is refused this time and the game diverges.
+That divergence is the finding; `--replay`'s summary carries the comparison
+(`… (journal said trusted=True)`), and a moment the old journal cannot answer stops that game
+rather than being guessed at.
+
+Three games of `overnight` rebuilt this way produced 81, 56 and 71 walkable moments.
 
 Which is a reason to keep the journals of games worth walking through, even though they are
 gitignored by default.

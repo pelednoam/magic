@@ -10,7 +10,8 @@ from typing import get_args
 
 import pytest
 
-from mtgcoach.api.eventspec import BadEventError, parse
+from mtgcoach.api.eventfields import BadEventError
+from mtgcoach.api.eventspec import BUILDERS, parse
 from mtgcoach.core.events import (
     AdvanceStep,
     ChangeLife,
@@ -23,9 +24,21 @@ from mtgcoach.core.events import (
 from mtgcoach.core.ids import InstanceId, PlayerId
 from mtgcoach.core.zones import ZoneName
 
-#: Every event a client can send, as it spells it on the wire.
+#: Every event a client can send, as it spells it on the wire. Written out
+#: rather than read from ``BUILDERS``: a test that derived the list from the
+#: thing it is checking would agree with anything.
 WIRE_FORMS = frozenset(
-    {"advance_step", "draw_card", "play_land", "set_tapped", "move_card", "change_life"}
+    {
+        "advance_step",
+        "pass_priority",
+        "draw_card",
+        "play_land",
+        "cast_spell",
+        "resolve_spell",
+        "set_tapped",
+        "move_card",
+        "change_life",
+    }
 )
 
 
@@ -103,7 +116,10 @@ def test_true_is_not_a_life_total() -> None:
 
 
 def test_an_unknown_zone_lists_the_real_ones() -> None:
-    body = {"type": "move_card", "player": "you", "instance_id": "x", "to": "stack"}
+    # The command zone, which is real in the rules and does not exist here:
+    # it arrives with commanders, which this project does not play. "stack"
+    # used to be the example, and is a zone now.
+    body = {"type": "move_card", "player": "you", "instance_id": "x", "to": "command"}
     with pytest.raises(BadEventError, match="expected one of battlefield, exile"):
         parse(body)
 
@@ -117,6 +133,10 @@ def test_every_event_type_the_engine_has_can_be_sent() -> None:
     """
     members = {member.__name__ for member in get_args(Event.__value__)}
     assert {_wire_name(name) for name in members} == WIRE_FORMS
+    # And the table the parser actually dispatches on says the same, so a name
+    # spelled one way in the union and another in `BUILDERS` is caught here
+    # rather than by a client getting "unknown event type".
+    assert set(BUILDERS) == WIRE_FORMS
 
 
 def _wire_name(class_name: str) -> str:

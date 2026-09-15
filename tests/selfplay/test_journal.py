@@ -12,7 +12,8 @@ import json
 from typing import TYPE_CHECKING
 
 from mtgcoach.coach.advice import Explanation
-from mtgcoach.selfplay.journal import Decision, Journal, explanation, fields, read
+from mtgcoach.selfplay.answers import explanation, read
+from mtgcoach.selfplay.journal import Decision, Journal, fields
 
 if TYPE_CHECKING:
     from pathlib import Path

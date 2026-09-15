@@ -13,19 +13,28 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING, assert_never
 
+from mtgcoach.core import priority
+from mtgcoach.core.casting import cast, resolve
 from mtgcoach.core.errors import IllegalEventError
 from mtgcoach.core.events import (
     AdvanceStep,
+    CastSpell,
     ChangeLife,
     DrawCard,
     MoveCard,
+    PassPriority,
     PlayLand,
+    ResolveSpell,
     SetTapped,
 )
 from mtgcoach.core.movement import move_card
 from mtgcoach.core.player import MAX_LAND_DROPS_PER_TURN
 from mtgcoach.core.turn import advance, draw_card
 from mtgcoach.core.zones import ZoneName
+
+#: The events that take a card from one zone to another. Named so that both
+#: ``apply`` and ``_moved`` can be closed over their own halves of ``Event``.
+type Moving = PlayLand | CastSpell | ResolveSpell | MoveCard
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -38,24 +47,67 @@ if TYPE_CHECKING:
 def apply(state: GameState, event: Event) -> GameState:
     """Return the state that results from applying ``event``.
 
+    Three of these are *actions*, taken by a player who holds priority:
+    ``CastSpell`` (CR 117.1a), ``PlayLand`` (CR 116.2a) and ``PassPriority``
+    itself. The rest are not, and deliberately need none. ``SetTapped``,
+    ``MoveCard`` and ``ChangeLife`` are the primitives that turn-based actions
+    and resolving effects are built from, and none of those uses priority
+    (CR 117.2c, CR 405.6a); ``DrawCard`` is the draw step's turn-based action
+    (CR 703.4d) that the tracker also offers as a button, which is an
+    approximation this engine makes on purpose and says so in
+    ``disclosure``. Gating them would have refused a combat damage
+    step half-way through applying itself.
+
     Raises:
-        IllegalEventError: If the event cannot legally be applied.
+        IllegalEventError: If the event cannot legally be applied, or if the
+            game is already over. A finished game is not a position anybody may
+            act in, and the tracker used to let one carry on -- advancing
+            steps, drawing cards and taking advice for a player who had already
+            lost.
     """
+    if state.over is not None:
+        beaten = ", ".join(str(one.player) for one in state.over.lost)
+        msg = f"the game is over: {beaten} lost, so nothing more can happen in it"
+        raise IllegalEventError(msg)
     match event:
         case AdvanceStep():
             return advance(state)
+        case PassPriority(player=player_id):
+            return priority.passes(state, player_id)
         case DrawCard(player=player_id):
             return draw_card(state, player_id)
-        case PlayLand(player=player_id, instance_id=instance_id):
-            return _play_land(state, player_id, instance_id)
+        case PlayLand() | CastSpell() | ResolveSpell() | MoveCard():
+            return _moved(state, event)
         case SetTapped(player=player_id, instance_id=instance_id, tapped=tapped):
             return _set_tapped(state, player_id, instance_id, tapped=tapped)
-        case MoveCard(player=player_id, instance_id=instance_id, to=zone):
-            player = state.player(player_id)
-            return state.with_player(player_id, move_card(player, instance_id, zone, state.turn))
         case ChangeLife(player=player_id, amount=amount):
             player = state.player(player_id)
             return state.with_player(player_id, replace(player, life=player.life + amount))
+    assert_never(event)
+
+
+def _moved(state: GameState, event: Moving) -> GameState:
+    """The events that take a card from one zone to another.
+
+    A second closed match rather than four more arms on the first, which had
+    grown past what one function may branch on. Both ends stay honest: this one
+    is ``assert_never``-closed over ``Moving`` and the caller is
+    ``assert_never``-closed over ``Event``, so a new event is a type error at
+    one of the two until somebody decides which it is.
+
+    Raises:
+        IllegalEventError: If the move is not a legal one.
+    """
+    match event:
+        case PlayLand(player=player_id, instance_id=instance_id):
+            return _play_land(state, player_id, instance_id)
+        case CastSpell(player=player_id, instance_id=instance_id, payment=payment):
+            return cast(state, player_id, instance_id, payment)
+        case ResolveSpell(player=player_id, instance_id=instance_id, to=zone):
+            return resolve(state, player_id, instance_id, zone)
+        case MoveCard(player=player_id, instance_id=instance_id, to=zone):
+            player = state.player(player_id)
+            return state.with_player(player_id, move_card(player, instance_id, zone, state.turn))
     assert_never(event)
 
 
@@ -73,6 +125,19 @@ def replay(initial: GameState, events: Iterable[Event]) -> GameState:
 
 
 def _play_land(state: GameState, player_id: PlayerId, instance_id: InstanceId) -> GameState:
+    """Spend the land drop (CR 305.2) on a card from hand.
+
+    Playing a land is a special action, taken only by a player who has
+    priority (CR 116.2a), so that is checked here and not left to the card-aware
+    layer: it needs no card data, and a check a caller can skip by not asking
+    is not a check. The rest of CR 116.2a -- your main phase, your turn, an
+    empty stack -- is ``legality.why_not_play_land``, which needs to know the
+    card is a land before any of it means anything.
+
+    Priority comes straight back (CR 117.3c): a land does not use the stack, so
+    there is nothing to wait for and the turn carries on.
+    """
+    priority.demanded(state, player_id)
     player = state.player(player_id)
     if player.find(ZoneName.HAND, instance_id) is None:
         msg = f"card {instance_id!r} is not in {player_id!r}'s hand"
@@ -81,10 +146,11 @@ def _play_land(state: GameState, player_id: PlayerId, instance_id: InstanceId) -
         msg = f"{player_id!r} has already played a land this turn"
         raise IllegalEventError(msg)
     played = move_card(player, instance_id, ZoneName.BATTLEFIELD, state.turn)
-    return state.with_player(
+    dropped = state.with_player(
         player_id,
         replace(played, lands_played_this_turn=player.lands_played_this_turn + 1),
     )
+    return priority.acted(dropped, player_id)
 
 
 def _set_tapped(

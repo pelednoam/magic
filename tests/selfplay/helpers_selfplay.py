@@ -13,11 +13,11 @@ from typing import TYPE_CHECKING
 from helpers import facts
 from helpers_coach import Book, land
 from mtgcoach.core.cards import CardInstance
-from mtgcoach.core.events import AdvanceStep
 from mtgcoach.core.ids import InstanceId, OracleId, PlayerId
 from mtgcoach.core.reduce import apply
 from mtgcoach.core.state import start_game
 from mtgcoach.core.steps import Step
+from mtgcoach.selfplay.passing import ending
 
 if TYPE_CHECKING:
     from mtgcoach.core.state import GameState
@@ -60,8 +60,14 @@ def main_phase(state: GameState | None = None) -> GameState:
     A game starts at untap, where nothing can be played -- so a test about
     playing a card that starts from `game()` finds an empty hand of options
     and fails for a reason that has nothing to do with it.
+
+    Through ``ending``, the same events the harness itself sends: a step ends
+    when both players have passed in succession (CR 500.2), so a bare
+    ``AdvanceStep`` is refused and a helper that sent one was leaning on the
+    gap this engine has closed.
     """
     state = state if state is not None else game()
     while state.step is not Step.PRECOMBAT_MAIN:
-        state = apply(state, AdvanceStep())
+        for event in ending(state):
+            state = apply(state, event)
     return state

@@ -13,20 +13,42 @@
 
 import { asObject } from "./shapes";
 
+import type { GameState } from "./game";
+
 /** One card in hand, and the engine's verdict on it. */
 export interface Playable {
   readonly instance_id: string;
   readonly name: string;
   /**
-   * Whether playing this is a land drop. The two actions are different events,
-   * and only one of them exists yet -- the engine cannot record *casting* a
-   * spell, so a client that treats every playable card as a land drop sends an
-   * illegal event for every spell the coach just said you can afford.
+   * Whether playing this is a land drop. Playing a land (CR 305.1) and casting
+   * a spell (CR 601) are different actions with different events, so a client
+   * has to know which it is looking at.
    */
   readonly is_land: boolean;
+  /**
+   * Whether casting this leaves a permanent on the battlefield (CR 608.3) or
+   * puts the card in its owner's graveyard as it resolves (CR 608.2m).
+   *
+   * The client sends it back in `resolve_spell`, because the engine holds no
+   * card data and cannot work it out. This app still decides nothing: the
+   * server read the type line and this carries the answer.
+   */
+  readonly is_permanent: boolean;
   readonly playable: boolean;
   /** Empty when playable. Otherwise the engine's own words, printed verbatim. */
   readonly reasons: readonly string[];
+  /**
+   * What the tracker will not do if you play this. Empty when it will do all
+   * of it.
+   *
+   * A different thing from `reasons`, which is why you *cannot* play the card.
+   * You can cast Giant Growth; the tracker simply will not change anybody's
+   * toughness when you do, and every number it shows afterwards is computed
+   * from a board that is wrong by three points. It used to come back playable
+   * with nothing said, because the card's effect is *described* in the
+   * fixture and being described is not being carried out.
+   */
+  readonly not_carried_out: readonly string[];
   readonly payment: Payment | null;
 }
 
@@ -82,38 +104,15 @@ export interface Advice {
   readonly reminders: readonly Reminder[];
   /** Cards the coach cannot speak for. Shown, never hidden. */
   readonly unknown: readonly string[];
-}
-
-/** One card, by both of its identities and the word printed on it. */
-export interface Card {
-  readonly instance_id: string;
-  readonly oracle_id: string;
-  readonly name: string;
-}
-
-/** One permanent, with the two states a tracker has to show. */
-export interface Permanent extends Card {
-  readonly tapped: boolean;
-  readonly summoning_sick: boolean;
-}
-
-/** One player's half of the board. The library is a count, never a list. */
-export interface Player {
-  readonly life: number;
-  readonly library: number;
-  readonly lands_played_this_turn: number;
-  readonly hand: readonly Card[];
-  readonly battlefield: readonly Permanent[];
-  readonly graveyard: readonly Card[];
-  readonly exile: readonly Card[];
-}
-
-/** The board, as much of it as a client may see. */
-export interface GameState {
-  readonly turn: number;
-  readonly step: string;
-  readonly active_player: string;
-  readonly players: Readonly<Record<string, Player>>;
+  /**
+   * What the *rules engine* does not model at this moment, in its own words.
+   *
+   * The same admission `unknown` makes about cards, made about the rules. A
+   * stack that holds only spells looks complete, and a child who learned from
+   * it that a trigger cannot be answered would have learned something that is
+   * not a rule of Magic. Shown, never hidden, for the same reason.
+   */
+  readonly not_modelled: readonly string[];
 }
 
 /** What every route returns: the board, plus advice for both players. */

@@ -1,4 +1,12 @@
-/** One player's battlefield, and the two states that stop a permanent acting. */
+/**
+ * One player's battlefield, and the two states that stop a permanent acting.
+ *
+ * The stack used to be here too, one line per player, because it was a field
+ * on each player. It is one shared, ordered zone (CR 405.1) and has its own
+ * panel now -- `Priority`, which shows the order, whose moment it is, and the
+ * buttons that move it on. Two half-stacks in two panels could not say which
+ * spell resolves first, which is the only thing that moment is about.
+ */
 
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -15,7 +23,10 @@ export function Board({
 }: {
   readonly title: string;
   readonly player: Player;
-  readonly onTap?: (permanent: Permanent) => void;
+  // `| undefined` spelled out because `exactOptionalPropertyTypes` is on: a
+  // caller computing the handler (`playable ? tap : undefined`) is passing
+  // undefined, which is different from not passing the prop at all.
+  readonly onTap?: ((permanent: Permanent) => void) | undefined;
 }) {
   return (
     <Panel title={title} note={`${player.life} life · ${player.library} in library`}>

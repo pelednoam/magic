@@ -11,9 +11,10 @@
  */
 
 import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useCoaching, useQuestions } from "../src/thinking";
+import { useCoaching, useLatest, useQuestions } from "../src/thinking";
 import type { Asked, Coaching } from "../src/wire";
 
 import { ADVICE, ASKED, deferred, mounted, roots } from "./hookharness";
@@ -113,5 +114,43 @@ describe("rules answers", () => {
     hook.moveBoard();
     await fail(new Error("rules are not installed"));
     expect(hook.latest().problem).toBe("");
+  });
+});
+
+describe("the staleness token", () => {
+  /** Render `useLatest` and hand the test its current value. */
+  function held(): { readonly take: () => () => boolean } {
+    let taken: (() => () => boolean) | null = null;
+    function Probe() {
+      taken = useLatest();
+      return null;
+    }
+    const root = createRoot(document.createElement("div"));
+    act(() => { root.render(<Probe />); });
+    return { take: () => (taken as unknown as () => () => boolean)() };
+  }
+
+  it("stays current until something else is asked for", () => {
+    const { take } = held();
+    const mine = take();
+    expect(mine()).toBe(true);
+  });
+
+  it("goes stale the moment a later request is taken", () => {
+    const { take } = held();
+    const first = take();
+    const second = take();
+    expect(first()).toBe(false);
+    expect(second()).toBe(true);
+  });
+
+  it("can be taken with nothing to follow, to abandon what is in flight", () => {
+    // Which is what leaving a screen does: the reply is still coming and the
+    // screen no longer wants it. Without this, choosing a game and going back
+    // put the screen where it had just left, a second after leaving.
+    const { take } = held();
+    const leaving = take();
+    take();
+    expect(leaving()).toBe(false);
   });
 });

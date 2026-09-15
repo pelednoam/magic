@@ -584,7 +584,7 @@
             {
               "kind": "unmodeled",
               "reason": "No modal (choose one) construct; also no Zombie subtype condition and no way to combine move_to battlefield with entering tapped.",
-              "text": "Choose one \u2014 \u2022 Destroy target creature or planeswalker. \u2022 Return target Zombie creature card from your graveyard to the battlefield tapped."
+              "text": "Choose one — • Destroy target creature or planeswalker. • Return target Zombie creature card from your graveyard to the battlefield tapped."
             }
           ],
           "kind": "spell"
@@ -592,7 +592,7 @@
       ],
       "confidence": "",
       "name": "Deadly Plot",
-      "notes": "Modal spell. The schema has no way to express \"Choose one \u2014\", and emitting both modes as effects would say the spell does both, which is a wrong rule. Mode two also needs a subtype-restricted graveyard target and a return-to-battlefield-tapped effect. The whole spell body is unmodeled.",
+      "notes": "Modal spell. The schema has no way to express \"Choose one —\", and emitting both modes as effects would say the spell does both, which is a wrong rule. Mode two also needs a subtype-restricted graveyard target and a return-to-battlefield-tapped effect. The whole spell body is unmodeled.",
       "oracle_id": "6178715c-870d-4710-b758-66e080804ee3"
     },
     {
@@ -784,7 +784,7 @@
       ],
       "confidence": "",
       "name": "Eaten Alive",
-      "notes": "The exile effect is exact. The additional cost (sacrifice a creature or pay {3}{B}) is unmodeled \u2014 a spell ability has no cost field.",
+      "notes": "The exile effect is exact. The additional cost (sacrifice a creature or pay {3}{B}) is unmodeled — a spell ability has no cost field.",
       "oracle_id": "d437ecc2-2fd3-4ad3-b23e-217f55e58dae"
     },
     {
@@ -851,7 +851,7 @@
           "effects": [
             {
               "kind": "unmodeled",
-              "reason": "amount allows only an integer or source_power/source_toughness/target_power/x \u2014 not a count of permanents you control.",
+              "reason": "amount allows only an integer or source_power/source_toughness/target_power/x — not a count of permanents you control.",
               "text": "Add {G} for each Elf you control."
             }
           ],
@@ -2045,7 +2045,7 @@
             "conditions": [],
             "controller": "any",
             "kinds": [
-              "self"
+              "enchanted"
             ],
             "maximum": 1,
             "minimum": 1
@@ -2058,7 +2058,7 @@
             "conditions": [],
             "controller": "any",
             "kinds": [
-              "self"
+              "enchanted"
             ],
             "maximum": 1,
             "minimum": 1
@@ -2069,7 +2069,7 @@
       ],
       "confidence": "",
       "name": "Pacifism",
-      "notes": "'Enchant creature' states what the Aura attaches to rather than being an ability, so it is not emitted. Per the Aura convention, 'enchanted creature' is affects {kinds:[\"self\"]}. The single printed sentence covers two restrictions, so it is split into two static_restriction abilities.",
+      "notes": "'Enchant creature' states what the Aura attaches to rather than being an ability, so it is not emitted. 'Enchanted creature' is affects {kinds:[\"enchanted\"]} -- NOT \"self\", which is the Aura itself. The single printed sentence covers two restrictions, so it is split into two static_restriction abilities. The engine cannot track attachments, so these are disclosed as unapplied rather than acted on.",
       "oracle_id": "5f5e0b10-c8cf-450c-bfd3-bcb0528ec330"
     },
     {
@@ -2099,7 +2099,7 @@
             "conditions": [],
             "controller": "any",
             "kinds": [
-              "self"
+              "enchanted"
             ],
             "maximum": 1,
             "minimum": 1
@@ -2126,7 +2126,7 @@
       ],
       "confidence": "",
       "name": "Pirate's Cutlass",
-      "notes": "Attaching an Equipment has no effect kind in the schema, so both the enters trigger and the equip ability keep their attach clause unmodeled; the equip mana cost is preserved on the activated ability. The schema also cannot express the subtype restriction 'target Pirate you control' or 'Equip only as a sorcery'. The +2/+1 is modeled as a static_modifier on {kinds:[\"self\"]}, following the Aura convention for 'equipped creature'.",
+      "notes": "Attaching an Equipment has no effect kind in the schema, so both the enters trigger and the equip ability keep their attach clause unmodeled. \"Equipped creature gets +2/+1\" is affects {kinds:[\"enchanted\"]} -- NOT \"self\", which is the Equipment. The enters trigger's subject stays \"self\": it is the Cutlass that enters.",
       "oracle_id": "ac77591c-39d7-4fd1-a6e9-805f57c6614a"
     },
     {
@@ -2262,7 +2262,7 @@
                 "name": "Treasure",
                 "power": null,
                 "toughness": null,
-                "type_line": "Token Artifact \u2014 Treasure"
+                "type_line": "Token Artifact — Treasure"
               }
             }
           ],
@@ -2388,7 +2388,7 @@
                 "name": "Treasure",
                 "power": null,
                 "toughness": null,
-                "type_line": "Token Artifact \u2014 Treasure"
+                "type_line": "Token Artifact — Treasure"
               }
             }
           ],
@@ -2443,7 +2443,7 @@
         {
           "kind": "unmodeled",
           "reason": "intervening-if condition (\"if you attacked this turn\") cannot be expressed on a triggered ability",
-          "text": "Raid \u2014 When this creature enters, if you attacked this turn, draw a card."
+          "text": "Raid — When this creature enters, if you attacked this turn, draw a card."
         }
       ],
       "confidence": "",
@@ -2528,7 +2528,7 @@
                 "conditions": [],
                 "controller": "any",
                 "kinds": [
-                  "self"
+                  "enchanted"
                 ],
                 "maximum": 1,
                 "minimum": 1
@@ -2544,7 +2544,7 @@
             "conditions": [],
             "controller": "any",
             "kinds": [
-              "self"
+              "enchanted"
             ],
             "maximum": 1,
             "minimum": 1
@@ -2555,7 +2555,7 @@
       ],
       "confidence": "",
       "name": "Starlight Snare",
-      "notes": "\"Enchant creature\" is the Aura's attachment keyword, not emitted. Per the Aura convention, \"enchanted creature\" is {\"kinds\":[\"self\"]}.",
+      "notes": "\"Enchant creature\" is the Aura's attachment keyword, not emitted. \"Enchanted creature\" is {\"kinds\":[\"enchanted\"]} -- NOT \"self\", which is the Aura itself. The enters trigger taps the enchanted creature; the static restriction keeps it from untapping.",
       "oracle_id": "f0691d46-5bf4-4617-8a0a-19d17afb7219"
     },
     {
@@ -2563,7 +2563,7 @@
         {
           "kind": "unmodeled",
           "reason": "Intervening-if condition on a trigger (Raid) cannot be expressed; the schema's triggered ability has no condition field.",
-          "text": "Raid \u2014 When this creature enters, if you attacked this turn, draw a card."
+          "text": "Raid — When this creature enters, if you attacked this turn, draw a card."
         }
       ],
       "confidence": "",

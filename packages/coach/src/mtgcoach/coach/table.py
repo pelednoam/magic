@@ -10,6 +10,12 @@ So this is the other half: both battlefields, named, with the three properties
 that decide most beginner questions -- is it tapped, is it summoning sick, and
 how big is it -- plus an explicit note on any card the engine cannot read, so a
 question about *that* card is answered "look at the card" rather than guessed.
+
+What each card *says* is not here. It used to be flagged and not said -- a
+permanent with rules text was listed as "has rules text not shown here", which
+told the model an instruction existed and left it to remember what -- and now it
+is quoted in full by ``printed``, which this carries alongside the two
+battlefields so that no caller can be given one without the other.
 """
 
 from __future__ import annotations
@@ -17,10 +23,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from mtgcoach.coach.printed import printed
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from mtgcoach.coach.lookup import CardLookup
+    from mtgcoach.coach.printed import PrintedCard
     from mtgcoach.core.ids import PlayerId
     from mtgcoach.core.permanents import Permanent
     from mtgcoach.core.state import GameState
@@ -38,13 +47,6 @@ class Thing:
     keywords: tuple[str, ...] = ()
     #: Set when the engine cannot read the card. Passed on rather than hidden.
     unreadable: bool = False
-    #: Set when the card has abilities beyond its keywords. Their text is not
-    #: here -- this is a board summary, not a card database -- but their
-    #: *existence* is, because a creature listed as "Bear, 2/2" and nothing
-    #: else reads as vanilla, and answering a rules question about it as if it
-    #: were vanilla is the confident wrong answer this project is built around
-    #: avoiding.
-    has_abilities: bool = False
 
     def described(self) -> str:
         """One line, as a person would read it out."""
@@ -57,8 +59,6 @@ class Thing:
         if self.summoning_sick:
             parts.append("summoning sick")
 
-        if self.has_abilities:
-            parts.append("has rules text not shown here -- read the card before relying on it")
         if self.unreadable:
             parts.append("THE ENGINE CANNOT READ THIS CARD -- say so rather than guessing")
         return ", ".join(parts)
@@ -66,10 +66,17 @@ class Thing:
 
 @dataclass(frozen=True, slots=True)
 class Table:
-    """Both battlefields, from one player's side of it."""
+    """Both battlefields, from one player's side of it, and what the cards say."""
 
     yours: tuple[Thing, ...] = ()
     theirs: tuple[Thing, ...] = ()
+    #: Every distinct card in the position, once, quoted. One field on one
+    #: object rather than a second argument threaded beside it: the board lines
+    #: above no longer warn that a card's text is missing, so a prompt given
+    #: the lines without the text would describe an ability-laden board as if
+    #: every creature on it were vanilla -- which is the failure this exists to
+    #: fix, reintroduced by a caller that forgot an argument.
+    cards: tuple[PrintedCard, ...] = ()
 
 
 def table(state: GameState, player_id: PlayerId, lookup: CardLookup) -> Table:
@@ -83,6 +90,7 @@ def table(state: GameState, player_id: PlayerId, lookup: CardLookup) -> Table:
     return Table(
         yours=_things(mine, lookup),
         theirs=tuple(thing for field in theirs for thing in _things(field, lookup)),
+        cards=printed(state, player_id, lookup),
     )
 
 
@@ -115,5 +123,4 @@ def _thing(permanent: Permanent, lookup: CardLookup) -> Thing:
         toughness=facts.toughness,
         keywords=tuple(sorted(facts.keywords)),
         unreadable=not lookup.modelled(permanent.card.oracle_id),
-        has_abilities=bool(lookup.abilities(permanent.card.oracle_id)),
     )

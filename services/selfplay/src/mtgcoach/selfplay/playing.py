@@ -18,17 +18,18 @@ from typing import TYPE_CHECKING
 
 from mtgcoach.coach.report import advise
 from mtgcoach.core.errors import IllegalEventError
-from mtgcoach.core.events import AdvanceStep
 from mtgcoach.core.reduce import apply
 from mtgcoach.core.steps import Step
 from mtgcoach.selfplay import applying, watching
+from mtgcoach.selfplay.ending import finished, over_with
 from mtgcoach.selfplay.offers import offered, planned
+from mtgcoach.selfplay.passing import ending
 from mtgcoach.selfplay.records import Game, Kind, Reached, Trouble
 
 if TYPE_CHECKING:
     from mtgcoach.coach.lookup import CardLookup
     from mtgcoach.coach.report import TurnReport
-    from mtgcoach.core.ids import PlayerId
+    from mtgcoach.core.events import Event
     from mtgcoach.core.state import GameState
     from mtgcoach.selfplay.moves import Seat
 
@@ -54,10 +55,20 @@ class Run:
 
     seed: int
     seats: tuple[Seat, Seat]
+    #: The card data, so applying an action can go through the server's own
+    #: guard rather than straight to the reducer. Without it the harness
+    #: exercised every check in ``core`` and none of the card-aware ones, and
+    #: a defect could pass a three-hundred-game season while failing the first
+    #: tap in the app.
+    catalogue: CardLookup | None = None
     trouble: list[Trouble] = field(default_factory=list[Trouble])
     unknown: set[str] = field(default_factory=set[str])
     events: int = 0
     reached: Reached = field(default_factory=Reached)
+    #: Every event this game applied, in order. The record that makes a game
+    #: replayable by anything holding `core`: the journal stores it, and the
+    #: API rebuilds any moment of it with `reduce.replay` alone.
+    log: list[Event] = field(default_factory=list["Event"])
 
     def also(self, **more: int) -> None:
         """Add to what this game reached."""
@@ -67,7 +78,7 @@ class Run:
 def play(seats: tuple[Seat, Seat], state: GameState, catalogue: CardLookup, seed: int) -> Game:
     """Play until somebody wins, somebody decks, or the cap is reached."""
     table = {seat.player: seat for seat in seats}
-    run = Run(seed=seed, seats=seats)
+    run = Run(seed=seed, seats=seats, catalogue=catalogue)
 
     while state.turn <= TURN_CAP:
         report = advise(state, state.active_player, catalogue)
@@ -78,17 +89,21 @@ def play(seats: tuple[Seat, Seat], state: GameState, catalogue: CardLookup, seed
         )
         if state.step in DECISIONS:
             state = _decide(state, table[state.active_player], report, run)
-        dead = _dead(state)
-        if dead is not None:
-            return _over(run, state, dead)
         state, stepped = _stepped(state, run)
+        # The engine's own answer, not a second one. This loop used to check
+        # life totals itself, outside the game -- so the harness knew a game
+        # had ended while the live API path carried on advancing steps. One
+        # question must not have two answers, and the engine's is the one a
+        # player sees.
+        if state.over is not None:
+            return finished(run, state, state.over)
         if not stepped:
-            return _over(run, state, None, ending="decked")
+            return over_with(run, state, None, ending="stuck")
 
     run.trouble.append(
         Trouble(Kind.STUCK, f"still going after {TURN_CAP} turns", state.turn, state.step)
     )
-    return _over(run, state, None, ending="no end")
+    return over_with(run, state, None, ending="no end")
 
 
 def _decide(state: GameState, seat: Seat, report: TurnReport, run: Run) -> GameState:
@@ -106,13 +121,17 @@ def _decide(state: GameState, seat: Seat, report: TurnReport, run: Run) -> GameS
         move = seat.agent.act(state, report, seat.player)
         if move.play is not None:
             card = offered(report, move.play)
-            state = applying.played(state, seat.player, card)
+            done = applying.played(state, seat.player, card, run.catalogue)
+            state = _logged(run, done)
             if card.is_land:
                 run.also(lands=1)
             else:
                 run.also(spells=1)
         elif move.attack:
-            state = applying.attacked(state, seat.player, planned(report, move.attack))
+            done = applying.attacked(
+                state, seat.player, planned(report, move.attack), run.catalogue
+            )
+            state = _logged(run, done)
             run.also(attacks=1)
     except (IllegalEventError, LookupError) as refused:
         run.trouble.append(Trouble(Kind.REFUSED, str(refused), state.turn, state.step, seat.player))
@@ -137,14 +156,18 @@ def _decide(state: GameState, seat: Seat, report: TurnReport, run: Run) -> GameS
 
 
 def _stepped(state: GameState, run: Run) -> tuple[GameState, bool]:
-    """Advance one step, watching what that did.
+    """Pass with both seats and end the step, watching what that did.
 
-    A refusal here is how a game ends by decking: the draw step raises when the
-    library is empty, which is the rules working rather than anything wrong.
+    A refusal here used to be how a game ended by decking: the draw step raised
+    when the library was empty. It does not any more -- CR 121.3 makes that a
+    *loss*, which `advance` records in the state -- so decking now arrives as a
+    result rather than as an exception, and the caller reads `state.over`.
     """
     before = state
     try:
-        state = apply(state, AdvanceStep())
+        for event in ending(state):
+            state = apply(state, event)
+            run.log.append(event)
     except IllegalEventError:
         return before, False
     except Exception as crashed:  # noqa: BLE001 - see `_decide`
@@ -160,21 +183,7 @@ def _stepped(state: GameState, run: Run) -> tuple[GameState, bool]:
     return state, True
 
 
-def _dead(state: GameState) -> PlayerId | None:
-    """The player who has lost on life, if there is one."""
-    return next((pid for pid, player in state.players.items() if player.life <= 0), None)
-
-
-def _over(run: Run, state: GameState, dead: PlayerId | None, ending: str = "life") -> Game:
-    """Everything that happened, as a record."""
-    return Game(
-        seed=run.seed,
-        decks=(run.seats[0].deck, run.seats[1].deck),
-        turns=state.turn,
-        winner=state.opponent_of(dead) if dead is not None else None,
-        ending=ending,
-        trouble=tuple(run.trouble),
-        unknown=tuple(sorted(run.unknown)),
-        events=run.events,
-        reached=run.reached,
-    )
+def _logged(run: Run, done: applying.Applied) -> GameState:
+    """Keep what was applied, and hand back where it got to."""
+    run.log.extend(done.events)
+    return done.state

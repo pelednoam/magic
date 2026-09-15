@@ -14,8 +14,9 @@ from mtgcoach.core.combat.budget import (
     TooManyCombinationsError,
 )
 from mtgcoach.core.combat.damage import resolve
+from mtgcoach.core.combat.defending import best_defence
 from mtgcoach.core.combat.model import Blocks, Creature, can_block
-from mtgcoach.core.combat.search import best_defence, plans
+from mtgcoach.core.combat.search import plans
 from mtgcoach.core.ids import InstanceId, OracleId
 from mtgcoach.core.permanents import Permanent
 
