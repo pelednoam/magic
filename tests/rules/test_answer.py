@@ -9,8 +9,9 @@ the outside, and it is the failure §8 says must never reach a child.
 from __future__ import annotations
 
 from helpers_rules import PASSAGES
-from mtgcoach.rules.answer import Answer, cited, refusal, settle, verify
+from mtgcoach.rules.answer import Answer, cited, grounded, settle, verify
 from mtgcoach.rules.corpus import Kind, Passage
+from mtgcoach.rules.refusing import refusal
 
 TRAMPLE = [p for p in PASSAGES if p.reference in {"702.19b", "Trample"}]
 
@@ -56,16 +57,41 @@ def test_an_answer_with_nothing_to_look_up_is_refused() -> None:
     assert "no rule to look up" in problems[0]
 
 
-def test_a_real_citation_is_not_treated_as_proof_of_the_claim() -> None:
-    """The limit of this check, written down so nobody mistakes it for more.
+def test_a_real_citation_is_still_not_proof_of_the_claim() -> None:
+    """The limit of *this* check, written down so nobody mistakes it for more.
 
     "Trample doubles all damage [702.19b]" cites a rule that was retrieved and
-    says no such thing. It passes, and it has to -- nothing here reads the
-    rule. That is exactly why the wire field is `cited` and not `trusted`, and
-    why the retrieved rules are printed under every answer.
+    says no such thing. `cited` passes it, and has to: it is a check on where
+    the reference came from, and keeping that meaning is what lets a client
+    tell the two failures apart. What refuses it is `grounded`, below.
     """
     wrong = _said(answer="Trample doubles all damage.", citations=("702.19b",))
     assert cited(wrong, TRAMPLE)
+
+
+def test_the_doubling_claim_is_refused_by_the_grounding_check() -> None:
+    """R07's probe. A fluent sentence with a real rule number under it.
+
+    702.19b was retrieved and does not double anything, so the arithmetic in
+    the answer came from somewhere other than the evidence -- which for a
+    nine-year-old reading it is indistinguishable from the rule saying so.
+    `verify` reports it, so the route refuses the answer.
+    """
+    wrong = _said(answer="Trample doubles all damage.", citations=("702.19b",))
+    assert not grounded(wrong, TRAMPLE)
+    assert "doubled" in verify(wrong, TRAMPLE)[0]
+
+
+def test_the_child_sentence_is_checked_like_any_other_claim() -> None:
+    """The child's sentence -- "hits twice as hard" -- is checked like any other."""
+    wrong = _said(answer="Assign lethal damage first.", in_short="It hits twice as hard.")
+    assert not grounded(wrong, TRAMPLE)
+
+
+def test_an_answer_that_stays_inside_the_passages_is_grounded() -> None:
+    """The check has to let a correct answer about the same rule through."""
+    assert grounded(_said(), TRAMPLE)
+    assert verify(_said(), TRAMPLE) == ()
 
 
 def test_admitting_doubt_does_not_excuse_an_uncited_claim() -> None:

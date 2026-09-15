@@ -43,6 +43,26 @@ class CardLookup(Protocol):
         """
         ...
 
+    def text(self, oracle_id: OracleId) -> str:
+        """The card's printed rules text, verbatim, empty when it is unknown.
+
+        A different question from ``abilities``, and the two must not be
+        confused: that is the engine's *model* of the card, which exists to be
+        carried out, and this is the printing, which exists to be quoted. A
+        rules question used to reach the model with the model's own summary --
+        name, printed statistics, keywords, and a flag saying rules text
+        existed somewhere -- so "does my Dazzling Angel gain me life when I
+        play a creature?" arrived without the sentence "Whenever another
+        creature you control enters, you gain 1 life" anywhere in it, and was
+        answered from whatever the model remembered about the card.
+
+        Empty rather than raising, like the rest of this Protocol. And empty
+        rather than the ability model rendered back into prose: a paraphrase of
+        a card is the same failure as a paraphrase of a rule, and this project
+        exists to stop the second one.
+        """
+        ...
+
     def name(self, oracle_id: OracleId) -> str:
         """The printed name, falling back to the identifier when unknown.
 

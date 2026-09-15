@@ -42,6 +42,15 @@ CATALOGUE = Catalogue(
     cards={"Forest": FOREST, "Bear": BEAR, "Growth": GROWTH, "Bell": BELL},
     # An entry, even an empty one, is the fixture saying "I know this card".
     rules={"Forest": (taps_for("{G}"),), "Bell": (RINGS,), "Bear": (), "Growth": ()},
+    # What each card says, as printed. Here because the rules question route
+    # quotes it into the prompt and the answer checks are grounded in it -- a
+    # catalogue with no text would leave both untested through the route, which
+    # is the one path an answer can reach a client through.
+    texts={
+        "Forest": "({T}: Add {G}.)",
+        "Growth": "Target creature gets +3/+3 until end of turn.",
+        "Bell": "At the beginning of your upkeep, ring the bell.",
+    },
 )
 
 #: The opening seven are the first seven, so this is what a test will be

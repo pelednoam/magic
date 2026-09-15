@@ -17,9 +17,12 @@ from mtgcoach.rules.question import brief
 FOREST, FOREST_RULES = land("Forest", "{G}")
 BEAR = facts("Grizzly Bears", "{1}{G}", power=2, toughness=2, creature=True)
 OGRE = facts("Ogre", "{3}{R}", power=3, toughness=3, creature=True)
+ANGEL = facts("Dazzling Angel", "{2}{W}", "Flying", power=2, toughness=3, creature=True)
+ANGEL_TEXT = "Flying\nWhenever another creature you control enters, you gain 1 life."
 BOOK = Book(
-    cards={"Forest": FOREST, "Bear": BEAR, "Ogre": OGRE},
-    rules={"Forest": FOREST_RULES, "Bear": (), "Ogre": ()},
+    cards={"Forest": FOREST, "Bear": BEAR, "Ogre": OGRE, "Angel": ANGEL},
+    rules={"Forest": FOREST_RULES, "Bear": (), "Ogre": (), "Angel": ()},
+    texts={"Forest": "({T}: Add {G}.)", "Angel": ANGEL_TEXT},
 )
 TRAMPLE = [p for p in PASSAGES if p.reference in {"702.19b", "Trample"}]
 
@@ -159,6 +162,30 @@ def test_a_card_the_engine_cannot_read_is_flagged_on_the_battlefield() -> None:
 
 def test_the_board_is_optional_too() -> None:
     assert "BATTLEFIELD:" not in brief("how does trample work?", TRAMPLE)
+
+
+def test_the_card_text_reaches_the_prompt_with_the_board() -> None:
+    """R07's first half: the sentence the question turns on used to be absent.
+
+    The board line said "has rules text not shown here", which told the model
+    an instruction existed and left it to remember which.
+    """
+    board = table(game(battlefield=("Angel",)), ME, BOOK)
+    text = brief("does my Angel gain me life?", TRAMPLE, board=board)
+    assert "WHAT THESE CARDS SAY" in text
+    assert "Whenever another creature you control enters, you gain 1 life." in text
+    assert "not shown here" not in text
+
+
+def test_the_prompt_says_a_card_may_not_be_cited() -> None:
+    """Only a retrieved rule is citable, and a card beside one invites citing it.
+
+    An answer citing "Dazzling Angel" is thrown away by the citation check --
+    for doing what the prompt implied it should.
+    """
+    board = table(game(battlefield=("Angel",)), ME, BOOK)
+    text = _flat(brief("does my Angel gain me life?", TRAMPLE, board=board))
+    assert "A card is not a rule: it is not citable" in text
 
 
 def test_cards_the_engine_cannot_read_are_passed_on() -> None:

@@ -33,6 +33,10 @@ class Book:
 
     cards: Mapping[str, CardFacts] = field(default_factory=dict[str, CardFacts])
     rules: Mapping[str, tuple[Ability, ...]] = field(default_factory=dict[str, tuple[Ability, ...]])
+    #: What each card says, as printed. Defaulted empty, which is the honest
+    #: answer for a book that has not been given any: a card with no text on
+    #: file is reported as having none rather than as having none printed.
+    texts: Mapping[str, str] = field(default_factory=dict[str, str])
 
     def facts(self, oracle_id: OracleId) -> CardFacts | None:
         """The engine's view of the card, or None when it is not in the book."""
@@ -41,6 +45,10 @@ class Book:
     def abilities(self, oracle_id: OracleId) -> Sequence[Ability]:
         """The card's modelled abilities, empty when it has none."""
         return self.rules.get(str(oracle_id), ())
+
+    def text(self, oracle_id: OracleId) -> str:
+        """The card's printed rules text, or empty when the book has none."""
+        return self.texts.get(str(oracle_id), "")
 
     def name(self, oracle_id: OracleId) -> str:
         """The printed name, or the identifier when the book has no card."""

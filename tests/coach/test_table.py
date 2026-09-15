@@ -25,6 +25,7 @@ FOREST, FOREST_RULES = land("Forest", "{G}")
 BEAR = facts("Grizzly Bears", "{1}{G}", power=2, toughness=2, creature=True)
 FLYER = facts("Bird", "{1}{U}", "Flying", power=1, toughness=1, creature=True)
 ODD = facts("Odd Thing", "{1}")
+ANGEL = facts("Dazzling Angel", "{2}{W}", "Flying", power=2, toughness=3, creature=True)
 BOOK = Book(
     cards={"Forest": FOREST, "Bear": BEAR, "Bird": FLYER, "Odd": ODD},
     rules={"Forest": FOREST_RULES, "Bear": (), "Bird": (), "Odd": (UNKNOWN_ABILITY,)},
@@ -117,20 +118,47 @@ def test_a_player_who_is_not_in_the_game_is_refused() -> None:
         table(game(), PlayerId("nobody"), BOOK)
 
 
-def test_a_card_with_rules_text_says_it_has_some() -> None:
-    """A creature listed as "Bear, 2/2" and nothing else reads as vanilla.
+def test_a_card_with_rules_text_arrives_with_the_text_and_not_a_warning() -> None:
+    """What R07 was about, on the board summary's side of it.
 
-    Its text is not here -- this is a board summary, not a card database -- but
-    answering a rules question about a card as if it were vanilla is exactly
-    the confident wrong answer the whole design is built around avoiding.
+    A permanent with rules text used to be listed as "has rules text not shown
+    here", which told a model an instruction existed and left it to remember
+    which. The line is now just the board, and the instruction comes with it in
+    ``cards`` -- so the warning has gone because it is no longer true.
     """
-    book = Book(cards={"Forest": FOREST}, rules={"Forest": FOREST_RULES})
-    (thing,) = table(game(battlefield=("Forest",)), ME, book).yours
-    assert thing.has_abilities
-    assert "read the card" in thing.described()
+    book = Book(
+        cards={"Angel": ANGEL},
+        rules={"Angel": ()},
+        texts={"Angel": "Flying\nWhenever another creature you control enters, you gain 1 life."},
+    )
+    board = table(game(battlefield=("Angel",)), ME, book)
+    (thing,) = board.yours
+    assert "not shown here" not in thing.described()
+    assert [card.text for card in board.cards] == [
+        "Flying\nWhenever another creature you control enters, you gain 1 life."
+    ]
 
 
 def test_a_vanilla_creature_says_nothing_extra() -> None:
     (bear,) = table(game(battlefield=("Bear",)), ME, BOOK).yours
-    assert not bear.has_abilities
     assert bear.described() == "Grizzly Bears, 2/2"
+
+
+def test_the_board_carries_the_text_of_every_card_on_it() -> None:
+    """One object, so a prompt cannot be given the lines without the text.
+
+    The board lines no longer warn that a card's text is missing, so a caller
+    that had the lines and not the text would describe an ability-laden board
+    as if every creature on it were vanilla -- which is the failure this fixed,
+    reintroduced by a forgotten argument.
+    """
+    book = Book(
+        cards={"Bear": BEAR, "Bird": FLYER},
+        rules={"Bear": (), "Bird": ()},
+        texts={"Bird": "Flying"},
+    )
+    board = table(game(battlefield=("Bear",), theirs=("Bird",)), ME, book)
+    assert [(card.name, card.text) for card in board.cards] == [
+        ("Grizzly Bears", ""),
+        ("Bird", "Flying"),
+    ]

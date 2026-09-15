@@ -22,6 +22,10 @@ BOX = 124
 MODELLED = 65
 
 PLAYABLE = FIXTURES / "scryfall_fdn_playable.json"
+
+#: Eight unedited Scryfall objects, including the transform and adventure cards
+#: whose text lives only on their faces. See ``carddata.test_scryfall``.
+SAMPLE = FIXTURES / "scryfall_fdn_sample.json"
 EFFECTS = Path(__file__).resolve().parents[2] / "data" / "sets" / "FDN" / "effects.json"
 
 FOREST = OracleId("b34bb2dc-c1af-4d77-b0b3-a0fb342a5fc6")
@@ -114,3 +118,32 @@ def test_a_vanilla_card_in_the_fixture_is_modelled() -> None:
 
 def test_a_card_with_an_unmodelled_ability_is_not() -> None:
     assert not Catalogue(rules={"odd": (UNKNOWN_ABILITY,)}).modelled(OracleId("odd"))
+
+
+def test_a_cards_printed_text_is_carried_for_quoting() -> None:
+    """R07: the text was in the store all along and never reached a prompt."""
+    catalogue = build(cards_in(PLAYABLE), EFFECTS)
+    assert "{T}: Add {G}." in catalogue.text(FOREST)
+
+
+def test_a_card_the_store_has_never_seen_has_no_text_on_file() -> None:
+    """Empty, not raising: the coach's lookups report absence, they do not fail."""
+    assert build(cards_in(PLAYABLE)).text(OracleId("nope")) == ""
+
+
+def test_a_transform_cards_text_names_both_faces() -> None:
+    """Half a card quoted verbatim looks like a whole card.
+
+    A transform card has no top-level text at all -- both halves live on the
+    faces -- so a prompt built from the front alone would quote one half and
+    read as complete, which is the confident-wrong-answer shape this project
+    exists to avoid. The fixture is unedited Scryfall JSON, because a
+    hand-built two-faced card could not catch a wrong assumption about the
+    real shape.
+    """
+    cards = list(cards_in(SAMPLE))
+    two = next(card for card in cards if card.is_multifaced)
+    said = build(cards).text(two.oracle_id)
+    for face in two.faces:
+        assert f"{face.name}:" in said
+    assert two.faces[1].oracle_text in said

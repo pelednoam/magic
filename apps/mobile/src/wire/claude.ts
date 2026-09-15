@@ -2,12 +2,11 @@
  * What Claude said, and what the server checked before passing it on.
  *
  * Separate from the board types because these are the only payloads that began
- * life inside a language model. Each carries a flag saying what the server was
- * able to check, and the two flags are deliberately different words: a turn
- * recommendation is `trusted` because the engine agreed with the *choice*, and
- * a rules answer is only `cited` because a citation is not a proof. The guards
- * below are the second half of the check -- a cast is a claim, and this is
- * where the claim gets tested.
+ * life inside a language model. Each carries flags saying what the server could
+ * check, and the words are deliberately different: a turn recommendation is
+ * `trusted` because the engine agreed with the *choice*, and a rules answer is
+ * only `cited` and `grounded`, neither of which is a proof. The guards below
+ * are the second half of the check -- a cast is a claim, tested here.
  */
 
 import { asObject, isStrings } from "./shapes";
@@ -15,11 +14,11 @@ import { asObject, isStrings } from "./shapes";
 /**
  * What Claude said about a turn, once the engine has checked it.
  *
- * `play` and `attack` are identifiers, not names: they are a *choice among the
- * options above*, and the server rejected the answer outright if they were
- * anything else. The app looks them up in `advice.hand` and `advice.attacks`
- * rather than printing them, so a coached recommendation and the engine's own
- * list are always talking about the same card.
+ * `play` and `attack` are identifiers, not names: a *choice among the options
+ * above*, and the server rejected the answer outright if they were anything
+ * else. The app looks them up in `advice.hand` and `advice.attacks` rather
+ * than printing them, so a coached recommendation and the engine's own list
+ * are always talking about the same card.
  */
 export interface Explanation {
   /** An `instance_id` from `advice.hand`, or empty for "play nothing". */
@@ -67,9 +66,9 @@ export interface Coaching {
 /**
  * One rule the server retrieved for a question, quoted verbatim.
  *
- * The certainly-true half of an answer. These are shown whatever the model
- * said, and whether or not it cited them: a player who can read 702.19b for
- * themselves does not need to trust anybody about trample.
+ * The certainly-true half of an answer, shown whatever the model said and
+ * whether or not it cited it: a player who can read 702.19b for themselves
+ * does not need to trust anybody about trample.
  */
 export interface RuleText {
   /** How it is cited: "702.19b", or a term for a glossary entry. */
@@ -96,20 +95,35 @@ export interface Asked {
   /**
    * Whether every rule the answer named was one the server retrieved for it.
    *
-   * **Not** whether the answer is right about what those rules say — nothing
-   * reads the rule and checks the claim against it, and calling this `trusted`
-   * would promise a child something nobody verified. False means `answer` is
-   * the refusal text: the model cited a rule nobody retrieved, or cited none
-   * at all. `rules` is populated either way, so the question is never lost --
-   * the player reads the rule instead of the answer.
+   * **Not** whether the answer is right about what those rules say, and
+   * calling it `trusted` would promise a child something nobody verified.
+   * False means `answer` is the refusal text: the model cited a rule nobody
+   * retrieved, or cited none at all. `rules` is populated either way, so the
+   * question is never lost -- the player reads the rule instead.
    */
   readonly cited: boolean;
+  /**
+   * Whether the answer's arithmetic and abilities were words the prompt carried.
+   *
+   * Separate from `cited` because it fails separately: an answer can cite
+   * perfectly and still double something no rule doubles, as "trample doubles
+   * all damage [702.19b]" did. False means `answer` is the refusal text, and
+   * true is still not "the answer is right".
+   */
+  readonly grounded: boolean;
+  /**
+   * What no check on the server establishes, in the server's own sentences.
+   *
+   * Printed under every answer: a flag named for what is *not* known reads as
+   * a warning light that is off, and a parent repeating it needs it said.
+   */
+  readonly unchecked: readonly string[];
   /**
    * Whether the search found any rules at all.
    *
    * False with `cited` false is not a failure: nothing matched, so nothing
-   * could be cited, and the answer says so. Without this the app showed "the
-   * answer did not stay inside the rules" over an answer that never left them.
+   * could be cited, and the answer says so. Without it the app showed "the
+   * answer did not stay inside the rules" over one that never left them.
    */
   readonly matched: boolean;
   readonly rules: readonly RuleText[];
@@ -120,8 +134,8 @@ export interface Asked {
 /**
  * Whether a decoded response is shaped like the coach's reply.
  *
- * Same reasoning as `isSnapshot`, and more necessary: this payload started life
- * inside a language model, and the only thing between it and the screen is the
+ * Same reasoning as `isSnapshot`, and more necessary: this payload began inside
+ * a language model, and all that stands between it and the screen is the
  * server's check and this one.
  */
 export function isCoaching(value: unknown): value is Coaching {
@@ -153,6 +167,8 @@ export function isAsked(value: unknown): value is Asked {
   if (
     body === null ||
     typeof body["cited"] !== "boolean" ||
+    typeof body["grounded"] !== "boolean" ||
+    !isStrings(body["unchecked"]) ||
     typeof body["matched"] !== "boolean" ||
     typeof body["version"] !== "number" ||
     !Array.isArray(body["rules"])

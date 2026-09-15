@@ -8,16 +8,21 @@ answer citing anything else is refused unread.
 
 That is weaker than the turn coach's check, and the difference has a name.
 ``coach.advice.trusted`` means *the engine agrees with this choice*. Nothing
-here can mean that: a citation is not a proof, and "trample doubles all damage
-[702.19b]" cites a real retrieved rule that says nothing of the kind. So what
-this returns is ``cited`` -- every rule it named was one we put in front of it,
-and it named at least one. The word "trusted" is deliberately not used on this
-side of the project, because it would be a lie in a place where a child reads
-the result.
+here can mean that, so what this returns is ``cited`` -- every rule it named was
+one we put in front of it, and it named at least one. "Trusted" is deliberately
+not used on this side of the project: it would be a lie where a child reads it.
 
-What that buys, and what matters at a kitchen table, is that every answer comes
-with a number somebody can look up, that the number is real, and that the rule
-it points at is printed underneath the answer for them to read.
+**A citation is not a proof**, and "trample doubles all damage [702.19b]" cites
+a real retrieved rule that says nothing of the kind. That answer used to pass.
+``grounding`` now refuses it, on a second and separate axis -- ``grounded`` --
+by requiring the words a rules claim cannot be paraphrased around to appear in
+the evidence the prompt carried. Two booleans rather than one, because they are
+two facts about an answer and one of them cannot say which failed.
+
+Neither is ``correct``, and ``refusing.UNCHECKED`` says so in the reply itself.
+What the pair buys at a kitchen table is that every answer comes with a real
+number somebody can look up, that its arithmetic and its abilities came from the
+evidence rather than from memory, and that the rule is printed underneath.
 """
 
 from __future__ import annotations
@@ -25,7 +30,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol
 
+from mtgcoach.rules import grounding
 from mtgcoach.rules.citations import resolved
+from mtgcoach.rules.grounding import NOTHING, Given
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -65,7 +72,9 @@ class Asker(Protocol):
         ...
 
 
-def settle(answer: Answer, supplied: Sequence[Passage]) -> tuple[Answer, tuple[str, ...]]:
+def settle(
+    answer: Answer, supplied: Sequence[Passage], given: Given = NOTHING
+) -> tuple[Answer, tuple[str, ...]]:
     """The answer with its citations resolved, and every problem left with it.
 
     Resolving first is what stops the check punishing decoration. A model shown
@@ -86,12 +95,30 @@ def settle(answer: Answer, supplied: Sequence[Passage]) -> tuple[Answer, tuple[s
         resolved(answer.citations, supplied),
         answer.unsure,
     )
-    return settled, verify(settled, supplied)
+    return settled, verify(settled, supplied, given)
 
 
-def verify(answer: Answer, supplied: Sequence[Passage]) -> tuple[str, ...]:
-    """Every way this answer goes beyond what it was given, empty when none."""
+def verify(answer: Answer, supplied: Sequence[Passage], given: Given = NOTHING) -> tuple[str, ...]:
+    """Every way this answer goes beyond what it was given, empty when none.
+
+    ``given`` is what the prompt carried besides the rules -- the card text and
+    the document's keyword names. Empty by default, and the route supplies it;
+    a test of the route asserts that it does.
+    """
+    return (*_provenance(answer, supplied), *grounding.problems(_said(answer), supplied, given))
+
+
+def _provenance(answer: Answer, supplied: Sequence[Passage]) -> tuple[str, ...]:
+    """The two checks that ask where an answer's references came from."""
     return (*_check_citations(answer, supplied), *_check_substance(answer))
+
+
+def _said(answer: Answer) -> str:
+    """The answer's prose, adult and child together.
+
+    Both: "your creature hits twice as hard" is the half a nine-year-old reads.
+    """
+    return f"{answer.answer} {answer.in_short}"
 
 
 def _check_citations(answer: Answer, supplied: Sequence[Passage]) -> tuple[str, ...]:
@@ -131,28 +158,18 @@ def _check_substance(answer: Answer) -> tuple[str, ...]:
 def cited(answer: Answer, supplied: Sequence[Passage]) -> bool:
     """Whether every rule this answer names was one it was given.
 
-    Not "whether it is right". See the module docstring: nothing here reads the
-    rule and checks the claim against it.
+    Not "whether it is right", and deliberately not the grounding check either
+    -- this is the provenance of the references and nothing else, and it keeps
+    that meaning so that a client can tell the two failures apart.
     """
-    return not verify(answer, supplied)
+    return not _provenance(answer, supplied)
 
 
-def refusal(problems: Sequence[str]) -> Answer:
-    """What to show instead of an answer that failed its checks.
+def grounded(answer: Answer, supplied: Sequence[Passage], given: Given = NOTHING) -> bool:
+    """Whether the claims it leans on are words the evidence actually carried.
 
-    Not silence. The retrieved rules go to the client either way, so a refused
-    answer still leaves the player with the actual rules on screen -- which is
-    the part that was certainly true all along.
+    The second axis, and not a stronger word for the first. See ``grounding``:
+    it reports arithmetic and abilities the prompt did not contain, which is a
+    floor under an answer rather than a verdict on one.
     """
-    return Answer(
-        # Without "if there are any". The commonest refusal is an answer that
-        # cited nothing, and the commonest reason for *that* is that nothing
-        # was retrieved -- so the old wording pointed at rules below in exactly
-        # the case where there were none.
-        answer=(
-            "The answer did not stay inside the rules it was given, so it is not shown. "
-            "Any rules listed below are the real ones; read those."
-        ),
-        in_short="I could not answer that one safely. Let us read the card together.",
-        unsure="; ".join(problems),
-    )
+    return not grounding.problems(_said(answer), supplied, given)

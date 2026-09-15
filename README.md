@@ -11,11 +11,19 @@ a rewrite. See [`docs/PLAN.md`](docs/PLAN.md) for the full design.
 **M0–M6 merged.** The engine, the tracker, the two-seat server
 and the Expo app all work. The turn coach and the rules question box are the newest parts.
 
-The two checks are deliberately different strengths, and the wire says which you are getting.
+The checks are deliberately different strengths, and the wire says which you are getting.
 A turn recommendation is `trusted`: it is a choice among options the engine enumerated, and
-the engine agrees with it. A rules answer is only `cited`: every rule it named was one the
-server retrieved for it. Nothing reads that rule and checks the claim against it — so the
-retrieved rules are printed under every answer, and they are the part that is certainly true.
+the engine agrees with it. A rules answer gets two weaker verdicts, and neither is `correct`.
+`cited` means every rule it named was one the server retrieved for it. `grounded` means the
+words a rules claim cannot be paraphrased around — the arithmetic, and the keyword abilities
+it attributes to something — appear in the evidence the prompt carried: the retrieved
+passages, and the printed text of the cards in play. "Trample doubles all damage [702.19b]"
+is cited and not grounded, and is not shown.
+
+Nothing reads the cited rule and decides that the answer *follows* from it; that needs a
+second model, and two models agreeing is not a proof either. So every reply also carries
+`unchecked`, which says that in the server's own words, and the retrieved rules are printed
+under every answer — they are the part that is certainly true.
 
 ## Running it
 
