@@ -22,6 +22,7 @@ import { ActivityIndicator, StyleSheet, Text } from "react-native";
 import type { Coach } from "../client";
 import { Back, Page, Row } from "../components/Choosing";
 import { messageOf } from "../errors";
+import { lineNote } from "../format";
 import { colour, space, text } from "../theme";
 import { useLatest } from "../thinking";
 import type { GameLine, NewGame, PlayedGame, Walkthrough } from "../wire";
@@ -37,11 +38,15 @@ export function Replays({
   /**
    * Carry on from one moment as an ordinary game.
    *
-   * The seat goes with it: a moment belongs to whoever was being asked, and
-   * opening their turn showing the *other* player's advice would answer a
-   * question nobody asked.
+   * Without a seat, and the seat used to go with it: a moment belongs to
+   * whoever was being asked. It cannot any more — a live game is played from
+   * the seat this device's token names, and the server sends that back in the
+   * snapshot. So stepping into somebody else's turn shows *this* device's side
+   * of that position, with the other hand hidden as the rules hide it
+   * (CR 400.2). The walk screen goes on showing both, because a recording is
+   * not a game in progress.
    */
-  readonly onPlay: (game: NewGame, seat: string) => void;
+  readonly onPlay: (game: NewGame) => void;
   readonly onLeave: () => void;
 }) {
   const [runs, setRuns] = useState<readonly string[] | null>(null);
@@ -104,7 +109,7 @@ export function Replays({
     try {
       const started = await coach.stepInto(name, chosen.index, at);
       if (current()) {
-        onPlay(started, asked.player);
+        onPlay(started);
       }
     } catch (error: unknown) {
       if (current()) {
@@ -142,7 +147,7 @@ export function Replays({
             <Row
               key={line.index}
               name={line.decks.join(" v ")}
-              note={`${line.decisions} decisions · game ${line.seed}`}
+              note={lineNote(line)}
               onPress={() => { void show(line); }}
             />
           ))

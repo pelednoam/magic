@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from mtgcoach.api.eventspec import written
+from mtgcoach.api.sources import Sources
 from mtgcoach.core.cards import CardInstance
 from mtgcoach.core.ids import InstanceId, OracleId, PlayerId
 from mtgcoach.core.state import start_game
@@ -40,6 +41,11 @@ KIND = "game"
 
 #: What a card is written as: its instance id and its oracle id.
 CARD_FIELDS = 2
+
+#: The three revision fields, in the order a person reads them. One list, so
+#: that the writer above and ``reading`` cannot disagree about the spelling of
+#: a key -- which is the way a recorded revision silently becomes no revision.
+SOURCE_FIELDS = ("engine", "cards", "rules")
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +64,12 @@ class Recording:
         default_factory=dict[str, tuple[tuple[str, str], ...]]
     )
     events: tuple[Event, ...] = ()
+    #: Which engine, card data and rules the game was played under. Empty
+    #: fields for a recording written before this existed -- which is the whole
+    #: of the migration: an old journal is *missing* this, not wrong about it,
+    #: and refusing to open one over that would lose games nobody can replay
+    #: again. See ``sources``.
+    sources: Sources = field(default_factory=Sources)
 
     def opening(self) -> GameState:
         """The game as it began, hands drawn.
@@ -89,6 +101,16 @@ class Recording:
                     seat: [list(card) for card in cards] for seat, cards in self.libraries.items()
                 },
                 "events": [written(event) for event in self.events],
+                # Written even when every field is empty, so that a reader can
+                # tell "this journal predates the idea" from "this key was
+                # dropped by something in between".
+                "sources": dict(
+                    zip(
+                        SOURCE_FIELDS,
+                        (self.sources.engine, self.sources.cards, self.sources.rules),
+                        strict=True,
+                    )
+                ),
             },
             ensure_ascii=False,
         )

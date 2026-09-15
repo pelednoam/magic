@@ -12,15 +12,16 @@ operator's Claude subscription. A bearer token cannot be guessed, and asking
 for a header makes every such request preflighted, so a page that does not have
 it cannot even reach a route.
 
-**What it does not close.** Which *player* is asking. Every snapshot still
-carries both hands, and ``move_card`` will still move any card from any zone.
-§3's "you cannot see your opponent's hand" is enforced by the room, not by the
-code, and one shared secret does not change that -- a token per seat would, and
-is the obvious next step from here.
+**Which player is asking** is closed too, and not here. One shared secret left
+the ``player`` field in an event a claim the sender made about itself, so either
+device could act for either seat and both were sent both hands. ``seating``
+holds a token per seat and is what decides *who*; this module decides only
+whether a string is a token and whether two of them match.
 
-This module is the wire half: the header a request carries and whether it
-matches. ``tokenfile`` is the disk half -- where the token comes from, and why
-restarting the server does not invalidate the phone in somebody's hand.
+So: this is the wire half -- the header a request carries and the comparison.
+``seating`` is the identity half, ``tokenfile`` the disk half -- where the
+tokens come from, and why restarting the server does not invalidate the phone
+in somebody's hand.
 """
 
 from __future__ import annotations
@@ -40,7 +41,23 @@ SCHEME = "bearer "
 
 
 class MissingTokenError(ValueError):
-    """A server was built without a token. There is no open mode."""
+    """A server was built without a usable token for each seat.
+
+    There is no open mode, and no seat without a token: an argument that can be
+    left out is an argument that gets left out, and this one is the whole of the
+    server's access control. ``seating.Seating`` raises it on construction, so
+    a server that has one has one for every seat.
+    """
+
+
+#: How many random bytes a fresh token has. 32 is 256 bits, which is not going
+#: to be guessed on a home network or anywhere else.
+STRENGTH = 32
+
+
+def new_token() -> str:
+    """A fresh token."""
+    return secrets.token_urlsafe(STRENGTH)
 
 
 def usable(found: str) -> bool:

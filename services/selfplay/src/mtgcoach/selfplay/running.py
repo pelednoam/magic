@@ -16,9 +16,11 @@ from mtgcoach.api.cards import build
 from mtgcoach.api.claude import Cli
 from mtgcoach.api.explainer import ClaudeCliExplainer
 from mtgcoach.api.recording import Recording, dealt_as
+from mtgcoach.api.sources import Sources
 from mtgcoach.carddata.paths import effects_path
 from mtgcoach.carddata.store import CardStore
 from mtgcoach.core.ids import SetCode
+from mtgcoach.core.revision import engine
 from mtgcoach.selfplay import dealing, playing
 from mtgcoach.selfplay.answers import read
 from mtgcoach.selfplay.coached import Coached
@@ -93,6 +95,11 @@ def season(run: Run) -> Season:
         catalogue = build(cards, effects_path(data_root, set_code))
         names = {card.name: card.oracle_id for card in cards}
 
+    # What this season is played under, recorded on every game it writes. The
+    # rules revision is deliberately absent: no rules document is consulted
+    # here, so claiming one would be recording something that did not happen.
+    sources = Sources(engine=engine(), cards=catalogue.revision)
+
     decks = dealing.table(data_root, set_code, names)
     if len(decks) < dealing.PLAYERS:
         msg = (
@@ -119,11 +126,11 @@ def season(run: Run) -> Season:
         state = dealing.dealt(decks, chosen, this)
         finished = playing.play((seats[0], seats[1]), state, catalogue, this)
         played.append(finished)
-        _recorded(run, which, state, finished)
+        _recorded(run, which, state, finished, sources)
     return Season(games=tuple(played), coaching=tuple(agent.tally for agent in tallies))
 
 
-def _recorded(run: Run, which: Which, dealt: GameState, game: Game) -> None:
+def _recorded(run: Run, which: Which, dealt: GameState, game: Game, sources: Sources) -> None:
     """Write the game itself beside its decisions, if there is a journal.
 
     The decisions alone replay a game inside the harness. This is what lets
@@ -140,6 +147,7 @@ def _recorded(run: Run, which: Which, dealt: GameState, game: Game) -> None:
             first=str(dealt.active_player),
             libraries=dealt_as(dealt),
             events=game.log,
+            sources=sources,
         )
     )
 

@@ -26,7 +26,7 @@ from fastapi import HTTPException
 from starlette.status import HTTP_404_NOT_FOUND
 
 from mtgcoach.api import boardview, views
-from mtgcoach.api.context import snapshot
+from mtgcoach.api.context import Seated, snapshot
 from mtgcoach.api.replays import UnknownReplayError, games_in, journals
 
 if TYPE_CHECKING:
@@ -57,7 +57,7 @@ def routes(app: FastAPI, server: Server) -> None:
         route answers "which game?" -- a question that needs the decks, the
         length and nothing else. The chosen game is then one more request.
         """
-        return {"games": [listed(game) for game in _found(server, name)]}
+        return {"games": [listed(server, game) for game in _found(server, name)]}
 
     @app.get("/replays/{name}/{game}", response_model=None)
     def read_game(name: str, game: int) -> dict[str, Json]:
@@ -70,17 +70,23 @@ def routes(app: FastAPI, server: Server) -> None:
         return walked(server, _game(_found(server, name), game))
 
     @app.post("/replays/{name}/{game}/at/{index}", response_model=None)
-    def step_into(name: str, game: int, index: int) -> dict[str, Json]:
+    def step_into(name: str, game: int, index: int, seat: Seated) -> dict[str, Json]:
         """Adopt one moment as a game, so it can be asked about.
 
         Returns the same shape as starting a game, because it *is* one from
         here on -- which is what lets the question box, the coach and the
         board all work on a position out of somebody else's game without a
         single route knowing it came from a replay.
+
+        And because it is a game from here on, it is played from a seat: the
+        hand this device is shown is its own, though the moment it stepped in
+        from showed both. That is not an inconsistency. Reading a finished
+        game is not playing one, and the instant somebody can *act* on a
+        position the rules about who may see what apply again.
         """
         stepped = _moment(_game(_found(server, name), game), index)
         started = server.store.adopt(stepped.state)
-        return {"session_id": started.session_id, **snapshot(server, started)}
+        return {"session_id": started.session_id, **snapshot(server, started, seat)}
 
 
 def _found(server: Server, name: str) -> tuple[Replay, ...]:
@@ -130,19 +136,32 @@ def _moment(game: Replay, index: int) -> Moment:
     return game.moments[index]
 
 
-def listed(game: Replay) -> dict[str, Json]:
-    """One game, as a line to choose from."""
+def listed(server: Server, game: Replay) -> dict[str, Json]:
+    """One game, as a line to choose from -- and what it was played under.
+
+    ``differs`` is the whole point of recording the revisions: it names which
+    of the three have moved since, so "this journal will not open" becomes
+    "this journal was made by a different engine". A revision the journal never
+    recorded is not a difference -- see ``Sources.differs_from`` -- so an old
+    journal reads as old rather than as three things having changed.
+    """
     return {
         "index": game.index,
         "seed": game.seed,
         "decks": list(game.decks),
         "decisions": len(game.moments),
+        "sources": {
+            "engine": game.sources.engine,
+            "cards": game.sources.cards,
+            "rules": game.sources.rules,
+        },
+        "differs": list(game.sources.differs_from(server.sources)),
     }
 
 
 def walked(server: Server, game: Replay) -> dict[str, Json]:
     """One game, as something a screen can page through."""
-    return {**listed(game), "moments": [moment(server, one) for one in game.moments]}
+    return {**listed(server, game), "moments": [moment(server, one) for one in game.moments]}
 
 
 def moment(server: Server, one: Moment) -> dict[str, Json]:
@@ -152,6 +171,14 @@ def moment(server: Server, one: Moment) -> dict[str, Json]:
     -- so the app renders a replayed position with the components it already
     has, and a position looks the same whether it is happening now or happened
     last night.
+
+    With ``RECORDED`` for the seat, which is the one way it differs from a live
+    board: **both hands are shown.** A recording is not a game in progress.
+    Nobody can act on what it shows, there is no advantage left to take, and
+    what makes a game worth walking through is seeing why each side did what it
+    did -- which is the cards they were holding. A live board withholds the
+    other hand (CR 400.2) and this one cannot, because there is no player here
+    to withhold it from.
 
     Named from the server's catalogue, for the same reason. A journal holds
     oracle ids, which are Scryfall's UUIDs; without the catalogue every card on
@@ -165,7 +192,7 @@ def moment(server: Server, one: Moment) -> dict[str, Json]:
         "turn": one.turn,
         "step": str(one.step),
         "player": one.player,
-        "state": boardview.state(one.state, server.catalogue),
+        "state": boardview.state(one.state, server.catalogue, boardview.RECORDED),
         "said": views.explanation(one.said) if one.said is not None else None,
         "trusted": one.trusted,
         "problems": list(one.problems),

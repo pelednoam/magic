@@ -10,7 +10,7 @@
  * engine? If yes, it belongs in Python.
  */
 
-import type { Card, Permanent, Plan, Player } from "./wire";
+import type { Card, GameLine, Permanent, Plan, Player } from "./wire";
 
 /** `precombat_main` as a person says it. */
 export function stepName(step: string): string {
@@ -23,10 +23,35 @@ export function turnLine(turn: number, step: string, yourTurn: boolean): string 
   return `Turn ${turn} · ${stepName(step)}${yourTurn ? "" : " · their turn"}`;
 }
 
-/** The name printed on a card, found by the identifier the advice used. */
+/**
+ * The name printed on a card, found by the identifier the advice used.
+ *
+ * `hand` is null for the other player — it is a hidden zone (CR 400.2) and the
+ * server does not send it — so the search is over what this device can see.
+ * Falling back to the identifier is what it already did for a card it could
+ * not find, and is the honest answer for one it may not look at.
+ */
 export function nameOf(board: Player, instanceId: string): string {
-  const everywhere: readonly Card[] = [...board.battlefield, ...board.hand];
+  const everywhere: readonly Card[] = [...board.battlefield, ...(board.hand ?? [])];
   return everywhere.find((card) => card.instance_id === instanceId)?.name ?? instanceId;
+}
+
+/**
+ * What to say under a replayed game's name.
+ *
+ * The `differs` half is why a game records which engine, card data and rules
+ * it was played under. When one of those has moved, "played under a different
+ * engine" is the sentence that turns a game the server will not open — it
+ * refuses one whose events the engine no longer considers legal — from a
+ * puzzle into a fact. Silent when nothing moved, and silent for a game that
+ * recorded nothing, which reads as old rather than as changed.
+ */
+export function lineNote(line: GameLine): string {
+  const played = `${line.decisions} decisions · game ${line.seed}`;
+  if (line.differs.length === 0) {
+    return played;
+  }
+  return `${played} · played under a different ${line.differs.join(", ")}`;
 }
 
 /** Several names, as a person would say them: "a, b and c". */

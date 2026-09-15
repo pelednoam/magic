@@ -18,7 +18,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from helpers_api import RULES, Answering, server, talking
+from helpers_api import RULES, server, talking
+from helpers_fakes import Answering
 from mtgcoach.rules.answer import Answer
 from wire import flag, obj, rows, text, words
 

@@ -17,7 +17,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from helpers_api import CATALOGUE, DECKS, TOKEN, NoAnswers, NoCoach, server, talking
+from helpers_api import CATALOGUE, DECKS, SEATING, server, talking
+from helpers_fakes import NoAnswers, NoCoach
 from mtgcoach.api.app import create_app
 from mtgcoach.api.context import Claude
 from wire import decoded, number
@@ -100,6 +101,6 @@ def test_a_client_that_sends_a_message_is_simply_kept_alive() -> None:
 
 
 def test_a_server_with_no_decks_still_starts() -> None:
-    with talking(create_app(CATALOGUE, {}, TOKEN, Claude(NoCoach(), NoAnswers()))) as client:
+    with talking(create_app(CATALOGUE, {}, SEATING, Claude(NoCoach(), NoAnswers()))) as client:
         assert client.get("/decks").json() == {"decks": []}
         assert DECKS

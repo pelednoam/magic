@@ -1,8 +1,13 @@
-"""A server built out of cards written in the test, not read from a disk."""
+"""A server built out of cards written in the test, not read from a disk.
+
+The models it is built with live in ``helpers_fakes``: this module says what a
+test *server* is made of, that one says what stands in for the two things this
+project asks a model. ``driving`` is the third of the set -- how a test drives
+what this builds.
+"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -10,10 +15,11 @@ from fastapi.testclient import TestClient
 
 from helpers import facts
 from helpers_coach import taps_for
+from helpers_fakes import NoAnswers, NoCoach
 from mtgcoach.api.app import create_app
 from mtgcoach.api.cards import Catalogue
 from mtgcoach.api.context import Claude
-from mtgcoach.coach.advice import ExplainerError, Explanation
+from mtgcoach.api.seating import SEATS, Seating
 from mtgcoach.core.abilities import Trigger, TriggeredAbility
 from mtgcoach.core.vocabulary import TriggerEvent
 from mtgcoach.rules.corpus import passages_in
@@ -25,8 +31,7 @@ if TYPE_CHECKING:
     from fastapi import FastAPI
 
     from mtgcoach.coach.advice import Explainer
-    from mtgcoach.coach.report import TurnReport
-    from mtgcoach.rules.answer import Answer, Asker
+    from mtgcoach.rules.answer import Asker
 
 FOREST = facts("Forest", land=True)
 BEAR = facts("Grizzly Bears", "{1}{G}", power=2, toughness=2, creature=True)
@@ -71,73 +76,8 @@ GREEN = (
 DECKS: Mapping[str, tuple[str, ...]] = {"green": GREEN, "other": GREEN}
 
 
-@dataclass(slots=True)
-class Canned:
-    """An explainer that says what the test told it to say.
-
-    Mutable, because an instance id only exists once a game has been dealt --
-    so a test that recommends a real card has to start the game, read the hand,
-    and only then decide what the coach will say about it.
-    """
-
-    said: Explanation
-
-    def explain(self, report: TurnReport, briefing: str) -> Explanation:
-        """The prepared answer, whatever was asked."""
-        del report, briefing
-        return self.said
-
-
-@dataclass(frozen=True, slots=True)
-class NoCoach:
-    """An explainer that is never available. The default, deliberately.
-
-    Every test gets this unless it asks for something else, so no test can
-    accidentally spawn a real ``claude`` -- which would be slow, would cost
-    quota, and would pass or fail for reasons nothing in the repository
-    controls.
-    """
-
-    def explain(self, report: TurnReport, briefing: str) -> Explanation:
-        """Never answer.
-
-        Raises:
-            ExplainerError: Always.
-        """
-        del report, briefing
-        msg = "no coach in this test"
-        raise ExplainerError(msg)
-
-
-@dataclass(slots=True)
-class Answering:
-    """An answerer that says what the test told it to say."""
-
-    said: Answer
-
-    def ask(self, question: str, briefing: str) -> Answer:
-        """The prepared answer, whatever was asked."""
-        del question, briefing
-        return self.said
-
-
-@dataclass(frozen=True, slots=True)
-class NoAnswers:
-    """An answerer that is never available. The default, for the same reason."""
-
-    def ask(self, question: str, briefing: str) -> Answer:
-        """Never answer.
-
-        Raises:
-            ExplainerError: Always.
-        """
-        del question, briefing
-        msg = "no answerer in this test"
-        raise ExplainerError(msg)
-
-
-#: The rules excerpt, indexed once for every test that needs it. Building it is
-#: a few milliseconds, but a fixture per test would pay that a hundred times.
+#: The rules excerpt, indexed once for every test that needs it: a fixture per
+#: test would pay those few milliseconds a hundred times.
 RULES = RuleIndex.build(
     passages_in(
         (Path(__file__).resolve().parents[1] / "fixtures" / "rules_excerpt.txt").read_text(
@@ -147,9 +87,16 @@ RULES = RuleIndex.build(
 )
 
 
-#: The token every test server uses. A fixed one rather than a fresh one so a
-#: failure message shows the same string every time.
+#: The token for the seat a test plays from, and the one for the other device.
+#: Fixed rather than fresh, so a failure message shows the same string every
+#: time. Two of them, because one for both seats is the arrangement a token per
+#: seat exists to replace.
 TOKEN = "token-for-tests"  # noqa: S105 - a test fixture, not a credential
+OTHER_TOKEN = "token-for-the-other-seat"  # noqa: S105 - a test fixture
+
+#: One token per seat, in ``seating.SEATS`` order, and what to call each seat.
+SEATING = Seating({SEATS[0]: TOKEN, SEATS[1]: OTHER_TOKEN})
+MINE, THEIRS = SEATS
 
 
 def server(
@@ -170,7 +117,7 @@ def server(
     return create_app(
         CATALOGUE,
         DECKS if decks is None else decks,
-        TOKEN,
+        SEATING,
         Claude(
             explainer=explainer if explainer is not None else NoCoach(),
             asker=asker if asker is not None else NoAnswers(),
@@ -188,8 +135,10 @@ def talking(app: FastAPI | None = None, token: str = TOKEN) -> TestClient:
     nothing about the thing it was testing. Named so it does not collide with
     the ``as client`` every caller binds it to.
 
-    ``token`` is only passed by the tests that build a *real* server: that one
-    makes its own and keeps it in a file, so the test has to read it back.
+    ``token`` defaults to ``MINE``'s, the seat almost every test plays from.
+    It is passed by the tests that need the other device -- ``OTHER_TOKEN`` --
+    and by the ones that build a *real* server, which makes its own tokens and
+    keeps them in a file, so the test has to read them back.
     """
     return TestClient(
         app if app is not None else server(),

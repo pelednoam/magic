@@ -31,7 +31,7 @@ against those phases:
 | Phase | | |
 |---|---|---|
 | **A** correct contradictions, define support honestly | done | R01, R03, R08, and the modelled-vs-verified split |
-| **B** shared action, priority, stack | mostly | stack, priority, passing and one validated runtime done; **state revision and retry semantics not** |
+| **B** shared action, priority, stack | mostly | stack, priority, passing, per-seat identity and one validated runtime done; **state revision and retry semantics not** |
 | **C** execute effects and state processing | begun | outcomes and state-based actions done; effects still only *described* |
 | **D** broaden interactions and formats | not begun | the rest of §6.2 |
 | **E** rules assistant and teaching flow | begun early | retrieval and card-aware evidence done; answer evaluation not |
@@ -70,38 +70,65 @@ downstream of it expresses doubt, so a misread card becomes a fact the coach
 reasons from confidently. Still open -- the classes are the advisor's
 recommendation, not a decision anybody has taken.
 
-## 4. Command semantics — **partly decided; per-seat identity now required**
+## 4. Command semantics — **partly decided; per-seat identity now done**
 
 Decided: a command is one event, applied through one reducer, recorded in a
 log; `CastSpell` carries its payment because CR 601.2 is one action and a
 half-cast spell is not a state the game can be in; `PassPriority` is a command
 rather than an inference; undo is replay of the log minus its tail.
 
-**Decided: an event must say which player sent it.** The token is per *server*
-today, so the seat in an event's payload is a claim the sender makes about
-itself and nothing checks it -- either device can send either seat's actions.
-That is the same hole as item 9 and has the same fix, so they are one piece of
-work.
+**Decided and done: an event must say which player sent it, and the server
+checks it.** A token names one seat (`api/seating`), the gate stamps the
+connection with it (`api/gatekeeper`), and `api/acting.sent_by` refuses an
+event naming anybody else -- 403, because the request is well formed and what
+is wrong is who sent it. `AdvanceStep` is the one exception and names nobody:
+ending a step is a consequence of every player passing (CR 117.4), not a move,
+and the passes it needs are seated events checked like any other.
+
+It was demonstrable in four lines before: one device could post
+`{"type": "change_life", "player": "them", "amount": -5}` and take five life
+off the other player. `tests/api/test_seats.py` is that, refused.
 
 Still not decided: retries, cancellation, and commit boundaries for a
 multi-event action that fails part-way. The review asks for "state revision and
 retry semantics" as a Phase B deliverable, and it is the part of Phase B that
 is missing.
 
-## 5. Source versions — **partly decided**
+Still not decided: retries, cancellation, and commit boundaries for a
+multi-event action that fails part-way. The review asks for "state revision and
+retry semantics" as a Phase B deliverable, and it is the part of Phase B that
+is missing.
+
+## 5. Source versions — **decided and done**
 
 Decided: card data is sealed with a sha256 manifest (`mtgcoach effects check`);
 CI records the Comprehensive Rules URL it fetched, so a run says which revision
 it was judged against.
 
-**Decided: a game is pinned to the versions it was played under.** A journal
-records its events and not the engine, card data or rules revision that
-produced them -- which is exactly what made item 6 a question, and what made a
-whole directory of journals unreadable when priority arrived with nothing
-recording that they predated it.
+**Decided and done: a game is pinned to the versions it was played under.**
+Three revisions ride together as `api/sources.Sources`, in every board and on
+every recorded game:
 
-Per-scenario too: the review asks that each rules scenario record the document
-version it was derived from, which is where this meets item 8.
+| | What it is | Why it matters |
+|---|---|---|
+| `engine` | a digest over `packages/core`'s source (`core/revision`) | decides which events are *legal*, so a stricter one makes an old journal unreplayable — the failure that happened |
+| `cards` | the sha256 of the sealed effects file | decides what a card *does*, so a re-sealed fixture changes what the same events meant |
+| `rules` | the document's own "These rules are effective as of…" line (`rules/effective`) | is what an answer was judged against |
+
+Not the package version (every `pyproject.toml` here says `0.0.0`) and not a
+git commit (absent from an installed wheel, and moves when a README does). A
+digest cannot be forgotten, because nothing has to remember it.
+
+**Nothing gates on them.** The engine is the gate: it refuses an event it no
+longer considers legal and `replays` skips that game. What these do is turn
+"this journal will not open" into "played under a different engine", which the
+walk screen now says. A revision nobody recorded is not a difference, so the
+journals already on disk read as *old* rather than as three things having
+changed — that is the whole of the migration.
+
+Per-scenario too, which is where this meets item 8: `tests/rules` records the
+revision its excerpt was cut from, and `check_retrieval` prints the revision of
+the document it actually asked.
 
 ## 6. Replay policy — **decided, and this is where it is written down**
 
@@ -161,19 +188,41 @@ advisor says the same and adds two things:
   for continuous/replacement/prevention, 508-510 for combat, 514 for cleanup,
   704 for state-based actions.
 
-The convention already in use is a CR citation in the docstring. What is
-missing is the revision, which item 5 now requires anyway.
+The convention already in use is a CR citation in the docstring. The revision
+is recorded now, in the two places rules scenarios exist:
+`tests/rules/helpers_rules.REVISION` is read off the excerpt every one of them
+is derived from (asserted, so re-cutting the fixture has to move the date), and
+`tools/check_retrieval.py` prints which revision it asked -- "33/33 questions
+answered -- rules of August 7, 2026". A result that does not say what document
+it was got from is one nobody can reproduce.
 
-## 9. Privacy and visibility — **partly decided**
+## 9. Privacy and visibility — **partly decided; the seat half done**
 
 Decided: what reaches a prompt is public information plus the asking player's
 own hand -- both battlefields, the stack, that hand, and no other hidden zone
 (CR 400.2). `printed.py` enforces it.
 
-**Decided: a token per seat.** The snapshot carries *both* hands to *both*
-devices today, so "you cannot see your opponent's hand" is enforced by the room
-rather than by the server -- and the same gap means nothing verifies which
-player sent an event (item 4). One piece of work, two decisions.
+**Decided and done: a token per seat.** The snapshot carried *both* hands to
+*both* devices, twice over -- once in the board and once in the advice, since a
+turn report names every card in the hand it is about. Each device holds its own
+token now and is sent one hand and its own advice; the other player's `hand` is
+`null` (not `[]`, which would say they hold nothing) beside a `hand_size`,
+because how many cards an opponent holds is public and the contents are not.
+The socket carries its seat too, which is why a broadcast takes a payload *per
+seat* rather than one message.
+
+Two consequences worth writing down. The seat is no longer chosen on the device
+-- start a game and you were "you", join one and you were "them" -- but read
+off the token and sent back in every board, so a device cannot be set to the
+wrong one. And the coach and rules routes refuse a request naming the other
+seat: both put a hand in a prompt, so asking about the other player was a way
+to read their cards out of a model's answer.
+
+A replay is the deliberate exception: a recorded game shows both hands, because
+it is not a game in progress, nobody can act on what it shows, and what makes a
+game worth walking through is seeing what each side was holding. Stepping *into*
+a moment makes it a live game again, and the hand withholding comes back with
+it.
 
 Still not decided: what game data is kept for evaluation. Journals hold every
 briefing verbatim, which is what makes a bad answer diagnosable and also means
@@ -236,21 +285,21 @@ The review left its boxes unchecked deliberately. So does this.
 
 ## What the decisions ask for next
 
-In dependency order, not priority order:
+In dependency order, not priority order. The first two are done:
 
-1. **A token per seat** (items 4 and 9, one piece of work). The server cannot
-   tell the two devices apart, so it cannot withhold a hand from one of them
-   and cannot verify that an event came from the seat it claims. Both halves
-   go away together, and it is the only open item with a way to go wrong at a
-   real table: the second device is the one the child holds.
-2. **Versions on a game** (item 5) -- engine, card data and rules revision in
-   the journal, and the rules revision on each scenario (item 8). Cheap, and it
-   is what would have made a directory of unreadable journals diagnosable
-   instead of puzzling.
+1. ~~**A token per seat**~~ (items 4 and 9) -- done. The server could not tell
+   the two devices apart, so it could not withhold a hand from one of them and
+   could not verify that an event came from the seat it claimed. Both halves
+   went away together, and it was the only open item with a way to go wrong at
+   a real table: the second device is the one the child holds.
+2. ~~**Versions on a game**~~ (item 5, and item 8's second half) -- done.
+   Engine, card data and rules revision on every board and every recorded game;
+   the rules revision on each scenario.
 3. **State revision and retry semantics** (item 4) -- the remaining Phase B
    deliverable, and the thing a flaky LAN will find first.
 4. **Executing effects** (Phase C) -- the largest, and what turns
    `not_carried_out` from a disclosure into a shrinking list.
 
-Items 2 and 3 are the two nobody should decide in passing: whether to keep
-extending this engine, and how an uncertain observation reaches an answer.
+Items 2 and 3 of the ten -- runtime sourcing and state capture -- remain the
+two nobody should decide in passing: whether to keep extending this engine, and
+how an uncertain observation reaches an answer.

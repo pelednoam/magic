@@ -18,7 +18,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 from conftest import GREEN, WHITE
-from helpers_api import RULES, TOKEN, Answering, Canned, talking
+from helpers_api import RULES, SEATING, talking
+from helpers_fakes import Answering, Canned
 from mtgcoach.api.app import create_app
 from mtgcoach.api.context import Claude
 from mtgcoach.coach.advice import Explanation
@@ -60,7 +61,7 @@ def client(catalogue: Catalogue, coach: Canned, answerer: Answering) -> Iterator
     app = create_app(
         catalogue,
         {"green": GREEN, "white": WHITE},
-        TOKEN,
+        SEATING,
         Claude(coach, answerer, RULES),
     )
     with talking(app) as connected:
@@ -114,9 +115,9 @@ def test_recommending_a_card_the_engine_cannot_afford_is_refused(
 
 def test_no_coach_at_all_is_a_503(catalogue: Catalogue) -> None:
     """The engine's own advice is still in every snapshot; only the words fail."""
-    from helpers_api import NoCoach  # noqa: PLC0415 - the point is this one app
+    from helpers_fakes import NoCoach  # noqa: PLC0415 - the point is this one app
 
-    app = create_app(catalogue, {"green": GREEN, "white": WHITE}, TOKEN, Claude(NoCoach()))
+    app = create_app(catalogue, {"green": GREEN, "white": WHITE}, SEATING, Claude(NoCoach()))
     with talking(app) as client:
         session_id = start(client)
         no_coach(client, session_id)

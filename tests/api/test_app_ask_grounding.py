@@ -21,8 +21,9 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from helpers import ME
-from helpers_api import CATALOGUE, RULES, Answering, server, talking
+from helpers_api import CATALOGUE, RULES, server, talking
 from helpers_coach import game
+from helpers_fakes import Answering
 from mtgcoach.api.asking import answered
 from mtgcoach.api.context import Position
 from mtgcoach.coach.report import advise

@@ -60,6 +60,7 @@ def test_the_wire_folder_is_where_it_is_thought_to_be() -> None:
         "index.ts",
         "replay.ts",
         "shapes.ts",
+        "snapshot.ts",
     ]
 
 

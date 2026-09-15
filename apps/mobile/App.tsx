@@ -16,7 +16,6 @@ import { Replays } from "./src/screens/Replays";
 import { Start } from "./src/screens/Start";
 import { colour } from "./src/theme";
 import type { NewGame } from "./src/wire";
-import { YOU } from "./src/wire";
 
 /**
  * Where the server is. The laptop on the same LAN, by default -- §4's "run it
@@ -25,11 +24,14 @@ import { YOU } from "./src/wire";
 const SERVER = process.env["EXPO_PUBLIC_COACH_URL"] ?? "http://localhost:8000";
 
 /**
- * The server's token, if this build was given one.
+ * This device's token, if this build was given one.
  *
- * The server prints it at startup; `npm run web` on the same laptop picks it up
- * from the environment. A phone will not have it, which is why `Start` asks
- * for it when the server refuses -- see its `onToken`.
+ * The server prints one per seat at startup; `npm run web` on the same laptop
+ * picks one up from the environment. A phone will not have it, which is why
+ * `Start` asks for it when the server refuses -- see its `onToken`.
+ *
+ * The token is also which player this device *is*: the server reads the seat
+ * off it and puts it in every payload. Nothing here chooses a seat any more.
  */
 const TOKEN = process.env["EXPO_PUBLIC_COACH_TOKEN"] ?? "";
 
@@ -38,15 +40,15 @@ export default function App() {
   // replaces it and everything below needs the new one.
   const [coach, setCoach] = useState(() => new Coach(SERVER, TOKEN));
   const [game, setGame] = useState<NewGame | null>(null);
-  // Which side of the table this device is. The first device takes "you"; a
-  // device that joins an existing game takes the other seat.
-  const [seat, setSeat] = useState(YOU);
   // Whether the replay lists are open. Not a screen a game can be in, so it is
   // its own flag rather than another value of `game`.
   const [browsing, setBrowsing] = useState(false);
 
-  const begin = (started: NewGame, taken: string) => {
-    setSeat(taken);
+  // No seat here. It was held in state and chosen by which button was pressed
+  // -- start a game and you were "you", join one and you were "them" -- so a
+  // device set to the wrong one was a device acting as the other player. It
+  // comes off the snapshot now, which comes off the token.
+  const begin = (started: NewGame) => {
     setGame(started);
     setBrowsing(false);
   };
@@ -55,7 +57,7 @@ export default function App() {
     <SafeAreaView style={styles.screen}>
       <StatusBar style="light" />
       {game !== null ? (
-        <Game coach={coach} game={game} seat={seat} />
+        <Game coach={coach} game={game} />
       ) : browsing ? (
         <Replays coach={coach} onPlay={begin} onLeave={() => { setBrowsing(false); }} />
       ) : (

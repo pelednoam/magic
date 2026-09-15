@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 from helpers import facts
 from mtgcoach.api.cards import Catalogue
 from mtgcoach.api.recording import Recording, dealt_as
+from mtgcoach.api.sources import Sources
 from mtgcoach.core.cards import CardInstance
 from mtgcoach.core.events import PlayLand
 from mtgcoach.core.ids import InstanceId, OracleId, PlayerId
@@ -111,7 +112,13 @@ def _walk(state: GameState, to: Step, events: list[Event]) -> GameState:
     return state
 
 
-def recording() -> Recording:
+#: What the fixture game says it was played under. A made-up engine digest on
+#: purpose: it is not this engine's, so a test can see the list route say which
+#: revision has moved -- which is the whole reason a game records them.
+SOURCES = Sources(engine="0the-old-one", cards="0the-old-cards", rules="July 1, 2024")
+
+
+def recording(sources: Sources = SOURCES) -> Recording:
     """The whole game, ready to be written down."""
     return Recording(
         seed=SEED,
@@ -119,6 +126,7 @@ def recording() -> Recording:
         first="you",
         libraries=dealt_as(opening()),
         events=played(),
+        sources=sources,
     )
 
 

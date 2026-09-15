@@ -27,8 +27,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from driving import HTTP_OK, stepped
-from helpers_api import RULES, Answering, Canned, server, talking
+from driving import HTTP_OK, device, stepped
+from helpers_api import RULES, server, talking
+from helpers_fakes import Answering, Canned
 from mtgcoach.coach.advice import Explanation
 from mtgcoach.rules.answer import Answer
 from wire import decoded, named, rows, text
@@ -74,21 +75,42 @@ def a_whole_turn() -> set[str]:
         found.update(keys(created))
 
         def act(**event: object) -> dict[str, object]:
-            response = client.post(f"/games/{session_id}/events", json=event)
+            """One event, from the device that holds the seat it names.
+
+            Which is not a detail of the harness: the server refuses an event
+            naming another seat (`test_seats`), so a walk driven by one client
+            could only ever play one side of the game.
+            """
+            who = event.get("player")
+            sender = device(client, who) if isinstance(who, str) else client
+            response = sender.post(f"/games/{session_id}/events", json=event)
             assert response.status_code == HTTP_OK, response.text
             body = decoded(response.json())
             found.update(keys(body))
             return body
 
+        def board(seat: str) -> dict[str, object]:
+            """This seat's own view of the game.
+
+            A board carries one hand -- its own -- so a walk that needs both
+            players' cards has to ask twice, from two devices. Both views count
+            towards the contract: the one with the hand in it and the one with
+            `hand` null and only the count.
+            """
+            seen = decoded(device(client, seat).get(f"/games/{session_id}").json())
+            found.update(keys(seen))
+            return seen
+
         body = _stepped(client, session_id, found)
         # A creature each, so an attack has something to kill, and a trigger
         # on the table so an upkeep has something to remind you about.
         for player in ("you", "them"):
-            bear = named(rows(body, "state", "players", player, "hand"), "Grizzly Bears")
+            hand = rows(board(player), "state", "players", player, "hand")
+            bear = named(hand, "Grizzly Bears")
             body = act(
                 type="move_card", player=player, instance_id=bear["instance_id"], to="battlefield"
             )
-        bell = named(rows(body, "state", "players", "you", "hand"), "Bell-Ringer")
+        bell = named(rows(board("you"), "state", "players", "you", "hand"), "Bell-Ringer")
         body = act(
             type="move_card", player="you", instance_id=bell["instance_id"], to="battlefield"
         )

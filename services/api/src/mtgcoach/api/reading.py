@@ -16,7 +16,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from mtgcoach.api.eventspec import parse
-from mtgcoach.api.recording import CARD_FIELDS, KIND, Recording
+from mtgcoach.api.recording import CARD_FIELDS, KIND, SOURCE_FIELDS, Recording
+from mtgcoach.api.sources import Sources
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -45,7 +46,30 @@ def recorded(line: object) -> Recording | None:
         first=first,
         libraries=_libraries(cast("dict[str, object]", libraries)),
         events=_events(loaded.get("events")),
+        sources=_sources(loaded.get("sources")),
     )
+
+
+def _sources(loaded: object) -> Sources:
+    """Which revisions the game was played under, empty where it does not say.
+
+    Tolerant, unlike everything else here, and for a reason that does not apply
+    to the rest: a missing or damaged revision costs a *diagnosis*, while a
+    missing or damaged card costs the game. So a journal from before this
+    existed reads back as three empty strings and replays exactly as it did --
+    which is what item 5 of the decisions asks for, and the alternative would
+    have made every journal on disk unreadable to fix journals being
+    unreadable.
+
+    Only strings are kept. A number or a null where a revision should be is not
+    a revision, and recording it as ``"3"`` would put a claim in front of
+    somebody that nothing supports.
+    """
+    if not isinstance(loaded, dict):
+        return Sources()
+    found = cast("dict[str, object]", loaded)
+    said = {name: value for name in SOURCE_FIELDS if isinstance(value := found.get(name), str)}
+    return Sources(**said)
 
 
 def _libraries(loaded: Mapping[str, object]) -> dict[str, tuple[tuple[str, str], ...]]:

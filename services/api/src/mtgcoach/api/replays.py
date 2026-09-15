@@ -24,11 +24,12 @@ moment anybody re-ran a season without deleting the journal first.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from mtgcoach.api.cutting import games
 from mtgcoach.api.decisions import Moment, decisions, moment, order
+from mtgcoach.api.sources import Sources
 from mtgcoach.core.errors import IllegalEventError
 from mtgcoach.core.reduce import apply
 
@@ -61,6 +62,10 @@ class Replay:
     seed: int
     decks: tuple[str, str]
     moments: tuple[Moment, ...] = ()
+    #: Which engine, card data and rules it was played under, as recorded.
+    #: Empty for a journal written before that was recorded, which is most of
+    #: the ones on disk -- and is exactly the case this exists to make legible.
+    sources: Sources = field(default_factory=Sources)
 
 
 def _decoded(text: str) -> list[object]:
@@ -155,6 +160,7 @@ def _replay(index: int, written: Written) -> Replay | None:
         seed=written.recording.seed,
         decks=written.recording.decks,
         moments=moments,
+        sources=written.recording.sources,
     )
 
 

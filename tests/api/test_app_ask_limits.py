@@ -19,7 +19,8 @@ import threading
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from helpers_api import RULES, Answering, server, talking
+from helpers_api import RULES, server, talking
+from helpers_fakes import Answering
 from mtgcoach.api import rationing
 from test_app_ask import GOOD, ask, new_game
 
@@ -27,6 +28,7 @@ if TYPE_CHECKING:
     from mtgcoach.rules.answer import Answer
 
 HTTP_BAD_REQUEST = 400
+HTTP_FORBIDDEN = 403
 HTTP_NOT_FOUND = 404
 HTTP_UNAVAILABLE = 503
 
@@ -51,13 +53,20 @@ def test_a_game_that_is_not_there_is_a_404_before_anything_else() -> None:
         assert response.status_code == HTTP_NOT_FOUND
 
 
-def test_a_player_who_is_not_in_the_game_is_a_bad_request() -> None:
+def test_asking_as_a_player_this_device_is_not_is_refused() -> None:
+    """403, not 400. The request is well formed; the seat is not this one.
+
+    It used to be "a player who is not in the game", which had to be a 400
+    because nothing knew which player was asking. `test_seats` covers the case
+    that matters: naming the *other seat*, which is a way to read their hand
+    out of an answer that quotes every card in it.
+    """
     with talking(server(asker=Answering(GOOD), rules=RULES)) as client:
         response = client.post(
             f"/games/{new_game(client)}/ask",
             json={"question": "anything", "player": "nobody"},
         )
-        assert response.status_code == HTTP_BAD_REQUEST
+        assert response.status_code == HTTP_FORBIDDEN
 
 
 def test_a_server_without_the_rules_installed_says_so() -> None:

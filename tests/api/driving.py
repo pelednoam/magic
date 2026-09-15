@@ -16,16 +16,21 @@ It exists at all because of one rule. A step in which players receive priority
 ends when the stack is empty and every player has passed in succession
 (CR 500.2), so ending one is three events rather than a request, and a helper
 is the only way that stays readable in fifty tests.
+
+It drives the *table*, not a device, which since seats got their own tokens
+means it drives two clients. A test hands it one and it reaches for the other
+seat's when an event says that seat sent it -- because the server now refuses
+an event naming a player other than the token's (see ``test_seats``). The
+refusal itself is tested there, against a client built by hand; nothing here
+would notice it, which is exactly why it is tested somewhere else.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from fastapi.testclient import TestClient
 
+from helpers_api import MINE, SEATING
 from wire import decoded, rows, text, words
-
-if TYPE_CHECKING:
-    from fastapi.testclient import TestClient
 
 #: What an accepted event answers with, and what a refused one does.
 HTTP_OK = 200
@@ -80,7 +85,34 @@ def walked(client: TestClient, session_id: str, to: str) -> dict[str, object]:
 
 
 def _applied(client: TestClient, session_id: str, event: dict[str, object]) -> dict[str, object]:
-    """Send one event, insisting it was accepted, and hand back the board."""
-    sent = client.post(f"/games/{session_id}/events", json=event)
+    """Send one event, insisting it was accepted, and hand back the board.
+
+    From the device that holds the seat the event names. ``advance_step`` names
+    nobody -- ending a step is not a player's action (CR 117.4) -- and goes
+    from whichever device the test was already holding.
+    """
+    who = event.get("player")
+    sender = device(client, who) if isinstance(who, str) else client
+    sent = sender.post(f"/games/{session_id}/events", json=event)
     assert sent.status_code == HTTP_OK, sent.text
     return decoded(sent.json())
+
+
+def device(client: TestClient, seat: str) -> TestClient:
+    """The same server, spoken to by the device that holds ``seat``'s token.
+
+    Public, because a test that reads the *other* seat's hand or advice has to
+    ask from that seat's device -- the board this one is sent does not carry
+    them, which is the point of ``test_seats``.
+
+    The same *app*, which is what makes it the same game: a second client on a
+    second app would be a second server with a second store and every event
+    would land in a game the first one has never heard of.
+
+    Built on demand rather than threaded through fifty call sites. Not entered
+    as a context manager either, which is only needed for lifespan and sockets
+    -- this sends requests, and the app it sends them to is already running.
+    """
+    if seat == MINE:
+        return client
+    return TestClient(client.app, headers={"Authorization": f"Bearer {SEATING.token(seat)}"})

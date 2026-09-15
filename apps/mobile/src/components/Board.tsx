@@ -16,6 +16,18 @@ import type { Permanent, Player } from "../wire";
 
 import { Panel } from "./Panel";
 
+/**
+ * The numbers under a battlefield's title.
+ *
+ * The hand *count* is here for both players, because how many cards somebody
+ * is holding is public (CR 400.2 hides the contents, not the number) and is
+ * the thing a player at a table actually counts. The contents arrive for one
+ * of them; `Hand` shows those.
+ */
+function boardNote(player: Player): string {
+  return `${player.life} life · ${player.hand_size} in hand · ${player.library} in library`;
+}
+
 export function Board({
   title,
   player,
@@ -29,7 +41,7 @@ export function Board({
   readonly onTap?: ((permanent: Permanent) => void) | undefined;
 }) {
   return (
-    <Panel title={title} note={`${player.life} life · ${player.library} in library`}>
+    <Panel title={title} note={boardNote(player)}>
       {player.battlefield.length === 0 ? (
         <Text style={styles.empty}>Nothing on the battlefield.</Text>
       ) : (

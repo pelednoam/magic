@@ -18,10 +18,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from helpers_api import CATALOGUE, TOKEN, NoAnswers, NoCoach, server, talking
+from helpers_api import CATALOGUE, SEATING, server, talking
+from helpers_fakes import NoAnswers, NoCoach
 from mtgcoach.api.app import create_app
 from mtgcoach.api.context import Claude
-from wire import decoded, flag, named, number, obj, rows
+from wire import flag, named, number, obj, rows
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
@@ -50,14 +51,14 @@ def test_starting_a_game_returns_the_board_and_the_advice() -> None:
     with talking(server()) as client:
         body = client.post("/games", json={"you": "green", "them": "other"}).json()
         assert number(body, "state", "turn") == 1
-        assert set(obj(body, "advice")) == {"you", "them"}
+        assert set(obj(body, "advice")) == {"you"}
 
 
-def test_both_players_get_advice() -> None:
-    """One screen at a kitchen table; the defender needs advice too."""
+def test_the_advice_is_the_asking_seat_s_own() -> None:
+    """It used to be both. The defender has their own device. See `test_hidden`."""
     with talking(server()) as client:
         body = client.get(f"/games/{_new_game(client)}").json()
-        assert flag(body, "advice", "them", "your_turn") is False
+        assert set(obj(body, "advice")) == {"you"}
         assert flag(body, "advice", "you", "your_turn") is True
 
 
@@ -91,11 +92,21 @@ def test_a_malformed_event_is_a_bad_request_with_a_sentence() -> None:
 
 
 def test_an_event_the_rules_refuse_is_a_bad_request_too() -> None:
-    """Drawing for a player who is not in the game."""
+    """Resolving a spell that is not on the stack.
+
+    It used to be drawing for a player who is not in the game -- a 403 now,
+    since the seat is checked before the engine is asked anything. So this
+    needs an event the *rules* refuse from the seat that sent it.
+    """
     with talking(server()) as client:
         response = client.post(
             f"/games/{_new_game(client)}/events",
-            json={"type": "draw_card", "player": "nobody"},
+            json={
+                "type": "resolve_spell",
+                "player": "you",
+                "instance_id": "nothing-is-waiting",
+                "to": "graveyard",
+            },
         )
         assert response.status_code == HTTP_BAD_REQUEST
 
@@ -120,67 +131,11 @@ def test_an_event_on_a_game_that_does_not_exist() -> None:
         assert response.status_code == HTTP_NOT_FOUND
 
 
-def test_undo_takes_the_last_event_back() -> None:
-    with talking(server()) as client:
-        session_id = _new_game(client)
-        client.post(
-            f"/games/{session_id}/events",
-            json={"type": "change_life", "player": "you", "amount": -3},
-        )
-        body = client.post(f"/games/{session_id}/undo").json()
-        assert number(body, "state", "players", "you", "life") == 20
-
-
-def test_undo_on_a_game_that_does_not_exist() -> None:
-    with talking(server()) as client:
-        assert client.post("/games/nope/undo").status_code == HTTP_NOT_FOUND
-
-
-def test_the_version_only_ever_goes_up() -> None:
-    """It is the client's only ordering, and undo is a change like any other.
-
-    Counting *events* made it go backwards on undo -- and the client keeps a
-    snapshot unless the new one is at least as new, so it discarded every undo
-    and undo silently did nothing. This test used to pin that: it asserted the
-    undo snapshot came back as 0.
-    """
-    with talking(server()) as client:
-        session_id = _new_game(client)
-        seen = [number(decoded(client.get(f"/games/{session_id}").json()), "version")]
-        seen.append(
-            number(
-                decoded(
-                    client.post(
-                        f"/games/{session_id}/events",
-                        json={"type": "change_life", "player": "you", "amount": -1},
-                    ).json()
-                ),
-                "version",
-            )
-        )
-        seen.append(number(decoded(client.post(f"/games/{session_id}/undo").json()), "version"))
-        assert seen == sorted(seen), f"versions went backwards: {seen}"
-        assert len(set(seen)) == len(seen), f"two states shared a version: {seen}"
-
-
-def test_an_undo_is_newer_than_the_event_it_undid() -> None:
-    """Otherwise the client cannot tell the undo from the thing being undone."""
-    with talking(server()) as client:
-        session_id = _new_game(client)
-        after = decoded(
-            client.post(
-                f"/games/{session_id}/events",
-                json={"type": "change_life", "player": "you", "amount": -1},
-            ).json()
-        )
-        undone = decoded(client.post(f"/games/{session_id}/undo").json())
-        assert number(undone, "version") > number(after, "version")
-        assert number(undone, "state", "players", "you", "life") == 20
-
-
 def test_a_deck_too_short_to_deal_is_a_bad_request() -> None:
     """A partial import can advertise a deck of six. That is a thing to say."""
-    short = create_app(CATALOGUE, {"tiny": ("Forest",) * 3}, TOKEN, Claude(NoCoach(), NoAnswers()))
+    short = create_app(
+        CATALOGUE, {"tiny": ("Forest",) * 3}, SEATING, Claude(NoCoach(), NoAnswers())
+    )
     with talking(short) as client:
         response = client.post("/games", json={"you": "tiny", "them": "tiny"})
         assert response.status_code == HTTP_BAD_REQUEST

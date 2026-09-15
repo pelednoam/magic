@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from mtgcoach.carddata.enginefacts import UnmodellableCardError, facts_for
+from mtgcoach.carddata.manifest import sha256_of
 from mtgcoach.carddata.sealed import load
 from mtgcoach.core.abilities import unmodelled_reasons
 from mtgcoach.core.carrying import not_carried_out
@@ -48,6 +49,12 @@ class Catalogue:
     #: about cards and must not be handed prose it would be tempted to parse --
     #: this is here to be quoted into a prompt and nowhere else.
     texts: Mapping[str, str] = field(default_factory=dict[str, str])
+    #: Which sealed bytes this was built from: the sha256 of the effects file,
+    #: which is the same checksum its manifest records. Recorded on a game so
+    #: that a journal says what its cards *did* at the time, not just what
+    #: happened -- see ``sources``. Empty for a catalogue built without a
+    #: fixture, which is every catalogue written in a test.
+    revision: str = ""
 
     def facts(self, oracle_id: OracleId) -> CardFacts | None:
         """The engine's view of the card, or None when it is not known."""
@@ -130,13 +137,19 @@ def build(cards: Iterable[Card], effects: Path | None = None) -> Catalogue:
         except UnmodellableCardError:
             continue
     rules: dict[str, tuple[Ability, ...]] = {}
+    revision = ""
     if effects is not None and effects.exists():
         rules = {str(c.oracle_id): tuple(c.abilities) for c in load(effects)}
+        # Checksummed here rather than read out of the manifest beside it: this
+        # is the revision of the bytes actually loaded, and a manifest that
+        # disagrees with them is the thing `mtgcoach effects check` exists to
+        # catch. Recording what was read cannot inherit that disagreement.
+        revision = sha256_of(effects)
     # Keyed off ``cards`` rather than ``facts``: a card whose cost the parser
     # refused is one the coach cannot reason about, and its text is exactly
     # what a player asking about it needs to see.
     texts = {str(card.oracle_id): _printed(card) for card in listed}
-    return Catalogue(cards=facts, rules=rules, texts=texts)
+    return Catalogue(cards=facts, rules=rules, texts=texts, revision=revision)
 
 
 def _printed(card: Card) -> str:

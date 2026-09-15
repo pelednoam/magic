@@ -10,13 +10,15 @@
  * Nothing here interprets anything. `reasons` are sentences the engine wrote
  * and this app prints; it does not know what a land is, and must not learn.
  *
- * Split in four: `game` is the board and how it ended, `board` is what the
- * engine computed about it and is certainly true, `claude` is what a model said
- * and had to be checked, and `replay` is a game that already happened.
- * Importers do not care -- `from "./wire"` still reaches all of it.
+ * Split in five: `game` is the board and how it ended, `board` is what the
+ * engine computed about it and is certainly true, `snapshot` is the envelope
+ * those two arrive in, `claude` is what a model said and had to be checked,
+ * and `replay` is a game that already happened. Importers do not care --
+ * `from "./wire"` still reaches all of it.
  */
 
 export * from "./board";
+export * from "./snapshot";
 export * from "./game";
 export * from "./claude";
 export * from "./replay";

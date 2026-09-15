@@ -10,6 +10,27 @@
  * the server starts sending a field none of them knows about.
  */
 
+/**
+ * Which engine, card data and rules a board was produced under.
+ *
+ * Every field is empty when nothing recorded it — which is what a journal
+ * written before any of this existed reads back as. Empty means "not
+ * recorded", never "none": an old game is missing this, not wrong about it.
+ *
+ * Diagnostic, not a gate. The engine itself refuses an event it no longer
+ * considers legal and the server then declines to show that game; these three
+ * are what turn "this will not open" into "this was made by a different
+ * engine".
+ */
+export interface Sources {
+  /** A digest over the rules engine's source. */
+  readonly engine: string;
+  /** The checksum of the sealed card-data fixture. */
+  readonly cards: string;
+  /** The date the Comprehensive Rules say they took effect. */
+  readonly rules: string;
+}
+
 /** One card, by both of its identities and the word printed on it. */
 export interface Card {
   readonly instance_id: string;
@@ -34,7 +55,27 @@ export interface Player {
   readonly life: number;
   readonly library: number;
   readonly lands_played_this_turn: number;
-  readonly hand: readonly Card[];
+  /**
+   * The cards in this hand, or **null** when it is not this device's hand.
+   *
+   * A hand is a hidden zone (CR 400.2). The server used to send both to both
+   * devices and "you cannot see your opponent's hand" held because nobody
+   * looked; each device has its own token now and is sent one hand — see
+   * `Snapshot.seat`.
+   *
+   * Null, not an empty list: an empty list says this player is holding
+   * nothing, which is a different fact about the game and one a player would
+   * act on.
+   */
+  readonly hand: readonly Card[] | null;
+  /**
+   * How many cards this player is holding, always.
+   *
+   * Public information — CR 400.2 hides the *contents* of a hand, not the
+   * number — and the thing a player at a table actually counts. So hiding the
+   * other list costs this tracker nothing it should have had.
+   */
+  readonly hand_size: number;
   readonly battlefield: readonly Permanent[];
   readonly graveyard: readonly Card[];
   readonly exile: readonly Card[];

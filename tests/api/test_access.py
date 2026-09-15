@@ -13,6 +13,10 @@ unauthenticated" as a known gap from M5 until now. The thing it actually
 closes is not a guest's phone -- it is a web page the household visits, which
 could make cross-origin requests to the laptop and did not previously need to
 know anything to drive the game or spend the operator's subscription.
+
+This is the door. `test_seats` is which *player* came through it and what that
+lets them do, and `test_hidden` is what they are then sent. All three were one
+question while there was one token.
 """
 
 from __future__ import annotations
@@ -21,13 +25,10 @@ import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from helpers_api import CATALOGUE, DECKS, TOKEN, NoAnswers, NoCoach, server, talking
-from mtgcoach.api.access import (
-    MissingTokenError,
-)
-from mtgcoach.api.app import create_app
-from mtgcoach.api.context import Claude
+from helpers_api import OTHER_TOKEN, TOKEN, server, talking
+from mtgcoach.api.access import MissingTokenError
 from mtgcoach.api.gatekeeper import REFUSAL
+from mtgcoach.api.seating import SEATS, Seating
 
 HTTP_OK = 200
 HTTP_UNAUTHORIZED = 401
@@ -82,11 +83,13 @@ def test_every_route_is_behind_the_door(method: str, path: str) -> None:
 
 
 def test_the_refusal_says_nothing_about_the_token() -> None:
-    """Not its length, and not how close the attempt was."""
+    """Not its length, not which seat it nearly was, and not how close."""
     with talking(server(), token="x") as client:  # noqa: S106 - the point of the test
         said = client.get("/decks").json()["detail"]
     assert TOKEN not in said
+    assert OTHER_TOKEN not in said
     assert str(len(TOKEN)) not in said
+    assert not any(seat in said for seat in SEATS)
 
 
 def test_a_refusal_still_carries_cors_headers() -> None:
@@ -159,10 +162,13 @@ def test_a_server_cannot_be_built_without_a_token() -> None:
     """There is no open mode.
 
     An argument that can be left out is an argument that gets left out, and
-    this one is the whole of the server's access control.
+    this one is the whole of the server's access control. It is no longer
+    `create_app`'s check: a `Seating` refuses to exist without a usable token
+    for every seat, so a server that has one has one for each -- which is a
+    stronger promise, made by the type rather than by a line in a factory.
     """
-    with pytest.raises(MissingTokenError, match="no open mode"):
-        create_app(CATALOGUE, DECKS, "", Claude(NoCoach(), NoAnswers()))
+    with pytest.raises(MissingTokenError, match="needs a token for each"):
+        Seating({})
 
 
 def test_an_http_request_may_not_use_the_query_string() -> None:

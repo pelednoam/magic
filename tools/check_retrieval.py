@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import Final, cast
 
 from mtgcoach.rules.corpus import CorpusError, passages_in
+from mtgcoach.rules.effective import effective_from
 from mtgcoach.rules.library import rules_path
 from mtgcoach.rules.search import DEFAULT_LIMIT, RuleIndex
 
@@ -145,19 +146,27 @@ def main() -> int:
     try:
         questions = asked(QUESTIONS)
         document = rules.read_text(encoding="utf-8", errors="replace")
+        revision = effective_from(document)
         with RuleIndex.build(passages_in(document)) as index:
             report = verdicts(index, questions)
     except (OSError, ValueError, CorpusError) as exc:
         print(f"could not run the retrieval check: {type(exc).__name__}: {exc}")
         return 1
-    return said(report)
+    return said(report, revision)
 
 
-def said(report: list[tuple[str, str, str]]) -> int:
+def said(report: list[tuple[str, str, str]], revision: str = "") -> int:
     """Print the outcome and decide the exit code.
 
     Public because the exit code is the whole contract with the gate, and a
     test that has to reach past an underscore to check it tends not to exist.
+
+    ``revision`` is which document was asked -- its own "effective as of"
+    sentence. Printed because `docs/DECISIONS.md` item 8 asks that a rules
+    scenario record the revision it was judged against, and this check is the
+    only one that asks the *real* document: a run that says "33/33 answered"
+    without saying of what is a result nobody can reproduce. Empty when the
+    document does not say, which prints nothing rather than a guess.
     """
     if not report:
         # A gate that asked nothing must not report a pass. "0/0 questions
@@ -178,6 +187,7 @@ def said(report: list[tuple[str, str, str]]) -> int:
     print(
         f"== retrieval         {found}/{len(report)} questions answered"
         f"{f', {len(gaps)} known gap(s)' if gaps else ''}"
+        f"{f' -- rules of {revision}' if revision else ''}"
     )
     return 1 if missed or fixed else 0
 

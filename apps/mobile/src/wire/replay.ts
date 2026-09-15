@@ -15,7 +15,7 @@
 
 import { asObject } from "./shapes";
 
-import type { GameState } from "./game";
+import type { GameState, Sources } from "./game";
 import type { Explanation } from "./claude";
 
 /** One decision: where in the game, the board, and what was said about it. */
@@ -44,6 +44,17 @@ export interface GameLine {
   readonly seed: number;
   readonly decks: readonly string[];
   readonly decisions: number;
+  /** What the game was played under, as recorded. See `Sources`. */
+  readonly sources: Sources;
+  /**
+   * Which of those have moved since — `engine`, `card data`, `rules`.
+   *
+   * Empty for a game played under this server's own versions, and empty for
+   * one that recorded none: an old journal reads as old rather than as three
+   * things having changed. A non-empty list is the sentence to show beside a
+   * game that will not open.
+   */
+  readonly differs: readonly string[];
 }
 
 /** One game, with every moment of it. */

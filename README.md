@@ -38,7 +38,11 @@ The server prints two things when it starts, and the app needs both:
 
 ```
 Magic Coach on http://192.168.1.42:8000
-  token: <43 characters>
+  token for you: <43 characters>
+  token for them: <43 characters>
+  give each device one of them, and paste it in when the app asks.
+  whichever seat it holds is the player it plays, and the only
+  hand it is shown.
   the app needs the address too: EXPO_PUBLIC_COACH_URL=http://192.168.1.42:8000
 ```
 
@@ -46,17 +50,21 @@ The **address** is the laptop's on the LAN, not `localhost` — the app defaults
 which on a phone is the phone. Set `EXPO_PUBLIC_COACH_URL` to what the server printed before
 `npm run web`, since Metro serves the bundle to the phone and the value is baked into it.
 
-The **token** is the whole of the access control, so every request needs it —
+The **tokens** are the whole of the access control, so every request needs one —
 `Authorization: Bearer <token>`, and `?token=` on the WebSocket, which a browser will not let
 a page put a header on. A phone asks for it once and you paste it in.
 `EXPO_PUBLIC_COACH_TOKEN` works for a localhost-only session, but Expo bakes that into the
 bundle Metro serves unauthenticated — so on a LAN, set the URL and paste the token.
 
-What that closes is not a guest's phone. It is a web page the household visits, which could
-make cross-origin requests to `http://<laptop>:8000` and previously needed to know nothing at
-all to drive the game or spend the Claude subscription. What it does not close is *which
-player* is asking: every snapshot still carries both hands, so "you cannot see your opponent's
-hand" is still enforced by the room. A token per seat would fix that, and is the next step.
+**One token to each device, and not the other.** A token *is* a seat: the device holding the one
+marked `them` is that player, is sent that hand and no other, and may send events only for it.
+Giving both to one device puts the arrangement back the way it was before seats existed.
+
+What that closes is a web page the household visits, which could make cross-origin requests to
+`http://<laptop>:8000` and previously needed to know nothing at all to drive the game or spend
+the Claude subscription — and, now, *which player* is asking. A snapshot used to carry both
+hands to both devices, so "you cannot see your opponent's hand" was enforced by the room; the
+server withholds it now (CR 400.2), sending the other player's hand size and not its contents.
 
 ## Playing it against itself
 

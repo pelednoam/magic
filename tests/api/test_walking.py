@@ -75,7 +75,21 @@ def test_a_journal_lists_its_games_without_their_boards(tmp_path: Path) -> None:
     with talking(serving(tmp_path)) as client:
         body = decoded(client.get(f"/replays/{NAME}").json())
         (game,) = rows(body, "games")
-        assert game == {"index": 0, "seed": SEED, "decks": ["green", "other"], "decisions": 3}
+        assert game == {
+            "index": 0,
+            "seed": SEED,
+            "decks": ["green", "other"],
+            "decisions": 3,
+            # What it was played under, and which of those have moved since.
+            # "This journal was made by a different engine" is the sentence
+            # that turns an unopenable game from a puzzle into a fact.
+            "sources": {
+                "engine": "0the-old-one",
+                "cards": "0the-old-cards",
+                "rules": "July 1, 2024",
+            },
+            "differs": ["engine"],
+        }
 
 
 def test_a_game_comes_back_as_moments(tmp_path: Path) -> None:

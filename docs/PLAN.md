@@ -1429,20 +1429,43 @@ rule of Magic. Pending choices beyond the stack (mulligans, discarding to hand s
 targets and modes) are Phase C, and `DrawCard` remains a button as well as the draw step's
 turn-based action.
 
-The remaining gap is identity, and it is now half closed. The API is **not** unauthenticated: the
-server makes a token on first run, prints it at startup, and `api/gatekeeper.py` refuses every
-request and every socket without it — as ASGI middleware rather than a per-route dependency, so
-a route added later is behind it whether or not anybody remembered. The threat that closes is
-not a guest's phone but a web page the household visits, which could reach
-`http://<laptop>:8000` cross-origin and needed to know nothing to drive the game or spend the
-subscription.
+**Identity is closed, both halves of it.** The API is not unauthenticated: the server makes
+tokens on first run, prints them at startup, and `api/gatekeeper.py` refuses every request and
+every socket without one — as ASGI middleware rather than a per-route dependency, so a route
+added later is behind it whether or not anybody remembered. The threat that closes is not a
+guest's phone but a web page the household visits, which could reach `http://<laptop>:8000`
+cross-origin and needed to know nothing to drive the game or spend the subscription.
 
-What is still open is *which player* is asking. One shared secret does not say, so every
-snapshot still carries both players' hands and `move_card` will still move any card from any
-zone — §3's "can't see your opponent's hand" is enforced by the room, not the code. A token per
-*seat* closes that, issued when a game starts, and is the obvious next step from here: the
-gatekeeper already knows how to read a token off a request, and would then put a `PlayerId` on
-the scope instead of a boolean.
+And there is a token **per seat** (`api/seating.py`), which is what says *which player* is
+asking. The gate stamps the connection with the seat its token names and `seat_of` is the only
+way to read it, so nothing downstream takes the sender's word for it. Two things follow, and
+they are the two halves of one hole:
+
+- `api/acting.sent_by` refuses an event naming another seat — 403, because the request is well
+  formed and what is wrong is who sent it. `AdvanceStep` names nobody and is the exception:
+  ending a step is a consequence of every player passing (CR 117.4), and the passes it needs are
+  seated events checked like any other. Before this, one device could post
+  `{"type": "change_life", "player": "them", "amount": -5}`.
+- a board carries one hand — its own. The other player's `hand` is `null` beside a `hand_size`,
+  because the *contents* of a hand are hidden and the number is not (CR 400.2); the advice is
+  one seat's too, since a turn report names every card in the hand it is about. The socket
+  carries its seat, so a broadcast builds a payload per seat rather than sending one message to
+  everybody.
+
+The seat is no longer chosen on the device either. It is read off the token and sent back in
+every board, so a device cannot be set to the wrong one — which it could, and was: starting a
+game made you "you" and joining one made you "them", whichever token you held.
+
+A replay is the deliberate exception: a recorded game shows both hands, because it is not a game
+in progress and what makes one worth walking through is seeing what each side held. Stepping
+*into* a moment makes it live again, and the withholding comes back with it.
+
+**A game says what it was played under.** `api/sources.py` carries three revisions — a digest
+over `core`'s source, the sealed card fixture's checksum, and the rules document's own
+"effective as of" date — in every board and on every recorded game. Nothing gates on them; the
+engine is the gate. What they do is turn "this journal will not open" into "played under a
+different engine", which is the difference between a puzzle and a fact, and which is what a
+directory of journals unreadable after priority arrived could not say.
 
 **The server may not contradict its own coach.** `guard.py` asks `legality.why_not_play_land`
 rather than re-deciding. It used to check only that the card was a land, and the reducer checks
