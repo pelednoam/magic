@@ -171,6 +171,15 @@ would be a worse workflow.
 The app's checks need `node_modules`. `tools/gate.sh` says so and stops rather than reporting "all
 gates passed" having silently checked no TypeScript; `SKIP_APP=1` accepts that trade explicitly.
 
+## What is decided, and what is not
+
+[docs/DECISIONS.md](docs/DECISIONS.md) records the ten design decisions
+[the advisor's review](docs/PROJECT_REVIEW_2026-09-15.md) asks for: which are
+settled and why, and which are still open. Two of them -- replay policy, and
+what the words `modelled`, `cited`, `grounded` and `unchecked` are each allowed
+to claim -- were made in passing while fixing that review's findings, which is
+the reason the file exists.
+
 ## Layout
 
 | Path | What |
