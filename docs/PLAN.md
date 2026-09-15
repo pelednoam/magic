@@ -900,11 +900,20 @@ moment attached to each name — `Volley Veteran (when it came onto the battlefi
 asserted once in the heading. One section, so rule 4 and `silence.triggers` stay one rule and one
 check.
 
-*The window is wider than the trigger.* `summoning_sick` means "since your last untap", not "this
-turn", so a creature played on your turn is still flagged through the opponent's. For a tracker
-somebody fills in by hand that is the better error: the reminder stays up until the turn comes
-round rather than flashing past in one step and being missed. A narrower window wants
-`entered_on_turn` on `Permanent`, which is a state-model change and a bigger one than this was.
+*The window is exactly the trigger.* The first version used `summoning_sick` and argued the
+imprecision was the useful kind — it is cleared at the controller's *untap*, so a creature played
+on your turn stays flagged through the opponent's, and the reminder would stay up longer. That was
+wrong, and it was the right thing to be told so: the panel would have claimed a trigger was firing
+when it had fired a turn ago, and a beginner learning the rules from this app would have learned
+that one wrong. A reminder that teaches something false is worse than no reminder.
+
+So `Permanent` records `entered_on_turn` and `arrivals` compares it to the current turn.
+Demonstrable: a creature played on turn 1 is still `summoning_sick` on turn 2 — the old rule would
+still have reported it — and now reports nothing, because 1 ≠ 2.
+
+`summoning_sick` stays, unchanged and doing its own job: "under its controller's control since
+their most recent turn began" is the attacking condition from CR 302.6 and is genuinely a
+different question from "when did this arrive". Two facts, two fields.
 
 Measured the same way it was found — same season, same seed, everything else identical:
 **0 → 1,702 turns with a trigger** across 60 games. Live on real cards it reports Volley Veteran

@@ -46,5 +46,5 @@ def reminders(
     """
     return (
         *triggers_at(state.step, player.battlefield, lookup.abilities, named, your_turn=your_turn),
-        *arrivals(player.battlefield, lookup.abilities, named),
+        *arrivals(player.battlefield, lookup.abilities, named, state.turn),
     )

@@ -52,7 +52,7 @@ def apply(state: GameState, event: Event) -> GameState:
             return _set_tapped(state, player_id, instance_id, tapped=tapped)
         case MoveCard(player=player_id, instance_id=instance_id, to=zone):
             player = state.player(player_id)
-            return state.with_player(player_id, move_card(player, instance_id, zone))
+            return state.with_player(player_id, move_card(player, instance_id, zone, state.turn))
         case ChangeLife(player=player_id, amount=amount):
             player = state.player(player_id)
             return state.with_player(player_id, replace(player, life=player.life + amount))
@@ -80,7 +80,7 @@ def _play_land(state: GameState, player_id: PlayerId, instance_id: InstanceId) -
     if player.lands_played_this_turn >= MAX_LAND_DROPS_PER_TURN:
         msg = f"{player_id!r} has already played a land this turn"
         raise IllegalEventError(msg)
-    played = move_card(player, instance_id, ZoneName.BATTLEFIELD)
+    played = move_card(player, instance_id, ZoneName.BATTLEFIELD, state.turn)
     return state.with_player(
         player_id,
         replace(played, lands_played_this_turn=player.lands_played_this_turn + 1),

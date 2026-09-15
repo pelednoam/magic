@@ -42,10 +42,10 @@ AT_STEP: Final[dict[Step, TriggerEvent]] = {
 }
 
 #: Triggers whose event the *state* still remembers, so a scanner can find
-#: them after the fact. A permanent that arrived since its controller's last
-#: untap step is flagged ``summoning_sick``, and that flag is the record that
-#: it entered -- so "when this enters" can be reported by looking at the
-#: battlefield, which is the only reason these are not in ``EVENT_DRIVEN``.
+#: them after the fact. Every permanent records the turn it arrived on, and
+#: that number is the record that it entered -- so "when this enters" can be
+#: reported by looking at the battlefield, which is the only reason these are
+#: not in ``EVENT_DRIVEN``.
 #:
 #: This split was found by self-play, not by a test. Sixty games reached zero
 #: reminders, because the Beginner Box has 31 triggered abilities and every one
@@ -129,8 +129,9 @@ def arrivals(
     battlefield: Sequence[Permanent],
     abilities: Callable[[OracleId], Sequence[Ability]],
     names: Callable[[OracleId], str],
+    turn: int,
 ) -> tuple[Reminder, ...]:
-    """Every arrival trigger on a permanent that has recently arrived.
+    """Every arrival trigger that fired *this turn*.
 
     Two shapes, and they are not the same permanent:
 
@@ -138,25 +139,24 @@ def arrivals(
       arrived, so it is reported when it is itself newly here.
     - **"Whenever another creature enters"** -- the ability is on a permanent
       that was already here, and something *else* arriving is what fired it. So
-      it is reported when any other permanent is newly here.
+      it is reported when any other permanent arrived this turn.
 
-    **The window is "since your last untap step", not "this turn"**, because
-    ``summoning_sick`` is the only record the state keeps of having arrived.
-    That is wider than the moment the trigger fired: a creature played on your
-    turn is still flagged through the opponent's. For a tracker somebody is
-    filling in by hand that is the better error to make -- the reminder stays
-    up until the turn comes back round, rather than flashing past in one step
-    and being missed. A narrower window wants ``entered_on_turn`` on
-    ``Permanent``, which is a state-model change and a bigger one than this.
+    **Exactly this turn.** The first version used ``summoning_sick``, which is
+    cleared at the controller's untap step rather than at end of turn -- so a
+    creature played on your turn was still flagged through the opponent's, and
+    the panel claimed a trigger had fired when it had fired a turn ago. That is
+    a reminder teaching something false, which is worse than no reminder. The
+    permanent records the turn it arrived on and this compares it.
 
     Unlike ``triggers_at`` this takes no ``your_turn``: a permanent can arrive
     on either player's turn, and whose turn it is says nothing about whether
-    its arrival trigger was resolved.
+    its arrival trigger fired.
     """
-    arrived = [permanent for permanent in battlefield if permanent.summoning_sick]
-    if not arrived:
+    fresh = {
+        permanent.instance_id for permanent in battlefield if permanent.entered_on_turn == turn
+    }
+    if not fresh:
         return ()
-    fresh = {permanent.instance_id for permanent in arrived}
     return tuple(
         Reminder(permanent.instance_id, names(permanent.card.oracle_id), ability.trigger.event)
         for permanent in battlefield

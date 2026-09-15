@@ -47,7 +47,8 @@ def test_an_arrival_trigger_is_named_with_when_it_fired() -> None:
     state = game(battlefield=("Elite",))
     mine = state.player(ME)
     fresh = state.with_player(
-        ME, replace(mine, battlefield=(replace(mine.battlefield[0], summoning_sick=True),))
+        ME,
+        replace(mine, battlefield=(replace(mine.battlefield[0], entered_on_turn=state.turn),)),
     )
     text = _flat(brief(advise(fresh, ME, book)))
     assert "TRIGGERS TO HANDLE" in text
@@ -78,8 +79,8 @@ def test_a_watcher_is_named_with_what_set_it_off() -> None:
         replace(
             mine,
             battlefield=(
-                replace(watcher, summoning_sick=False),
-                replace(newcomer, summoning_sick=True),
+                replace(watcher, entered_on_turn=0),
+                replace(newcomer, entered_on_turn=state.turn),
             ),
         ),
     )

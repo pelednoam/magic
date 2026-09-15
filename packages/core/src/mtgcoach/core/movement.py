@@ -71,16 +71,22 @@ def remove_card(player: PlayerState, instance_id: InstanceId) -> tuple[PlayerSta
     raise IllegalEventError(msg)
 
 
-def add_card(player: PlayerState, card: CardInstance, zone: ZoneName) -> PlayerState:
+def add_card(player: PlayerState, card: CardInstance, zone: ZoneName, turn: int = 0) -> PlayerState:
     """Put a card into a zone.
 
     A card entering the battlefield is summoning sick, which is true of every
     permanent and only *matters* for creatures -- the distinction belongs to the
     legality rules, not to the state.
+
+    ``turn`` is recorded on the permanent because an "enters" trigger fires at
+    the moment it arrives, and nothing else in the state says when that was.
+    Defaulted so that a caller building a board by hand does not have to
+    invent one; a real move always passes it.
     """
     match zone:
         case ZoneName.BATTLEFIELD:
-            return replace(player, battlefield=(*player.battlefield, Permanent(card)))
+            arrived = Permanent(card, entered_on_turn=turn)
+            return replace(player, battlefield=(*player.battlefield, arrived))
         case ZoneName.LIBRARY:
             return replace(player, library=(*player.library, card))
         case ZoneName.HAND:
@@ -92,8 +98,13 @@ def add_card(player: PlayerState, card: CardInstance, zone: ZoneName) -> PlayerS
     assert_never(zone)
 
 
-def move_card(player: PlayerState, instance_id: InstanceId, to: ZoneName) -> PlayerState:
+def move_card(
+    player: PlayerState, instance_id: InstanceId, to: ZoneName, turn: int = 0
+) -> PlayerState:
     """Move one card to ``to``, wherever it currently is.
+
+    ``turn`` is passed through to ``add_card`` so a permanent knows when it
+    arrived; see there for why the state has to remember.
 
     Raises:
         IllegalEventError: If the card is already in ``to``. Remove-then-add
@@ -105,4 +116,4 @@ def move_card(player: PlayerState, instance_id: InstanceId, to: ZoneName) -> Pla
         msg = f"card {instance_id!r} is already in {to}"
         raise IllegalEventError(msg)
     without, card = remove_card(player, instance_id)
-    return add_card(without, card, to)
+    return add_card(without, card, to, turn)

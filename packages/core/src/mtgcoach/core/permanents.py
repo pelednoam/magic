@@ -23,6 +23,18 @@ class Permanent:
     card: CardInstance
     tapped: bool = False
     summoning_sick: bool = True
+    #: The turn this arrived on, or 0 for a permanent that was simply set up --
+    #: a test fixture, or a board written out by hand. Turns start at 1, so 0
+    #: can never equal the current turn and such a permanent never reads as
+    #: having just arrived.
+    #:
+    #: Separate from ``summoning_sick``, which answers a different question.
+    #: Sickness is "since your most recent turn began" and is cleared at your
+    #: untap step, so a creature that arrived on the opponent's turn is still
+    #: sick on yours -- correct for attacking, and a turn too wide for "its
+    #: enters trigger fired". A trigger fired *when it entered*, and that is a
+    #: turn number.
+    entered_on_turn: int = 0
 
     @property
     def instance_id(self) -> InstanceId:
