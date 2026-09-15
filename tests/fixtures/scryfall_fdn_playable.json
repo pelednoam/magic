@@ -1,181 +1,3018 @@
 [
  {
-  "object": "card",
-  "id": "b34bb2dc-c1af-4d77-b0b3-a0fb342a5fc6",
-  "oracle_id": "b34bb2dc-c1af-4d77-b0b3-a0fb342a5fc6",
-  "name": "Forest",
-  "mana_cost": "",
-  "cmc": 0.0,
-  "type_line": "Basic Land \u2014 Forest",
-  "oracle_text": "({T}: Add {G}.)",
-  "power": null,
-  "toughness": null,
-  "colors": [],
-  "color_identity": [
-   "G"
-  ],
-  "keywords": [],
-  "produced_mana": [
-   "G"
-  ],
-  "layout": "normal",
-  "set": "fdn",
-  "collector_number": "1",
-  "rarity": "common",
-  "lang": "en"
- },
- {
-  "object": "card",
-  "id": "bc71ebf6-2056-41f7-be35-b2e5c34afa99",
-  "oracle_id": "bc71ebf6-2056-41f7-be35-b2e5c34afa99",
-  "name": "Plains",
-  "mana_cost": "",
-  "cmc": 0.0,
-  "type_line": "Basic Land \u2014 Plains",
-  "oracle_text": "({T}: Add {W}.)",
-  "power": null,
-  "toughness": null,
-  "colors": [],
-  "color_identity": [
-   "W"
-  ],
-  "keywords": [],
-  "produced_mana": [
-   "W"
-  ],
-  "layout": "normal",
-  "set": "fdn",
-  "collector_number": "2",
-  "rarity": "common",
-  "lang": "en"
- },
- {
-  "object": "card",
-  "id": "68954295-54e3-4303-a6bc-fc4547a4e3a3",
-  "oracle_id": "68954295-54e3-4303-a6bc-fc4547a4e3a3",
-  "name": "Llanowar Elves",
-  "mana_cost": "{G}",
-  "cmc": 1.0,
-  "type_line": "Creature \u2014 Elf Druid",
-  "oracle_text": "{T}: Add {G}.",
-  "power": "1",
-  "toughness": "1",
-  "colors": [
-   "G"
-  ],
-  "color_identity": [
-   "G"
-  ],
-  "keywords": [],
-  "produced_mana": [
-   "G"
-  ],
-  "layout": "normal",
-  "set": "fdn",
-  "collector_number": "3",
-  "rarity": "common",
-  "lang": "en"
- },
- {
-  "object": "card",
-  "id": "b1793c3b-25d6-4fae-a99d-cfdd2210ca67",
-  "oracle_id": "b1793c3b-25d6-4fae-a99d-cfdd2210ca67",
-  "name": "Druid of the Cowl",
-  "mana_cost": "{1}{G}",
   "cmc": 2.0,
-  "type_line": "Creature \u2014 Elf Druid",
-  "oracle_text": "{T}: Add {G}.",
-  "power": "1",
-  "toughness": "3",
-  "colors": [
-   "G"
+  "collector_number": "488",
+  "color_identity": [
+   "W"
   ],
+  "colors": [
+   "W"
+  ],
+  "id": "1fd2c9ab-b3dd-4f68-b91f-0f075a045757",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{W}",
+  "name": "Adamant Will",
+  "object": "card",
+  "oracle_id": "467e22c3-6107-40ff-afc7-5960710c970b",
+  "oracle_text": "Target creature gets +2/+2 and gains indestructible until end of turn. (Damage and effects that say \"destroy\" don't destroy it.)",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Instant"
+ },
+ {
+  "cmc": 6.0,
+  "collector_number": "551",
   "color_identity": [
    "G"
   ],
-  "keywords": [],
-  "produced_mana": [
+  "colors": [
    "G"
   ],
+  "id": "7724b978-999b-4654-96f3-58e28aa7cb34",
+  "keywords": [
+   "Trample"
+  ],
+  "lang": "en",
   "layout": "normal",
+  "mana_cost": "{3}{G}{G}{G}",
+  "name": "Aggressive Mammoth",
+  "object": "card",
+  "oracle_id": "032b5fc4-5aca-41b6-9bf6-2c1ed0018968",
+  "oracle_text": "Trample (This creature can deal excess combat damage to the player or planeswalker it's attacking.)\nOther creatures you control have trample.",
+  "power": "8",
+  "rarity": "rare",
   "set": "fdn",
-  "collector_number": "4",
-  "rarity": "common",
-  "lang": "en"
+  "toughness": "8",
+  "type_line": "Creature — Elephant"
  },
  {
+  "cmc": 2.0,
+  "collector_number": "135",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [
+   "W"
+  ],
+  "id": "222c1a68-e34c-4103-b1be-17d4ceaef6ce",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{W}",
+  "name": "Ajani's Pridemate",
   "object": "card",
-  "id": "60ba93eb-39e6-4af2-9c66-cd38f72daff2",
-  "oracle_id": "60ba93eb-39e6-4af2-9c66-cd38f72daff2",
-  "name": "Savannah Lions",
-  "mana_cost": "{W}",
-  "cmc": 1.0,
-  "type_line": "Creature \u2014 Cat",
+  "oracle_id": "95e94dea-5ac0-4d6f-adec-ca147aee861f",
+  "oracle_text": "Whenever you gain life, put a +1/+1 counter on this creature.",
+  "power": "2",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Cat Soldier"
+ },
+ {
+  "cmc": 6.0,
+  "collector_number": "489",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [
+   "W"
+  ],
+  "id": "df43d9d4-3fef-4a56-8b38-d52824117201",
+  "keywords": [
+   "Flying"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{4}{W}{W}",
+  "name": "Ancestor Dragon",
+  "object": "card",
+  "oracle_id": "60b03a44-a7bd-48fa-8c8f-1704aed02cd7",
+  "oracle_text": "Flying\nWhenever one or more creatures you control attack, you gain 1 life for each attacking creature.",
+  "power": "5",
+  "rarity": "rare",
+  "set": "fdn",
+  "toughness": "6",
+  "type_line": "Creature — Dragon"
+ },
+ {
+  "cmc": 5.0,
+  "collector_number": "490",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [
+   "W"
+  ],
+  "id": "c0bf349e-2974-4aea-a5c0-fdaea77325cc",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{4}{W}",
+  "name": "Angelic Edict",
+  "object": "card",
+  "oracle_id": "36de8401-ee4e-413f-91ad-06924e39c857",
+  "oracle_text": "Exile target creature or enchantment.",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Sorcery"
+ },
+ {
+  "cmc": 5.0,
+  "collector_number": "29",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "06431793-5dfe-4cbf-990b-4bcc960d1f31",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{3}{U}{U}",
+  "name": "Arcane Epiphany",
+  "object": "card",
+  "oracle_id": "fe1556cc-32d0-4e51-bb15-f3fce669a5e1",
+  "oracle_text": "This spell costs {1} less to cast if you control a Wizard.\nDraw three cards.",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "type_line": "Instant"
+ },
+ {
+  "cmc": 4.0,
+  "collector_number": "533",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [
+   "R"
+  ],
+  "id": "fee05f7e-d4da-4a72-8140-d505eecbdd32",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{3}{R}",
+  "name": "Battle-Rattle Shaman",
+  "object": "card",
+  "oracle_id": "72dc807b-35fb-4d69-ae4c-04eed0646170",
+  "oracle_text": "At the beginning of combat on your turn, you may have target creature get +2/+0 until end of turn.",
+  "power": "2",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Goblin Shaman"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "552",
+  "color_identity": [
+   "G"
+  ],
+  "colors": [
+   "G"
+  ],
+  "id": "d8662ebb-068b-41d2-b504-4b5854e4d4aa",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{G}",
+  "name": "Bear Cub",
+  "object": "card",
+  "oracle_id": "ed206651-3d9b-4546-8d45-0682817192fd",
   "oracle_text": "",
   "power": "2",
-  "toughness": "1",
-  "colors": [
-   "W"
-  ],
-  "color_identity": [
-   "W"
-  ],
-  "keywords": [],
-  "produced_mana": [],
-  "layout": "normal",
-  "set": "fdn",
-  "collector_number": "5",
   "rarity": "common",
-  "lang": "en"
- },
- {
-  "object": "card",
-  "id": "95e94dea-5ac0-4d6f-adec-ca147aee861f",
-  "oracle_id": "95e94dea-5ac0-4d6f-adec-ca147aee861f",
-  "name": "Ajani's Pridemate",
-  "mana_cost": "{1}{W}",
-  "cmc": 2.0,
-  "type_line": "Creature \u2014 Cat Soldier",
-  "oracle_text": "Whenever you gain life, put a +1/+1 counter on Ajani's Pridemate.",
-  "power": "2",
+  "set": "fdn",
   "toughness": "2",
-  "colors": [
-   "W"
-  ],
-  "color_identity": [
-   "W"
-  ],
-  "keywords": [],
-  "produced_mana": [],
-  "layout": "normal",
-  "set": "fdn",
-  "collector_number": "6",
-  "rarity": "common",
-  "lang": "en"
+  "type_line": "Creature — Bear"
  },
  {
-  "object": "card",
-  "id": "5748ebf1-24e3-499d-ab7c-c2cebd462a24",
-  "oracle_id": "5748ebf1-24e3-499d-ab7c-c2cebd462a24",
-  "name": "Giant Growth",
-  "mana_cost": "{G}",
-  "cmc": 1.0,
-  "type_line": "Instant",
-  "oracle_text": "Target creature gets +3/+3 until end of turn.",
-  "power": null,
-  "toughness": null,
-  "colors": [
-   "G"
-  ],
+  "cmc": 3.0,
+  "collector_number": "100",
   "color_identity": [
    "G"
   ],
-  "keywords": [],
-  "produced_mana": [],
+  "colors": [
+   "G"
+  ],
+  "id": "0102e0be-5783-4825-9489-713b1b1df0b2",
+  "keywords": [
+   "Trample"
+  ],
+  "lang": "en",
   "layout": "normal",
-  "set": "fdn",
-  "collector_number": "7",
+  "mana_cost": "{2}{G}",
+  "name": "Beast-Kin Ranger",
+  "object": "card",
+  "oracle_id": "db794af5-ba2e-4b10-b213-e481e8a50432",
+  "oracle_text": "Trample (This creature can deal excess combat damage to the player or planeswalker it's attacking.)\nWhenever another creature you control enters, this creature gets +1/+0 until end of turn.",
+  "power": "3",
   "rarity": "common",
-  "lang": "en"
+  "set": "fdn",
+  "toughness": "3",
+  "type_line": "Creature — Elf Ranger"
+ },
+ {
+  "cmc": 4.0,
+  "collector_number": "31",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "9b1d5b76-b07e-45c6-800d-4cfce085164f",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{3}{U}",
+  "name": "Bigfin Bouncer",
+  "object": "card",
+  "oracle_id": "4e473298-0b67-42b8-90a8-3bcdd73da473",
+  "oracle_text": "When this creature enters, return target creature an opponent controls to its owner's hand.",
+  "power": "3",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Shark Pirate"
+ },
+ {
+  "cmc": 6.0,
+  "collector_number": "553",
+  "color_identity": [
+   "G"
+  ],
+  "colors": [
+   "G"
+  ],
+  "id": "ef20af5e-1ffe-426a-805a-ca4a6a122260",
+  "keywords": [
+   "Double"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{4}{G}{G}",
+  "name": "Biogenic Upgrade",
+  "object": "card",
+  "oracle_id": "30812870-87c0-469c-95a5-811d5a181e72",
+  "oracle_text": "Distribute three +1/+1 counters among one, two, or three target creatures, then double the number of +1/+1 counters on each of those creatures.",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "type_line": "Sorcery"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "491",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [
+   "W"
+  ],
+  "id": "16dfd7b3-6d01-4e98-aec3-b27e8e2444e8",
+  "keywords": [
+   "Lifelink"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{W}",
+  "name": "Bishop's Soldier",
+  "object": "card",
+  "oracle_id": "84487586-4f71-457a-b983-4f1f7a71deef",
+  "oracle_text": "Lifelink (Damage dealt by this creature also causes you to gain that much life.)",
+  "power": "2",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Vampire Soldier"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "212",
+  "color_identity": [
+   "G"
+  ],
+  "colors": [
+   "G"
+  ],
+  "id": "f8d70b3b-f6f9-4b3c-ad70-0ce369e812b5",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{G}",
+  "name": "Bite Down",
+  "object": "card",
+  "oracle_id": "623903de-3c04-4745-9af3-d7ec9fb2574d",
+  "oracle_text": "Target creature you control deals damage equal to its power to target creature or planeswalker you don't control.",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Instant"
+ },
+ {
+  "cmc": 5.0,
+  "collector_number": "751",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "37931135-100d-4a23-a6e3-baf90fb259ee",
+  "keywords": [
+   "Flying"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{4}{B}",
+  "name": "Bloodtithe Collector",
+  "object": "card",
+  "oracle_id": "93088b0c-d158-473a-9c06-aa2f344a9868",
+  "oracle_text": "Flying\nWhen this creature enters, if an opponent lost life this turn, each opponent discards a card.",
+  "power": "3",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "4",
+  "type_line": "Creature — Vampire Noble"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "152",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "acf7aafb-931f-49e5-8691-eab8cb34b05e",
+  "keywords": [
+   "Flash"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{U}",
+  "name": "Brineborn Cutthroat",
+  "object": "card",
+  "oracle_id": "916cb70f-3b06-48ed-972d-75f805aa0892",
+  "oracle_text": "Flash (You may cast this spell any time you could cast an instant.)\nWhenever you cast a spell during an opponent's turn, put a +1/+1 counter on this creature.",
+  "power": "2",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "1",
+  "type_line": "Creature — Merfolk Pirate"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "214",
+  "color_identity": [
+   "G"
+  ],
+  "colors": [
+   "G"
+  ],
+  "id": "61f9cbeb-cc9c-4562-be65-8a77053faefe",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{G}",
+  "name": "Broken Wings",
+  "object": "card",
+  "oracle_id": "5e316864-d55c-496f-8f46-773567896864",
+  "oracle_text": "Destroy target artifact, enchantment, or creature with flying.",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Instant"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "504",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "c5f11ea2-cd4c-417a-804c-3df80d9ddd5f",
+  "keywords": [
+   "Flash"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{U}",
+  "name": "Burrog Befuddler",
+  "object": "card",
+  "oracle_id": "73b60c2c-7c74-4554-8861-daa0d6fc22b4",
+  "oracle_text": "Flash (You may cast this spell any time you could cast an instant.)\nWhen this creature enters, target creature an opponent controls gets -1/-0 until end of turn.",
+  "power": "2",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "1",
+  "type_line": "Creature — Frog Wizard"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "505",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "475bff39-220a-4490-9c2e-d311e306a6db",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{U}{U}",
+  "name": "Cancel",
+  "object": "card",
+  "oracle_id": "7d00fb28-ea6c-49a9-b4af-ffb38860a9a7",
+  "oracle_text": "Counter target spell.",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Instant"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "759",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [
+   "R"
+  ],
+  "id": "6db2741d-2722-4eb7-b09d-0d81649c7ca2",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{R}",
+  "name": "Carnelian Orb of Dragonkind",
+  "object": "card",
+  "oracle_id": "651c967c-8f71-4eb5-b22f-545e55ea050e",
+  "oracle_text": "{T}: Add {R}. If that mana is spent on a Dragon creature spell, it gains haste until end of turn.",
+  "produced_mana": [
+   "R"
+  ],
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Artifact"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "517",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "34a80873-86d7-44a9-894b-65e8f77dd2ea",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{B}",
+  "name": "Cemetery Recruitment",
+  "object": "card",
+  "oracle_id": "07792d72-d5db-41b9-871c-e720e12ce659",
+  "oracle_text": "Return target creature card from your graveyard to your hand. If it's a Zombie card, draw a card.",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Sorcery"
+ },
+ {
+  "cmc": 4.0,
+  "collector_number": "33",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "36012810-0e83-4640-8ba7-7262229f1b84",
+  "keywords": [
+   "Flying"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{3}{U}",
+  "name": "Clinquant Skymage",
+  "object": "card",
+  "oracle_id": "d9a3207a-a330-4517-967e-f37c9a9f1355",
+  "oracle_text": "Flying\nWhenever you draw a card, put a +1/+1 counter on this creature.",
+  "power": "1",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "1",
+  "type_line": "Creature — Bird Wizard"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "506",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "d5017dbc-07fd-45ea-9629-7c584144e8be",
+  "keywords": [
+   "Treasure"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{U}",
+  "name": "Corsair Captain",
+  "object": "card",
+  "oracle_id": "a7ec13c6-7ade-433a-b5a2-047854eef486",
+  "oracle_text": "When this creature enters, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")\nOther Pirates you control get +1/+1.",
+  "power": "2",
+  "produced_mana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "rarity": "rare",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Human Pirate"
+ },
+ {
+  "cmc": 6.0,
+  "collector_number": "518",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "03a5e19c-4cb8-4bd7-923c-4db747dc6ca3",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{5}{B}",
+  "name": "Crossway Troublemakers",
+  "object": "card",
+  "oracle_id": "1a362e4d-6c02-4b67-ab63-c6622e505195",
+  "oracle_text": "Attacking Vampires you control have deathtouch and lifelink. (Any amount of damage they deal to a creature is enough to destroy it. Damage dealt by those creatures also causes their controller to gain that much life.)\nWhenever a Vampire you control dies, you may pay 2 life. If you do, draw a card.",
+  "power": "5",
+  "rarity": "rare",
+  "set": "fdn",
+  "toughness": "5",
+  "type_line": "Creature — Vampire"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "519",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "2cd74e93-064a-42d7-8e6e-c413912a08cd",
+  "keywords": [
+   "Flying",
+   "Mill"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{B}",
+  "name": "Crow of Dark Tidings",
+  "object": "card",
+  "oracle_id": "a4ffe297-5e82-43f9-91a4-7aa3d8dd3b4a",
+  "oracle_text": "Flying\nWhen this creature enters or dies, mill two cards. (Put the top two cards of your library into your graveyard.)",
+  "power": "2",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "1",
+  "type_line": "Creature — Zombie Bird"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "732",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [
+   "W"
+  ],
+  "id": "a0bdf4d1-576f-41b6-a077-8725be608331",
+  "keywords": [
+   "Flying"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{W}",
+  "name": "Dazzling Angel",
+  "object": "card",
+  "oracle_id": "7de464e3-fae3-44cc-8233-776fc727c00a",
+  "oracle_text": "Flying\nWhenever another creature you control enters, you gain 1 life.",
+  "power": "2",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "3",
+  "type_line": "Creature — Angel"
+ },
+ {
+  "cmc": 4.0,
+  "collector_number": "520",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "b32fddc3-a38f-4eea-ae01-4158e3cbca6c",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{3}{B}",
+  "name": "Deadly Plot",
+  "object": "card",
+  "oracle_id": "6178715c-870d-4710-b758-66e080804ee3",
+  "oracle_text": "Choose one —\n• Destroy target creature or planeswalker.\n• Return target Zombie creature card from your graveyard to the battlefield tapped.",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "type_line": "Instant"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "492",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [
+   "W"
+  ],
+  "id": "65f5804a-075b-41d8-9639-785cad5c0974",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{W}",
+  "name": "Deadly Riposte",
+  "object": "card",
+  "oracle_id": "e341478e-c3f8-45d9-9430-abe3a58fa2fc",
+  "oracle_text": "Deadly Riposte deals 3 damage to target tapped creature and you gain 2 life.",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Instant"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "521",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "34a27142-cf45-4164-9e10-373e5c8bf7c6",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{B}{B}",
+  "name": "Death Baron",
+  "object": "card",
+  "oracle_id": "99024aa8-5687-4d38-8a4b-feef42d6c1ff",
+  "oracle_text": "Skeletons you control and other Zombies you control get +1/+1 and have deathtouch. (Any amount of damage they deal to a creature is enough to destroy it.)",
+  "power": "2",
+  "rarity": "rare",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Zombie Wizard"
+ },
+ {
+  "cmc": 1.0,
+  "collector_number": "171",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "4682012c-d7e0-4257-b538-3de497507464",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{B}",
+  "name": "Diregraf Ghoul",
+  "object": "card",
+  "oracle_id": "6048fc70-0dcc-4b54-977d-16e240225f82",
+  "oracle_text": "This creature enters tapped.",
+  "power": "2",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Zombie"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "535",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [
+   "R"
+  ],
+  "id": "f9abe517-f601-4784-8d62-2350bd755146",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{R}",
+  "name": "Dragon Fodder",
+  "object": "card",
+  "oracle_id": "d0d2c45b-b6e3-4999-bdab-976e8f0d6617",
+  "oracle_text": "Create two 1/1 red Goblin creature tokens.",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Sorcery"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "536",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [
+   "R"
+  ],
+  "id": "37e35f88-a580-4b55-9c11-0b58e2f752d1",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{R}",
+  "name": "Dragonlord's Servant",
+  "object": "card",
+  "oracle_id": "faf81ae0-0b35-45ef-a50d-6cecf0c0eeeb",
+  "oracle_text": "Dragon spells you cast cost {1} less to cast.",
+  "power": "1",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "3",
+  "type_line": "Creature — Goblin Shaman"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "537",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [
+   "R"
+  ],
+  "id": "b44f758e-716a-408e-96d4-b58403591c2a",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{R}",
+  "name": "Dropkick Bomber",
+  "object": "card",
+  "oracle_id": "c394d4b6-cfb8-4639-90cb-a322a25c0a2f",
+  "oracle_text": "Other Goblins you control get +1/+1.\n{R}: Until end of turn, another target Goblin you control gains flying and \"When this creature deals combat damage, sacrifice it.\"",
+  "power": "2",
+  "rarity": "rare",
+  "set": "fdn",
+  "toughness": "3",
+  "type_line": "Creature — Goblin Warrior"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "554",
+  "color_identity": [
+   "G"
+  ],
+  "colors": [
+   "G"
+  ],
+  "id": "db2d0ee9-865c-4fc9-8cb6-540c597e1bf4",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{G}",
+  "name": "Druid of the Cowl",
+  "object": "card",
+  "oracle_id": "b1793c3b-25d6-4fae-a99d-cfdd2210ca67",
+  "oracle_text": "{T}: Add {G}.",
+  "power": "1",
+  "produced_mana": [
+   "G"
+  ],
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "3",
+  "type_line": "Creature — Elf Druid"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "218",
+  "color_identity": [
+   "G"
+  ],
+  "colors": [
+   "G"
+  ],
+  "id": "89d94c28-ea2e-4a3d-935f-6b2d9f2efc7a",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{G}",
+  "name": "Dwynen's Elite",
+  "object": "card",
+  "oracle_id": "3d4a7dd3-9258-4bd1-adc4-08f0205e196a",
+  "oracle_text": "When this creature enters, if you control another Elf, create a 1/1 green Elf Warrior creature token.",
+  "power": "2",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Elf Warrior"
+ },
+ {
+  "cmc": 1.0,
+  "collector_number": "172",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "1c4f7b20-b2a8-498c-8c36-dc296863b0b9",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{B}",
+  "name": "Eaten Alive",
+  "object": "card",
+  "oracle_id": "d437ecc2-2fd3-4ad3-b23e-217f55e58dae",
+  "oracle_text": "As an additional cost to cast this spell, sacrifice a creature or pay {3}{B}.\nExile target creature or planeswalker.",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Sorcery"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "507",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "475e28bb-1333-45e1-b6fd-83121c2f1ab9",
+  "keywords": [
+   "Enchant",
+   "Flash"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{U}",
+  "name": "Eaten by Piranhas",
+  "object": "card",
+  "oracle_id": "c37eae65-1afe-4242-b677-24dd40e6f401",
+  "oracle_text": "Flash (You may cast this spell any time you could cast an instant.)\nEnchant creature\nEnchanted creature loses all abilities and is a black Skeleton creature with base power and toughness 1/1. (It loses all other colors, card types, and creature types.)",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "type_line": "Enchantment — Aura"
+ },
+ {
+  "cmc": 1.0,
+  "collector_number": "493",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [
+   "W"
+  ],
+  "id": "b405a442-cf6f-4c0b-9950-f208b30c052e",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{W}",
+  "name": "Elspeth's Smite",
+  "object": "card",
+  "oracle_id": "3f404fe4-4335-4dcc-ba90-78246c4b880b",
+  "oracle_text": "Elspeth's Smite deals 3 damage to target attacking or blocking creature. If that creature would die this turn, exile it instead.",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "type_line": "Instant"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "219",
+  "color_identity": [
+   "G"
+  ],
+  "colors": [
+   "G"
+  ],
+  "id": "341da856-7414-403b-b2e3-4bebd58a5aa4",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{G}{G}",
+  "name": "Elvish Archdruid",
+  "object": "card",
+  "oracle_id": "6e2c2423-d854-4478-99e6-64f29851f026",
+  "oracle_text": "Other Elf creatures you control get +1/+1.\n{T}: Add {G} for each Elf you control.",
+  "power": "2",
+  "produced_mana": [
+   "G"
+  ],
+  "rarity": "rare",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Elf Druid"
+ },
+ {
+  "cmc": 4.0,
+  "collector_number": "104",
+  "color_identity": [
+   "G"
+  ],
+  "colors": [
+   "G"
+  ],
+  "id": "2694e3cd-26ed-4a10-ae55-fb84d7800253",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{G}{G}",
+  "name": "Elvish Regrower",
+  "object": "card",
+  "oracle_id": "adac526d-1a85-431a-a302-0a4b8f4a0c44",
+  "oracle_text": "When this creature enters, return target permanent card from your graveyard to your hand.",
+  "power": "4",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "3",
+  "type_line": "Creature — Elf Druid"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "37",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "9273c417-0fcd-4273-b24e-afff76336d0c",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{U}",
+  "name": "Erudite Wizard",
+  "object": "card",
+  "oracle_id": "7d4b6613-9000-4f53-9737-fe0338f3f629",
+  "oracle_text": "Whenever you draw your second card each turn, put a +1/+1 counter on this creature.",
+  "power": "2",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "3",
+  "type_line": "Creature — Human Wizard"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "508",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "62c8024e-490a-484a-bcee-da7728a64a1f",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{U}",
+  "name": "Exclusion Mage",
+  "object": "card",
+  "oracle_id": "fd28fe55-36cd-4242-8dd4-edb58fbb9895",
+  "oracle_text": "When this creature enters, return target creature an opponent controls to its owner's hand.",
+  "power": "2",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Human Wizard"
+ },
+ {
+  "cmc": 4.0,
+  "collector_number": "12",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [
+   "W"
+  ],
+  "id": "cd092b14-d72f-4de0-8f19-1338661b9e3b",
+  "keywords": [
+   "Lifelink"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{3}{W}",
+  "name": "Felidar Savior",
+  "object": "card",
+  "oracle_id": "2bee2508-cd5d-4c62-a205-12d8bbb3143d",
+  "oracle_text": "Lifelink (Damage dealt by this creature also causes you to gain that much life.)\nWhen this creature enters, put a +1/+1 counter on each of up to two other target creatures you control.",
+  "power": "2",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "3",
+  "type_line": "Creature — Cat Beast"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "105",
+  "color_identity": [
+   "G"
+  ],
+  "colors": [
+   "G"
+  ],
+  "id": "96948ae3-b15d-4d6d-aa73-9f52084cd903",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{G}",
+  "name": "Felling Blow",
+  "object": "card",
+  "oracle_id": "fbfa19ca-98bb-4c7d-a04e-920a8aafb031",
+  "oracle_text": "Put a +1/+1 counter on target creature you control. Then that creature deals damage equal to its power to target creature an opponent controls.",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "type_line": "Sorcery"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "86",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [
+   "R"
+  ],
+  "id": "54fe00aa-d284-48f9-b5a2-1bd4c5fa8e58",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{R}",
+  "name": "Fiery Annihilation",
+  "object": "card",
+  "oracle_id": "d44f3724-17b7-48f0-885d-75292669f971",
+  "oracle_text": "Fiery Annihilation deals 5 damage to target creature. Exile up to one target Equipment attached to that creature. If that creature would die this turn, exile it instead.",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "type_line": "Instant"
+ },
+ {
+  "cmc": 5.0,
+  "collector_number": "538",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [
+   "R"
+  ],
+  "id": "dc506f58-048d-49cc-ad8c-2eb851b08bb6",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{3}{R}{R}",
+  "name": "Fire Elemental",
+  "object": "card",
+  "oracle_id": "3912d21e-1ebc-4a81-9dc9-f404248d564a",
+  "oracle_text": "",
+  "power": "5",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "4",
+  "type_line": "Creature — Elemental"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "761",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [
+   "R"
+  ],
+  "id": "ddcc3c1b-b564-4444-9a1a-0f62f8e6b8bb",
+  "keywords": [
+   "Flying"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{R}",
+  "name": "Firespitter Whelp",
+  "object": "card",
+  "oracle_id": "1cad92ce-55c8-4b78-8d8c-56645ef8e6ee",
+  "oracle_text": "Flying\nWhenever you cast a noncreature or Dragon spell, this creature deals 1 damage to each opponent.",
+  "power": "2",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Dragon"
+ },
+ {
+  "cmc": 1.0,
+  "collector_number": "155",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "c0b86a7b-4912-43a7-ab89-c3432385baa1",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{U}",
+  "name": "Fleeting Distraction",
+  "object": "card",
+  "oracle_id": "b36271cb-cda2-434a-a580-6050dc460409",
+  "oracle_text": "Target creature gets -1/-0 until end of turn.\nDraw a card.",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Instant"
+ },
+ {
+  "cmc": 0.0,
+  "collector_number": "280",
+  "color_identity": [
+   "G"
+  ],
+  "colors": [],
+  "id": "d232fcc2-12f6-401a-b1aa-ddff11cb9378",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "",
+  "name": "Forest",
+  "object": "card",
+  "oracle_id": "b34bb2dc-c1af-4d77-b0b3-a0fb342a5fc6",
+  "oracle_text": "({T}: Add {G}.)",
+  "produced_mana": [
+   "G"
+  ],
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Basic Land — Forest"
+ },
+ {
+  "cmc": 1.0,
+  "collector_number": "199",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [
+   "R"
+  ],
+  "id": "d5592573-2889-40b1-b1d5-c2802482549a",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{R}",
+  "name": "Frenzied Goblin",
+  "object": "card",
+  "oracle_id": "6ac470a1-c2be-4971-a5ca-10bb189ebe4d",
+  "oracle_text": "Whenever this creature attacks, you may pay {R}. If you do, target creature can't block this turn.",
+  "power": "1",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "1",
+  "type_line": "Creature — Goblin Berserker"
+ },
+ {
+  "cmc": 1.0,
+  "collector_number": "223",
+  "color_identity": [
+   "G"
+  ],
+  "colors": [
+   "G"
+  ],
+  "id": "bd0bf74e-14c1-4428-88d8-2181a080b5d0",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{G}",
+  "name": "Giant Growth",
+  "object": "card",
+  "oracle_id": "5748ebf1-24e3-499d-ab7c-c2cebd462a24",
+  "oracle_text": "Target creature gets +3/+3 until end of turn.",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Instant"
+ },
+ {
+  "cmc": 1.0,
+  "collector_number": "562",
+  "color_identity": [],
+  "colors": [],
+  "id": "55ab3f99-9541-4100-818c-5d9e916791e4",
+  "keywords": [
+   "Flash"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}",
+  "name": "Goblin Firebomb",
+  "object": "card",
+  "oracle_id": "2625fa9c-638c-46d3-966b-1166f440186f",
+  "oracle_text": "Flash\n{7}, {T}, Sacrifice this artifact: Destroy target permanent.",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Artifact"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "539",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [
+   "R"
+  ],
+  "id": "0259e4d8-849b-468e-a902-aa1d7f2d5b6a",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{R}",
+  "name": "Goblin Oriflamme",
+  "object": "card",
+  "oracle_id": "836bd011-2da5-443a-a814-19a664b98a1a",
+  "oracle_text": "Attacking creatures you control get +1/+0.",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "type_line": "Enchantment"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "540",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [
+   "R"
+  ],
+  "id": "5837ccf1-9bac-4afb-bcc9-82c5f3c0e8e2",
+  "keywords": [
+   "Haste"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{R}",
+  "name": "Goblin Smuggler",
+  "object": "card",
+  "oracle_id": "eae15f7d-1f6e-4dfc-afea-7698b93cd145",
+  "oracle_text": "Haste (This creature can attack and {T} as soon as it comes under your control.)\n{T}: Another target creature with power 2 or less can't be blocked this turn.",
+  "power": "2",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Goblin Rogue"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "16",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [
+   "W"
+  ],
+  "id": "1b9a0e91-80b5-428f-8f08-931d0631be14",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{W}",
+  "name": "Helpful Hunter",
+  "object": "card",
+  "oracle_id": "c0864adb-e9aa-40b6-91ff-a0646193e887",
+  "oracle_text": "When this creature enters, draw a card.",
+  "power": "1",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "1",
+  "type_line": "Creature — Cat"
+ },
+ {
+  "cmc": 5.0,
+  "collector_number": "735",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [
+   "W"
+  ],
+  "id": "2e1705da-dc35-4bcb-82d4-b77712e79af3",
+  "keywords": [
+   "Flying"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{3}{W}{W}",
+  "name": "Herald of Faith",
+  "object": "card",
+  "oracle_id": "cb97da84-1d13-4795-b68a-2bf111a50067",
+  "oracle_text": "Flying\nWhenever this creature attacks, you gain 2 life.",
+  "power": "4",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "3",
+  "type_line": "Creature — Angel"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "175",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "ad2c01d9-8f54-46c0-9dc9-d4d4764ce1c9",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{B}{B}",
+  "name": "Hero's Downfall",
+  "object": "card",
+  "oracle_id": "03df6a57-37c9-46d3-83b3-4a6240100714",
+  "oracle_text": "Destroy target creature or planeswalker.",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "type_line": "Instant"
+ },
+ {
+  "cmc": 4.0,
+  "collector_number": "522",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "53c56a23-eb4f-4be1-ada9-1ad5b80195d3",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{3}{B}",
+  "name": "Highborn Vampire",
+  "object": "card",
+  "oracle_id": "1adcf587-9035-4299-a2bd-62f805fdd897",
+  "oracle_text": "",
+  "power": "4",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "3",
+  "type_line": "Creature — Vampire Warrior"
+ },
+ {
+  "cmc": 1.0,
+  "collector_number": "730",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [
+   "W"
+  ],
+  "id": "632df69e-6377-43d0-bba5-65518a320aa5",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{W}",
+  "name": "Hinterland Sanctifier",
+  "object": "card",
+  "oracle_id": "d812fc6d-b96d-4986-b171-9f3feee603dc",
+  "oracle_text": "Whenever another creature you control enters, you gain 1 life.",
+  "power": "1",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Rabbit Cleric"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "62",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "790f9433-7565-4f7f-88e8-8af762ea0296",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{B}",
+  "name": "Hungry Ghoul",
+  "object": "card",
+  "oracle_id": "4a7a55a3-568c-4c31-9460-5b94dc0121d8",
+  "oracle_text": "{1}, Sacrifice another creature: Put a +1/+1 counter on this creature.",
+  "power": "2",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Zombie"
+ },
+ {
+  "cmc": 5.0,
+  "collector_number": "742",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "c2bfdfb6-aa0b-4bd7-89ba-6435da730e5e",
+  "keywords": [
+   "Flying"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{4}{U}",
+  "name": "Icewind Elemental",
+  "object": "card",
+  "oracle_id": "5001bf21-9dbb-4229-aeef-25805e71b832",
+  "oracle_text": "Flying\nWhen this creature enters, draw a card, then discard a card.",
+  "power": "3",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "4",
+  "type_line": "Creature — Elemental"
+ },
+ {
+  "cmc": 5.0,
+  "collector_number": "90",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [
+   "R"
+  ],
+  "id": "d58e20ab-c5ca-4295-884d-78efdaa83243",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{4}{R}",
+  "name": "Incinerating Blast",
+  "object": "card",
+  "oracle_id": "49f0da4a-e046-4220-b90e-e105a5f2ef00",
+  "oracle_text": "Incinerating Blast deals 6 damage to target creature.\nYou may discard a card. If you do, draw a card.",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Sorcery"
+ },
+ {
+  "cmc": 5.0,
+  "collector_number": "495",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [
+   "W"
+  ],
+  "id": "ea566679-4202-4076-9314-142241485f6e",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{4}{W}",
+  "name": "Ingenious Leonin",
+  "object": "card",
+  "oracle_id": "99853d2e-2223-4c05-bbd7-0a746f8f810d",
+  "oracle_text": "{3}{W}: Put a +1/+1 counter on another target attacking creature you control. If that creature is a Cat, it gains first strike until end of turn. (It deals combat damage before creatures without first strike.)",
+  "power": "4",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "4",
+  "type_line": "Creature — Cat Soldier"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "736",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [
+   "W"
+  ],
+  "id": "79016cf3-6eea-4b21-9ff3-f187d606e19a",
+  "keywords": [
+   "Flying"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{W}",
+  "name": "Inspiring Overseer",
+  "object": "card",
+  "oracle_id": "d646e42b-5635-4798-b633-29c093b66a55",
+  "oracle_text": "Flying\nWhen this creature enters, you gain 1 life and draw a card.",
+  "power": "2",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "1",
+  "type_line": "Creature — Angel Cleric"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "509",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "25edefa9-9fff-4b71-83ae-696c196a795c",
+  "keywords": [
+   "Kicker"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{U}",
+  "name": "Into the Roil",
+  "object": "card",
+  "oracle_id": "c2898bbd-82a4-4d26-b6ee-169b0ebe71b4",
+  "oracle_text": "Kicker {1}{U} (You may pay an additional {1}{U} as you cast this spell.)\nReturn target nonland permanent to its owner's hand. If this spell was kicked, draw a card.",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Instant"
+ },
+ {
+  "cmc": 0.0,
+  "collector_number": "274",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [],
+  "id": "17e2b637-72b1-4457-aaba-66d51107be4c",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "",
+  "name": "Island",
+  "object": "card",
+  "oracle_id": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+  "oracle_text": "({T}: Add {U}.)",
+  "produced_mana": [
+   "U"
+  ],
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Basic Land — Island"
+ },
+ {
+  "cmc": 4.0,
+  "collector_number": "497",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [
+   "W"
+  ],
+  "id": "5aa8f635-c638-4207-8631-f6b5185f8696",
+  "keywords": [
+   "First strike"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{W}{W}",
+  "name": "Jazal Goldmane",
+  "object": "card",
+  "oracle_id": "609d13dc-c850-4877-8ad3-e84171b58069",
+  "oracle_text": "First strike (This creature deals combat damage before creatures without first strike.)\n{3}{W}{W}: Attacking creatures you control get +X/+X until end of turn, where X is the number of attacking creatures.",
+  "power": "4",
+  "rarity": "rare",
+  "set": "fdn",
+  "toughness": "4",
+  "type_line": "Legendary Creature — Cat Warrior"
+ },
+ {
+  "cmc": 6.0,
+  "collector_number": "555",
+  "color_identity": [
+   "G"
+  ],
+  "colors": [
+   "G"
+  ],
+  "id": "01ceca57-65f4-4f99-bd14-9fe5f86c1f62",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{4}{G}{G}",
+  "name": "Joraga Invocation",
+  "object": "card",
+  "oracle_id": "216d3eed-cb07-40c5-869a-962e074e757d",
+  "oracle_text": "Each creature you control gets +3/+3 until end of turn and must be blocked this turn if able.",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "type_line": "Sorcery"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "762",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [
+   "R"
+  ],
+  "id": "7023129c-09f5-49cf-ae32-b9bd30e0ff63",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{R}",
+  "name": "Kargan Dragonrider",
+  "object": "card",
+  "oracle_id": "df366871-8ed7-4183-8b0c-414ca361a711",
+  "oracle_text": "As long as you control a Dragon, this creature has flying.",
+  "power": "2",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Human Warrior"
+ },
+ {
+  "cmc": 1.0,
+  "collector_number": "542",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [
+   "R"
+  ],
+  "id": "af158462-91e3-4ad7-b435-95d4eb32fe0a",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{R}",
+  "name": "Kindled Fury",
+  "object": "card",
+  "oracle_id": "ebeee06e-3345-4f02-896f-cb0b2cfa5548",
+  "oracle_text": "Target creature gets +1/+0 and gains first strike until end of turn. (It deals combat damage before creatures without first strike.)",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Instant"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "743",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "aa127602-10b2-4144-985b-38e075f1e1f7",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{U}",
+  "name": "Kitesail Corsair",
+  "object": "card",
+  "oracle_id": "6103f294-f920-4307-af80-d44cc71167fd",
+  "oracle_text": "This creature has flying as long as it's attacking.",
+  "power": "2",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "1",
+  "type_line": "Creature — Human Pirate"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "498",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [
+   "W"
+  ],
+  "id": "218e0009-5f11-4348-97b8-4bc7b41f80b8",
+  "keywords": [
+   "Flying"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{W}{W}",
+  "name": "Leonin Skyhunter",
+  "object": "card",
+  "oracle_id": "517c7295-8ba2-47a6-a1c6-aee722f8ca88",
+  "oracle_text": "Flying",
+  "power": "2",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Cat Knight"
+ },
+ {
+  "cmc": 1.0,
+  "collector_number": "499",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [
+   "W"
+  ],
+  "id": "17b25850-f1bd-4410-beec-603b2a77f264",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{W}",
+  "name": "Leonin Vanguard",
+  "object": "card",
+  "oracle_id": "de1e1352-adb2-4ac1-bb2a-ee654d5c727d",
+  "oracle_text": "At the beginning of combat on your turn, if you control three or more creatures, this creature gets +1/+1 until end of turn and you gain 1 life.",
+  "power": "1",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "1",
+  "type_line": "Creature — Cat Soldier"
+ },
+ {
+  "cmc": 1.0,
+  "collector_number": "227",
+  "color_identity": [
+   "G"
+  ],
+  "colors": [
+   "G"
+  ],
+  "id": "6a0b230b-d391-4998-a3f7-7b158a0ec2cd",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{G}",
+  "name": "Llanowar Elves",
+  "object": "card",
+  "oracle_id": "68954295-54e3-4303-a6bc-fc4547a4e3a3",
+  "oracle_text": "{T}: Add {G}.",
+  "power": "1",
+  "produced_mana": [
+   "G"
+  ],
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "1",
+  "type_line": "Creature — Elf Druid"
+ },
+ {
+  "cmc": 6.0,
+  "collector_number": "523",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "c166df8f-9508-427a-8ec7-bc8541b6ed88",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{5}{B}",
+  "name": "Maalfeld Twins",
+  "object": "card",
+  "oracle_id": "dda4b515-49c0-43fe-9f6a-36defa326bb1",
+  "oracle_text": "When this creature dies, create two 2/2 black Zombie creature tokens.",
+  "power": "4",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "4",
+  "type_line": "Creature — Zombie"
+ },
+ {
+  "cmc": 4.0,
+  "collector_number": "556",
+  "color_identity": [
+   "G"
+  ],
+  "colors": [
+   "G"
+  ],
+  "id": "5624e610-c4c0-4103-a32b-0f1264030a7a",
+  "keywords": [
+   "Reach"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{3}{G}",
+  "name": "Magnigoth Sentry",
+  "object": "card",
+  "oracle_id": "b52824f9-7897-46b7-a4e5-a0261861cb5b",
+  "oracle_text": "Reach (This creature can block creatures with flying.)",
+  "power": "4",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "4",
+  "type_line": "Creature — Treefolk"
+ },
+ {
+  "cmc": 1.0,
+  "collector_number": "228",
+  "color_identity": [
+   "G"
+  ],
+  "colors": [
+   "G"
+  ],
+  "id": "5389663a-fe25-41b9-8c92-1f4d7721ffc2",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{G}",
+  "name": "Mild-Mannered Librarian",
+  "object": "card",
+  "oracle_id": "fb7070ab-c234-4d54-8cdc-caf106bf24a6",
+  "oracle_text": "{3}{G}: This creature becomes a Werewolf. Put two +1/+1 counters on it and you draw a card. Activate only once.",
+  "power": "1",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "1",
+  "type_line": "Creature — Human"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "47",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "20d89cec-528b-4b2a-87db-e11ce0000622",
+  "keywords": [
+   "Flying"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{U}",
+  "name": "Mischievous Mystic",
+  "object": "card",
+  "oracle_id": "542831c6-6279-4977-9b29-0fb9c0ebf04d",
+  "oracle_text": "Flying\nWhenever you draw your second card each turn, create a 1/1 blue Faerie creature token with flying.",
+  "power": "2",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "1",
+  "type_line": "Creature — Human Wizard"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "524",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "3627f9fb-b828-49cd-887d-e2ab3ef43dfb",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{B}",
+  "name": "Moment of Craving",
+  "object": "card",
+  "oracle_id": "1489551f-5714-471b-a0e6-f40bc3085afc",
+  "oracle_text": "Target creature gets -2/-2 until end of turn. You gain 2 life.",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Instant"
+ },
+ {
+  "cmc": 1.0,
+  "collector_number": "500",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [
+   "W"
+  ],
+  "id": "911deea0-38d2-41d9-a2ae-fb8eb45b2c23",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{W}",
+  "name": "Moment of Triumph",
+  "object": "card",
+  "oracle_id": "57579799-2582-417f-9864-4560cac39ac3",
+  "oracle_text": "Target creature gets +2/+2 until end of turn. You gain 2 life.",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Instant"
+ },
+ {
+  "cmc": 0.0,
+  "collector_number": "278",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [],
+  "id": "279df7e2-2a3b-464a-a7df-e91da28e3a8c",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "",
+  "name": "Mountain",
+  "object": "card",
+  "oracle_id": "a3fb7228-e76b-4e96-a40e-20b5fed75685",
+  "oracle_text": "({T}: Add {R}.)",
+  "produced_mana": [
+   "R"
+  ],
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Basic Land — Mountain"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "511",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "c069ff32-6759-48a2-8674-4f729c91dcd0",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{U}",
+  "name": "Mystic Archaeologist",
+  "object": "card",
+  "oracle_id": "b77dfe2a-ebc9-46b0-9134-2ecb2abdd8be",
+  "oracle_text": "{3}{U}{U}: Draw two cards.",
+  "power": "2",
+  "rarity": "rare",
+  "set": "fdn",
+  "toughness": "1",
+  "type_line": "Creature — Human Wizard"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "557",
+  "color_identity": [
+   "G"
+  ],
+  "colors": [
+   "G"
+  ],
+  "id": "86b3923c-c35c-4eb2-9dd3-b15c13778ecf",
+  "keywords": [
+   "Enchant"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{G}",
+  "name": "New Horizons",
+  "object": "card",
+  "oracle_id": "8834d3c9-cdb5-423b-bc78-94a94add5e74",
+  "oracle_text": "Enchant land\nWhen this Aura enters, put a +1/+1 counter on target creature you control.\nEnchanted land has \"{T}: Add two mana of any one color.\"",
+  "produced_mana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Enchantment — Aura"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "525",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "6d5802ed-507d-4a52-90e3-d989cd61961b",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{B}",
+  "name": "Offer Immortality",
+  "object": "card",
+  "oracle_id": "be4499e6-616a-4c11-b37e-9201d2492682",
+  "oracle_text": "Target creature gains deathtouch and indestructible until end of turn. (Damage and effects that say \"destroy\" don't destroy it.)",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Instant"
+ },
+ {
+  "cmc": 1.0,
+  "collector_number": "512",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "58d26b54-0093-4e90-a2b1-b57c64340f9c",
+  "keywords": [
+   "Scry"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{U}",
+  "name": "Opt",
+  "object": "card",
+  "oracle_id": "713332c1-5bd8-400f-bfff-c1ca0697a043",
+  "oracle_text": "Scry 1. (Look at the top card of your library. You may put that card on the bottom.)\nDraw a card.",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Instant"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "501",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [
+   "W"
+  ],
+  "id": "839160d2-44a3-4566-be9d-558d043beac8",
+  "keywords": [
+   "Enchant"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{W}",
+  "name": "Pacifism",
+  "object": "card",
+  "oracle_id": "5f5e0b10-c8cf-450c-bfd3-bcb0528ec330",
+  "oracle_text": "Enchant creature\nEnchanted creature can't attack or block.",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Enchantment — Aura"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "563",
+  "color_identity": [],
+  "colors": [],
+  "id": "d9d20aef-d35b-4353-a241-e6cfa9730975",
+  "keywords": [
+   "Equip"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{3}",
+  "name": "Pirate's Cutlass",
+  "object": "card",
+  "oracle_id": "ac77591c-39d7-4fd1-a6e9-805f57c6614a",
+  "oracle_text": "When this Equipment enters, attach it to target Pirate you control.\nEquipped creature gets +2/+1.\nEquip {2} ({2}: Attach to target creature you control. Equip only as a sorcery.)",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Artifact — Equipment"
+ },
+ {
+  "cmc": 0.0,
+  "collector_number": "272",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [],
+  "id": "4ef17ed4-a9b5-4b8e-b4cb-2ecb7e5898c3",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "",
+  "name": "Plains",
+  "object": "card",
+  "oracle_id": "bc71ebf6-2056-41f7-be35-b2e5c34afa99",
+  "oracle_text": "({T}: Add {W}.)",
+  "produced_mana": [
+   "W"
+  ],
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Basic Land — Plains"
+ },
+ {
+  "cmc": 4.0,
+  "collector_number": "739",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [
+   "W"
+  ],
+  "id": "8d05289c-d8de-4085-ac01-5dd8fd954d35",
+  "keywords": [
+   "Flash"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{3}{W}",
+  "name": "Prayer of Binding",
+  "object": "card",
+  "oracle_id": "4505ff9f-97f1-45d1-aea9-5590fefb4a4d",
+  "oracle_text": "Flash\nWhen this enchantment enters, exile up to one target nonland permanent an opponent controls until this enchantment leaves the battlefield. You gain 2 life.",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "type_line": "Enchantment"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "21",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [
+   "W"
+  ],
+  "id": "b742117a-8a72-43b9-b05d-274829d138a2",
+  "keywords": [
+   "Vigilance"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{W}",
+  "name": "Prideful Parent",
+  "object": "card",
+  "oracle_id": "a90d1d35-6d67-43b3-8256-b0318b3a4b07",
+  "oracle_text": "Vigilance (Attacking doesn't cause this creature to tap.)\nWhen this creature enters, create a 1/1 white Cat creature token.",
+  "power": "2",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Cat"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "513",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "098c86fd-5a38-41fd-be44-ab963448f2a2",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{U}",
+  "name": "Quick Study",
+  "object": "card",
+  "oracle_id": "7bff8d4a-1c7d-48b8-b3e3-737dd6f01823",
+  "oracle_text": "Draw two cards.",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Instant"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "130",
+  "color_identity": [],
+  "colors": [],
+  "id": "69beec98-c89c-4673-953c-8b3ef3d81560",
+  "keywords": [
+   "Equip"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}",
+  "name": "Quick-Draw Katana",
+  "object": "card",
+  "oracle_id": "604ef241-df8f-48f8-8680-f9ed77ff30ae",
+  "oracle_text": "During your turn, equipped creature gets +2/+0 and has first strike. (It deals combat damage before creatures without first strike.)\nEquip {2} ({2}: Attach to target creature you control. Equip only as a sorcery.)",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Artifact — Equipment"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "543",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [
+   "R"
+  ],
+  "id": "9627b0a7-bda9-44df-81c9-aa70cc976331",
+  "keywords": [
+   "Double strike"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{R}",
+  "name": "Raging Redcap",
+  "object": "card",
+  "oracle_id": "679841ad-f3ac-48e2-ba11-2cf6d78642b4",
+  "oracle_text": "Double strike (This creature deals both first-strike and regular combat damage.)",
+  "power": "1",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Goblin Knight"
+ },
+ {
+  "cmc": 5.0,
+  "collector_number": "544",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [
+   "R"
+  ],
+  "id": "5eaddac1-d8ca-4949-8140-c9193e3df921",
+  "keywords": [
+   "Flying",
+   "Treasure"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{4}{R}",
+  "name": "Rapacious Dragon",
+  "object": "card",
+  "oracle_id": "0944ec2e-1dd9-459f-8f1d-667242cf52fe",
+  "oracle_text": "Flying\nWhen this creature enters, create two Treasure tokens. (They're artifacts with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+  "power": "3",
+  "produced_mana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "3",
+  "type_line": "Creature — Dragon"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "182",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "28e84b1b-1c05-4e1b-93b8-9cc2ca73509d",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{B}",
+  "name": "Reassembling Skeleton",
+  "object": "card",
+  "oracle_id": "9dbc3530-b278-4c8d-b2cc-a09dfac9d5e5",
+  "oracle_text": "{1}{B}: Return this card from your graveyard to the battlefield tapped.",
+  "power": "1",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "1",
+  "type_line": "Creature — Skeleton Warrior"
+ },
+ {
+  "cmc": 1.0,
+  "collector_number": "146",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [
+   "W"
+  ],
+  "id": "9c9ac1bc-cdf3-4fa6-8319-a7ea164e9e47",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{W}",
+  "name": "Savannah Lions",
+  "object": "card",
+  "oracle_id": "60ba93eb-39e6-4af2-9c66-cd38f72daff2",
+  "oracle_text": "",
+  "power": "2",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "1",
+  "type_line": "Creature — Cat"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "545",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [
+   "R"
+  ],
+  "id": "44ea09c1-d420-4e99-a968-ade614579287",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{R}",
+  "name": "Scorching Dragonfire",
+  "object": "card",
+  "oracle_id": "d14f313c-fea6-49c4-8197-5b74ee584a6b",
+  "oracle_text": "Scorching Dragonfire deals 3 damage to target creature or planeswalker. If that creature or planeswalker would die this turn, exile it instead.",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Instant"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "546",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [
+   "R"
+  ],
+  "id": "efcf7e75-5de2-45cc-9275-caccd73214fa",
+  "keywords": [
+   "Treasure"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{R}",
+  "name": "Seize the Spoils",
+  "object": "card",
+  "oracle_id": "58f83528-9110-4895-b5ea-51b90af30a8d",
+  "oracle_text": "As an additional cost to cast this spell, discard a card.\nDraw two cards and create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+  "produced_mana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Sorcery"
+ },
+ {
+  "cmc": 4.0,
+  "collector_number": "526",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "7a959048-0d8a-41bb-8a33-52264e525085",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{3}{B}",
+  "name": "Skeleton Archer",
+  "object": "card",
+  "oracle_id": "3792763c-7aa0-4055-b8a1-3257e0443ef1",
+  "oracle_text": "When this creature enters, it deals 1 damage to any target.",
+  "power": "3",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "3",
+  "type_line": "Creature — Skeleton Archer"
+ },
+ {
+  "cmc": 4.0,
+  "collector_number": "547",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [
+   "R"
+  ],
+  "id": "5e3fbafb-e915-43eb-8a68-245840ba73ff",
+  "keywords": [
+   "Reach"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{R}{R}",
+  "name": "Skyraker Giant",
+  "object": "card",
+  "oracle_id": "d481630c-83c4-47d2-a770-db331154d2b9",
+  "oracle_text": "Reach (This creature can block creatures with flying.)",
+  "power": "4",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "3",
+  "type_line": "Creature — Giant"
+ },
+ {
+  "cmc": 5.0,
+  "collector_number": "50",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "62958fc3-55dc-4b97-a070-490d6ed27820",
+  "keywords": [
+   "Flying",
+   "Raid"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{3}{U}{U}",
+  "name": "Skyship Buccaneer",
+  "object": "card",
+  "oracle_id": "5951f734-05d3-41ad-94ee-19bd310077d2",
+  "oracle_text": "Flying\nRaid — When this creature enters, if you attacked this turn, draw a card.",
+  "power": "4",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "3",
+  "type_line": "Creature — Human Pirate"
+ },
+ {
+  "cmc": 1.0,
+  "collector_number": "233",
+  "color_identity": [
+   "G"
+  ],
+  "colors": [
+   "G"
+  ],
+  "id": "6cc4c21d-9bdc-4490-9203-17f51db0ddd1",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{G}",
+  "name": "Snakeskin Veil",
+  "object": "card",
+  "oracle_id": "1e6a24be-8281-41c1-a5ba-b68f0ef1d7b8",
+  "oracle_text": "Put a +1/+1 counter on target creature you control. It gains hexproof until end of turn. (It can't be the target of spells or abilities your opponents control.)",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "type_line": "Instant"
+ },
+ {
+  "cmc": 1.0,
+  "collector_number": "746",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "5ef30b6c-0806-4bf6-9a84-c2aea8d84cf1",
+  "keywords": [
+   "Flying",
+   "Flash"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{U}",
+  "name": "Spectral Sailor",
+  "object": "card",
+  "oracle_id": "a8fdbcdf-479d-4582-9ad5-9fbd4c740c29",
+  "oracle_text": "Flash (You may cast this spell any time you could cast an instant.)\nFlying\n{3}{U}: Draw a card.",
+  "power": "1",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "1",
+  "type_line": "Creature — Spirit Pirate"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "514",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "74fb19b2-4f6c-4cbd-8756-a7eb5c7c9ef6",
+  "keywords": [
+   "Enchant"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{U}",
+  "name": "Starlight Snare",
+  "object": "card",
+  "oracle_id": "f0691d46-5bf4-4617-8a0a-19d17afb7219",
+  "oracle_text": "Enchant creature\nWhen this Aura enters, tap enchanted creature.\nEnchanted creature doesn't untap during its controller's untap step.",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Enchantment — Aura"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "515",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "f6c5206e-63db-44c0-86ab-f645cd358b3b",
+  "keywords": [
+   "Raid"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{U}",
+  "name": "Storm Fleet Spy",
+  "object": "card",
+  "oracle_id": "42081a57-b521-45c2-928d-0a0a4641818d",
+  "oracle_text": "Raid — When this creature enters, if you attacked this turn, draw a card.",
+  "power": "2",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Human Pirate"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "185",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "485d6a5a-2054-47d5-91b8-71ce308ed4dc",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{B}",
+  "name": "Stromkirk Bloodthief",
+  "object": "card",
+  "oracle_id": "c85987b4-090e-472e-b9af-1114cce56ffb",
+  "oracle_text": "At the beginning of your end step, if an opponent lost life this turn, put a +1/+1 counter on target Vampire you control.",
+  "power": "2",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Vampire Rogue"
+ },
+ {
+  "cmc": 4.0,
+  "collector_number": "527",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "3d2c5345-eb55-4bca-9183-b4e1404405f8",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{3}{B}",
+  "name": "Suspicious Shambler",
+  "object": "card",
+  "oracle_id": "ea6ee33f-0cba-4e96-817f-dc89c9064ead",
+  "oracle_text": "{4}{B}{B}, Exile this card from your graveyard: Create two 2/2 black Zombie creature tokens. Activate only as a sorcery.",
+  "power": "4",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Zombie"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "548",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [
+   "R"
+  ],
+  "id": "8db11970-74c2-463d-88bb-9f88aa079eaa",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{R}",
+  "name": "Swab Goblin",
+  "object": "card",
+  "oracle_id": "343ecf2f-0bbc-4840-8fb3-f5f61b26e76f",
+  "oracle_text": "",
+  "power": "2",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Goblin Pirate"
+ },
+ {
+  "cmc": 0.0,
+  "collector_number": "276",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [],
+  "id": "319bc1f0-ee42-44e5-b08b-735613ded2ba",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "",
+  "name": "Swamp",
+  "object": "card",
+  "oracle_id": "56719f6a-1a6c-4c0a-8d21-18f7d7350b68",
+  "oracle_text": "({T}: Add {B}.)",
+  "produced_mana": [
+   "B"
+  ],
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Basic Land — Swamp"
+ },
+ {
+  "cmc": 5.0,
+  "collector_number": "558",
+  "color_identity": [
+   "G"
+  ],
+  "colors": [
+   "G"
+  ],
+  "id": "da20a0d3-2022-4dea-84c8-85adc5a974f8",
+  "keywords": [
+   "Vigilance",
+   "Trample"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{4}{G}",
+  "name": "Tajuru Pathwarden",
+  "object": "card",
+  "oracle_id": "d8c7cd66-d8bf-4a99-add5-1d5651d4e025",
+  "oracle_text": "Vigilance (Attacking doesn't cause this creature to tap.)\nTrample (This creature can deal excess combat damage to the player or planeswalker it's attacking.)",
+  "power": "5",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "4",
+  "type_line": "Creature — Elf Warrior Ally"
+ },
+ {
+  "cmc": 7.0,
+  "collector_number": "764",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [
+   "R"
+  ],
+  "id": "4047b1c3-06eb-400d-993d-69b5210977ee",
+  "keywords": [
+   "Flying",
+   "Double strike"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{5}{R}{R}",
+  "name": "Terror of Mount Velus",
+  "object": "card",
+  "oracle_id": "8161248c-16a3-47db-a3ae-cdfd878d49e0",
+  "oracle_text": "Flying\nDouble strike (This creature deals both first-strike and regular combat damage.)\nWhen this creature enters, creatures you control gain double strike until end of turn.",
+  "power": "5",
+  "rarity": "rare",
+  "set": "fdn",
+  "toughness": "5",
+  "type_line": "Creature — Dragon"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "559",
+  "color_identity": [
+   "G"
+  ],
+  "colors": [
+   "G"
+  ],
+  "id": "189f6199-f2fe-49a5-89ca-3c4cb39fbf2b",
+  "keywords": [
+   "Reach",
+   "Deathtouch"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{G}",
+  "name": "Thornweald Archer",
+  "object": "card",
+  "oracle_id": "b5ba87f5-3589-4a8b-ad65-2ae2523e98e8",
+  "oracle_text": "Reach (This creature can block creatures with flying.)\nDeathtouch (Any amount of damage this deals to a creature is enough to destroy it.)",
+  "power": "2",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "1",
+  "type_line": "Creature — Elf Archer"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "560",
+  "color_identity": [
+   "G"
+  ],
+  "colors": [
+   "G"
+  ],
+  "id": "592364bf-68b5-4ea0-97d6-c7cadce940fd",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{G}{G}",
+  "name": "Thrashing Brontodon",
+  "object": "card",
+  "oracle_id": "60bc63dc-ac9f-4a2f-aef5-c90d0aa31553",
+  "oracle_text": "{1}, Sacrifice this creature: Destroy target artifact or enchantment.",
+  "power": "3",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "4",
+  "type_line": "Creature — Dinosaur"
+ },
+ {
+  "cmc": 7.0,
+  "collector_number": "167",
+  "color_identity": [
+   "U"
+  ],
+  "colors": [
+   "U"
+  ],
+  "id": "2569d4f3-55ed-4f99-9592-34c7df0aab72",
+  "keywords": [
+   "Ward"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{6}{U}",
+  "name": "Tolarian Terror",
+  "object": "card",
+  "oracle_id": "b9d0f2e1-62c2-44fd-ad38-471daf17bb0a",
+  "oracle_text": "This spell costs {1} less to cast for each instant and sorcery card in your graveyard.\nWard {2} (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays {2}.)",
+  "power": "5",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "5",
+  "type_line": "Creature — Serpent"
+ },
+ {
+  "cmc": 4.0,
+  "collector_number": "503",
+  "color_identity": [
+   "W"
+  ],
+  "colors": [
+   "W"
+  ],
+  "id": "5cd9e73d-de8d-486f-bbbd-a2f5d3f8f686",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{3}{W}",
+  "name": "Twinblade Paladin",
+  "object": "card",
+  "oracle_id": "d373dc71-5196-43a0-8cc5-67e2a591aad0",
+  "oracle_text": "Whenever you gain life, put a +1/+1 counter on this creature.\nAs long as you have 25 or more life, this creature has double strike. (It deals both first-strike and regular combat damage.)",
+  "power": "3",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "3",
+  "type_line": "Creature — Human Knight"
+ },
+ {
+  "cmc": 0.0,
+  "collector_number": "564",
+  "color_identity": [],
+  "colors": [],
+  "id": "172cd5b7-98fc-4add-b858-a0b3dfb75c19",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "",
+  "name": "Uncharted Haven",
+  "object": "card",
+  "oracle_id": "d23c3613-bc5e-4fc5-939c-62a090c53a79",
+  "oracle_text": "This land enters tapped. As it enters, choose a color.\n{T}: Add one mana of the chosen color.",
+  "produced_mana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Land"
+ },
+ {
+  "cmc": 1.0,
+  "collector_number": "528",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "97b3cf11-e352-4ee1-8c03-13898f576ef9",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{B}",
+  "name": "Undying Malice",
+  "object": "card",
+  "oracle_id": "8b061702-1bc3-45aa-a758-446b25034801",
+  "oracle_text": "Until end of turn, target creature gains \"When this creature dies, return it to the battlefield tapped under its owner's control with a +1/+1 counter on it.\"",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Instant"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "529",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "05937911-897b-4638-9536-2e463884f453",
+  "keywords": [
+   "Enchant"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{B}",
+  "name": "Untamed Hunger",
+  "object": "card",
+  "oracle_id": "550abd9b-9aae-4812-9bc0-7f131d6dcde8",
+  "oracle_text": "Enchant creature\nEnchanted creature gets +2/+1 and has menace. (It can't be blocked except by two or more creatures.)",
+  "rarity": "common",
+  "set": "fdn",
+  "type_line": "Enchantment — Aura"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "756",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "ac01d4eb-10ec-4bda-aa9b-04c74dabfcaf",
+  "keywords": [
+   "Flying"
+  ],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{B}",
+  "name": "Vampire Interloper",
+  "object": "card",
+  "oracle_id": "b753d7dd-4c6b-4472-a009-671572f927eb",
+  "oracle_text": "Flying\nThis creature can't block.",
+  "power": "2",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "1",
+  "type_line": "Creature — Vampire Scout"
+ },
+ {
+  "cmc": 1.0,
+  "collector_number": "531",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "86d64a1d-cda4-4c76-8d58-ccab5a6859a0",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{B}",
+  "name": "Vampire Neonate",
+  "object": "card",
+  "oracle_id": "c0045925-25bf-403c-b721-5f05ba30985b",
+  "oracle_text": "{2}, {T}: Each opponent loses 1 life and you gain 1 life.",
+  "power": "0",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "3",
+  "type_line": "Creature — Vampire"
+ },
+ {
+  "cmc": 3.0,
+  "collector_number": "532",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "b6fc8d2e-ad63-498d-83b6-5f72b5ae0e67",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{B}",
+  "name": "Vampire Spawn",
+  "object": "card",
+  "oracle_id": "33cee4b4-3d80-46f1-9223-49ed785891a1",
+  "oracle_text": "When this creature enters, each opponent loses 2 life and you gain 2 life.",
+  "power": "2",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "3",
+  "type_line": "Creature — Vampire"
+ },
+ {
+  "cmc": 2.0,
+  "collector_number": "76",
+  "color_identity": [
+   "B"
+  ],
+  "colors": [
+   "B"
+  ],
+  "id": "bd0c12dd-f138-45c0-9614-d83a1d8e8399",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{1}{B}",
+  "name": "Vengeful Bloodwitch",
+  "object": "card",
+  "oracle_id": "4cdbc466-42fc-471f-beab-397caec18101",
+  "oracle_text": "Whenever this creature or another creature you control dies, target opponent loses 1 life and you gain 1 life.",
+  "power": "1",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "1",
+  "type_line": "Creature — Vampire Warlock"
+ },
+ {
+  "cmc": 4.0,
+  "collector_number": "550",
+  "color_identity": [
+   "R"
+  ],
+  "colors": [
+   "R"
+  ],
+  "id": "7fc914fe-e699-4a21-aa09-f3573d020b87",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{3}{R}",
+  "name": "Volley Veteran",
+  "object": "card",
+  "oracle_id": "bf4268e6-170a-445b-b215-718f7494ae28",
+  "oracle_text": "When this creature enters, it deals damage to target creature an opponent controls equal to the number of Goblins you control.",
+  "power": "4",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "2",
+  "type_line": "Creature — Goblin Warrior"
+ },
+ {
+  "cmc": 4.0,
+  "collector_number": "561",
+  "color_identity": [
+   "G"
+  ],
+  "colors": [
+   "G"
+  ],
+  "id": "60f42969-bb5c-4183-8bd3-ba87f008391d",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{2}{G}{G}",
+  "name": "Wildheart Invoker",
+  "object": "card",
+  "oracle_id": "ff8fb796-af5d-4d64-ab3c-7f2469dfa6bf",
+  "oracle_text": "{8}: Target creature gets +5/+5 and gains trample until end of turn. (It can deal excess combat damage to the player or planeswalker it's attacking.)",
+  "power": "4",
+  "rarity": "common",
+  "set": "fdn",
+  "toughness": "3",
+  "type_line": "Creature — Elf Shaman"
+ },
+ {
+  "cmc": 1.0,
+  "collector_number": "236",
+  "color_identity": [
+   "G"
+  ],
+  "colors": [
+   "G"
+  ],
+  "id": "36359fb6-fb8c-4382-8555-e348422f116c",
+  "keywords": [],
+  "lang": "en",
+  "layout": "normal",
+  "mana_cost": "{X}{G}",
+  "name": "Wildwood Scourge",
+  "object": "card",
+  "oracle_id": "b9dec104-c636-4770-a7fc-7a3331face15",
+  "oracle_text": "This creature enters with X +1/+1 counters on it.\nWhenever one or more +1/+1 counters are put on another non-Hydra creature you control, put a +1/+1 counter on this creature.",
+  "power": "0",
+  "rarity": "uncommon",
+  "set": "fdn",
+  "toughness": "0",
+  "type_line": "Creature — Hydra"
  }
 ]

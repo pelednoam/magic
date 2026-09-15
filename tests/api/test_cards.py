@@ -15,6 +15,12 @@ from mtgcoach.carddata.scryfall import cards_in
 from mtgcoach.core.ids import OracleId
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
+#: How many cards the Beginner Box has, and how many of them the sealed
+#: fixture understands all the way down. Written out so a re-seal that changes
+#: either number has to say so here.
+BOX = 124
+MODELLED = 65
+
 PLAYABLE = FIXTURES / "scryfall_fdn_playable.json"
 EFFECTS = Path(__file__).resolve().parents[2] / "data" / "sets" / "FDN" / "effects.json"
 
@@ -70,7 +76,19 @@ def test_an_empty_catalogue_is_usable() -> None:
 
 
 def test_a_card_the_fixture_cannot_express_is_not_modelled() -> None:
-    """59 of the box's 124 cards are exactly this: identified, not understood."""
+    """Identified, and not understood -- which is most of the box.
+
+    This used to assert the opposite: that no card in the fixture was in that
+    state, because the fixture held seven cards chosen to avoid it. That made
+    the assertion about the *choice of fixture* rather than about ``modelled``,
+    and it also meant the fixture could not deal a single one of the box's ten
+    decks -- so three self-play tests failed on every CI run while passing on
+    any machine with the real import. Nobody looked, because the workflow was
+    red for other reasons too; see ``tools/check_ci_covers_gate.py``.
+
+    The fixture is the whole box now, so the split it documents can be
+    asserted: 65 cards understood all the way down, 59 identified and not.
+    """
     catalogue = build(cards_in(PLAYABLE), EFFECTS)
     unexpressible = [
         oracle_id
@@ -78,7 +96,9 @@ def test_a_card_the_fixture_cannot_express_is_not_modelled() -> None:
         if not catalogue.modelled(OracleId(oracle_id)) and catalogue.abilities(OracleId(oracle_id))
     ]
     assert catalogue.modelled(FOREST), "a land with a mana ability is understood"
-    assert unexpressible == [], "this small fixture was chosen to be fully modelled"
+    assert unexpressible, "the flag distinguishes nothing if every card passes it"
+    assert len(catalogue.cards) == BOX
+    assert len(catalogue.cards) - len(unexpressible) == MODELLED
 
 
 def test_a_card_absent_from_the_fixture_is_not_modelled() -> None:
