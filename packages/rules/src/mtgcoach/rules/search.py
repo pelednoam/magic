@@ -63,6 +63,17 @@ class RuleIndex:
         # nothing next to the subprocess it is about to wait on.
         self._lock = threading.Lock()
 
+    @property
+    def keywords(self) -> Keywords:
+        """The ability names this document defines.
+
+        Read off the passages by ``build`` and exposed because the answer
+        checks need them too: ``grounding`` cannot tell an ability claim from
+        ordinary English without the list, and a list written out anywhere but
+        the document would be wrong by the next set.
+        """
+        return self._keywords
+
     @classmethod
     def build(cls, passages: Iterable[Passage], path: str = ":memory:") -> Self:
         """Index these passages, in memory by default.

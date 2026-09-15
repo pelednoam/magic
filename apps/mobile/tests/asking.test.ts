@@ -24,6 +24,8 @@ const ASKED: Asked = {
     unsure: "",
   },
   cited: true,
+  grounded: true,
+  unchecked: ["Nothing here has read the cited rules and decided that it follows."],
   matched: true,
   version: 0,
   rules: [
@@ -67,6 +69,16 @@ describe("asking a rules question", () => {
     expect(reply.rules).toHaveLength(1);
   });
 
+  it("carries the ungrounded verdict and the unchecked sentences through", async () => {
+    // The second axis and the sentences under it are what the screen needs to
+    // say "this was not shown" and "here is what nobody verified". A client
+    // that dropped either would leave the panel claiming more than the server.
+    vi.stubGlobal("fetch", replying(200, { ...ASKED, grounded: false }));
+    const reply = await new Coach("http://x", TOKEN).ask("g1", "q", "you");
+    expect(reply.grounded).toBe(false);
+    expect(reply.unchecked).toHaveLength(1);
+  });
+
   it("passes on the server's sentence when the rules are not installed", async () => {
     vi.stubGlobal(
       "fetch",
@@ -78,7 +90,14 @@ describe("asking a rules question", () => {
   it("refuses a reply it cannot read rather than rendering undefined", async () => {
     vi.stubGlobal(
       "fetch",
-      replying(200, { cited: true, matched: true, rules: [], answer: { answer: 7 } }),
+      replying(200, {
+        cited: true,
+        grounded: true,
+        unchecked: [],
+        matched: true,
+        rules: [],
+        answer: { answer: 7 },
+      }),
     );
     await expect(new Coach("http://x", TOKEN).ask("g1", "q", "you")).rejects.toBeInstanceOf(ServerError);
   });
@@ -96,10 +115,13 @@ describe("recognising a rules answer", () => {
   it.each([
     ["null", null],
     ["an array", [ASKED]],
-    ["no answer", { cited: true, matched: true, rules: [] }],
+    ["no answer", { cited: true, grounded: true, unchecked: [], matched: true, rules: [] }],
     ["no verdict", { answer: ASKED.answer, rules: [], matched: true }],
-    ["no match flag", { answer: ASKED.answer, cited: true, rules: [], version: 0 }],
-    ["no rules list", { answer: ASKED.answer, cited: true, matched: true }],
+    ["no grounding verdict", { ...ASKED, grounded: undefined }],
+    ["no unchecked sentences", { ...ASKED, unchecked: undefined }],
+    ["unchecked sentences that are not strings", { ...ASKED, unchecked: [7] }],
+    ["no match flag", { ...ASKED, matched: undefined }],
+    ["no rules list", { ...ASKED, rules: undefined }],
     ["rules that are not a list", { ...ASKED, rules: { a: 1 } }],
     ["a rule with no text", { ...ASKED, rules: [{ reference: "1", title: "x" }] }],
     ["a rule that is not an object", { ...ASKED, rules: ["702.19b"] }],
