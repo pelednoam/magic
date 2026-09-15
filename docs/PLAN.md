@@ -1254,15 +1254,24 @@ ask about it. The substrate is `services/selfplay`'s journal — every decision 
 with the exact board the model was shown and what it said, keyed by turn, step and player. A game
 already replays from one deterministically, so the engine half is done.
 
-**Built.** Three routes and two screens:
+**Built.** Four routes and two screens:
 
 | | |
 |---|---|
 | `GET /replays` | Every journal this server has, newest first. |
-| `GET /replays/{name}` | Every game in one, with every moment of each. |
-| `POST /replays/{name}/{seed}/at/{index}` | Adopt one moment as a real game. |
+| `GET /replays/{name}` | A line per game — decks, seed, how many decisions. No boards. |
+| `GET /replays/{name}/{game}` | One game, with every moment of it. |
+| `POST /replays/{name}/{game}/at/{index}` | Adopt one moment as a real game. |
 | `screens/Replays.tsx` | Which run, then which game. |
 | `screens/Walk.tsx` | Back, forward, and "ask about this". |
+
+A game is addressed by its **position** in the journal, not its seed. Two runs
+into one journal repeat a seed, and the whole game then has to be looked up by
+something unique or one game's advice appears beside another game's board. The
+seed still travels, because it is what re-runs the game — it is a label, not a
+key. The list route carries no boards for a measured reason: three games of a
+coached season serialise to 1.1 MB, and choosing between them needs the decks
+and a count.
 
 The third route is what makes it teaching rather than a log viewer. Stepping *into* a moment
 creates an ordinary session from its board, so every route that already exists works on it: the

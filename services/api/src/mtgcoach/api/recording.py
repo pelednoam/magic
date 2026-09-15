@@ -38,6 +38,9 @@ if TYPE_CHECKING:
 #: What a line of this kind is called, so a reader can tell it from a decision.
 KIND = "game"
 
+#: What a card is written as: its instance id and its oracle id.
+CARD_FIELDS = 2
+
 
 @dataclass(frozen=True, slots=True)
 class Recording:
@@ -135,16 +138,38 @@ def recorded(line: object) -> Recording | None:
 
 
 def _libraries(loaded: Mapping[str, object]) -> dict[str, tuple[tuple[str, str], ...]]:
-    """Each seat's dealt library, from a decoded line."""
-    return {
-        seat: tuple(
-            (str(card[0]), str(card[1]))
-            for card in cast("list[Sequence[object]]", cards)
-            if isinstance(card, list) and len(card) == 2  # noqa: PLR2004 - id and oracle
-        )
-        for seat, cards in loaded.items()
-        if isinstance(cards, list)
-    }
+    """Each seat's dealt library, from a decoded line.
+
+    Raises:
+        ValueError: If any entry is not a card. Dropping one and carrying on
+            shifts every card after it, so the game that rebuilds is a game
+            that never happened -- the hands are different, the draws are
+            different, and nothing on screen says so. A game the screen refuses
+            to show is much the better failure.
+    """
+    return {seat: _cards(seat, cards) for seat, cards in loaded.items()}
+
+
+def _cards(seat: str, loaded: object) -> tuple[tuple[str, str], ...]:
+    """One seat's library.
+
+    Raises:
+        ValueError: If it is not a list of id-and-oracle pairs.
+    """
+    if not isinstance(loaded, list):
+        # ValueError, not TypeError: this is a value off a disk that is the
+        # wrong shape, not a caller passing the wrong argument, and every
+        # reader of a journal catches ValueError for exactly that reason.
+        msg = f"{seat}: a library is a list of cards, not {type(loaded).__name__}"
+        raise ValueError(msg)  # noqa: TRY004 - a bad file, not a bad call
+    made: list[tuple[str, str]] = []
+    for card in cast("list[object]", loaded):
+        if not isinstance(card, list) or len(cast("list[object]", card)) != CARD_FIELDS:
+            msg = f"{seat}: a card is an instance id and an oracle id, got {card!r}"
+            raise ValueError(msg)
+        pair = cast("Sequence[object]", card)
+        made.append((str(pair[0]), str(pair[1])))
+    return tuple(made)
 
 
 def _events(loaded: object) -> tuple[Event, ...]:

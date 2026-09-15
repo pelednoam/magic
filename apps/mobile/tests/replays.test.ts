@@ -12,9 +12,24 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Coach, ServerError } from "../src/client";
 import { placeOf, seatName } from "../src/format";
-import { isJournals, isWalkthrough } from "../src/wire";
+import { isJournals, isPlayedGame, isWalkthrough } from "../src/wire";
 
 const TOKEN = "t";
+
+/** One line of a journal's game list. */
+const LINE = { index: 2, seed: 77, decks: ["inferno", "healing"], decisions: 81 };
+
+/** One moment, down to what the stepper actually dereferences. */
+const MOMENT = {
+  turn: 7,
+  step: "declare_attackers",
+  player: "you",
+  state: { turn: 7, step: "declare_attackers", active_player: "you", players: { you: {}, them: {} } },
+  said: null,
+  trusted: false,
+  problems: [],
+  error: "",
+};
 
 function replying(status: number, body: unknown): typeof fetch {
   return vi.fn(
@@ -41,11 +56,27 @@ describe("asking for replays", () => {
     await expect(new Coach("http://x", TOKEN).replays()).rejects.toBeInstanceOf(ServerError);
   });
 
-  it("fetches a whole journal in one request", async () => {
-    const stub = replying(200, { games: [] });
+  it("lists a journal's games without their boards", async () => {
+    const stub = replying(200, { games: [LINE] });
     vi.stubGlobal("fetch", stub);
-    await new Coach("http://x", TOKEN).walkthrough("overnight");
+    const walk = await new Coach("http://x", TOKEN).walkthrough("overnight");
+    expect(walk.games[0]?.decisions).toBe(81);
     expect(stub).toHaveBeenCalledWith("http://x/replays/overnight", expect.anything());
+  });
+
+  it("fetches one game whole, addressed by position", async () => {
+    const stub = replying(200, { ...LINE, moments: [MOMENT] });
+    vi.stubGlobal("fetch", stub);
+    const game = await new Coach("http://x", TOKEN).game("overnight", 2);
+    expect(game.moments).toHaveLength(1);
+    expect(stub).toHaveBeenCalledWith("http://x/replays/overnight/2", expect.anything());
+  });
+
+  it("refuses a game whose moments have no board", async () => {
+    // The shallow guard let this through and the crash arrived one render
+    // later, inside `moment.state.players`, far from the frame that caused it.
+    vi.stubGlobal("fetch", replying(200, { ...LINE, moments: [{ turn: 1, step: "upkeep" }] }));
+    await expect(new Coach("http://x", TOKEN).game("x", 0)).rejects.toBeInstanceOf(ServerError);
   });
 
   it("escapes a journal name, because a file is called whatever it is called", async () => {
@@ -63,10 +94,10 @@ describe("asking for replays", () => {
   it("steps into a moment as a game", async () => {
     const stub = replying(200, { session_id: "abc" });
     vi.stubGlobal("fetch", stub);
-    const game = await new Coach("http://x", TOKEN).stepInto("overnight", 77, 20);
+    const game = await new Coach("http://x", TOKEN).stepInto("overnight", 3, 20);
     expect(game.session_id).toBe("abc");
     expect(stub).toHaveBeenCalledWith(
-      "http://x/replays/overnight/77/at/20",
+      "http://x/replays/overnight/3/at/20",
       expect.objectContaining({ method: "POST" }),
     );
   });
@@ -74,16 +105,40 @@ describe("asking for replays", () => {
 
 describe("recognising what came back", () => {
   it("knows a walkthrough", () => {
-    expect(isWalkthrough({ games: [] })).toBe(true);
+    expect(isWalkthrough({ games: [LINE] })).toBe(true);
   });
 
   it("knows a list of journals", () => {
-    expect(isJournals({ replays: [] })).toBe(true);
+    expect(isJournals({ replays: ["a"] })).toBe(true);
+  });
+
+  it("knows a played game", () => {
+    expect(isPlayedGame({ ...LINE, moments: [MOMENT] })).toBe(true);
   });
 
   it.each([null, "games", {}, { games: 3 }, { replays: 3 }])("rejects %o", (body) => {
     expect(isWalkthrough(body)).toBe(false);
     expect(isJournals(body)).toBe(false);
+    expect(isPlayedGame(body)).toBe(false);
+  });
+
+  // These are the shapes a shallow guard accepted and a screen then crashed
+  // on, one render after the frame that caused it.
+  it.each([
+    { games: [{ index: 0 }] },
+    { games: [{ index: 0, seed: 1, decks: [2] }] },
+    { replays: [3] },
+  ])("rejects malformed contents %o", (body) => {
+    expect(isWalkthrough(body) || isJournals(body)).toBe(false);
+  });
+
+  it.each([
+    { ...LINE, moments: [{ turn: 1, step: "upkeep" }] },
+    { ...LINE, moments: [{ ...MOMENT, state: {} }] },
+    { ...LINE, moments: [{ ...MOMENT, problems: "none" }] },
+    { ...LINE, moments: "all of them" },
+  ])("rejects a game whose moments will not render %o", (body) => {
+    expect(isPlayedGame(body)).toBe(false);
   });
 });
 

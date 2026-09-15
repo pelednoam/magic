@@ -8,10 +8,10 @@
  */
 
 import { ServerError } from "./failures";
-import { segment, socketBase, unwrap } from "./transport";
+import { Http, segment } from "./transport";
 
-import type { Asked, Coaching, NewGame, Snapshot, Walkthrough } from "./wire";
-import { isAsked, isCoaching, isJournals, isWalkthrough } from "./wire";
+import type { Asked, Coaching, NewGame, PlayedGame, Snapshot, Walkthrough } from "./wire";
+import { isAsked, isCoaching, isJournals, isPlayedGame, isWalkthrough } from "./wire";
 
 // Re-exported: every caller already imports it from here, and where the class
 // happens to live is not their business.
@@ -19,17 +19,15 @@ export { ServerError } from "./failures";
 
 /** How to reach the server, and how to ask it things. */
 export class Coach {
-  private readonly base: string;
-  private readonly token: string;
+  private readonly http: Http;
 
   constructor(base: string, token: string) {
-    this.base = base.replace(/\/+$/, "");
-    this.token = token;
+    this.http = new Http(base, token);
   }
 
   /** The same server, with a different token. Used when one is typed in. */
   withToken(token: string): Coach {
-    return new Coach(this.base, token);
+    return new Coach(this.http.base, token);
   }
 
   /** The decks this server can deal. */
@@ -114,16 +112,33 @@ export class Coach {
   }
 
   /**
-   * One journal, as games with every moment of each.
+   * What is in one journal: a line per game, and no boards.
    *
-   * The whole thing in one request, deliberately: a game is a few hundred
-   * kilobytes, stepping through it should be instant, and a request per step
-   * would make the back button slower than the forward one.
+   * Without the moments on purpose. A twelve-game coached season is several
+   * megabytes once every position is serialised, and this is read to choose
+   * between a few lines of text.
    */
   async walkthrough(name: string): Promise<Walkthrough> {
     const body = await this.get<unknown>(`/replays/${segment(name)}`);
     if (!isWalkthrough(body)) {
       throw new ServerError(0, "the server sent a replay this app cannot read");
+    }
+    return body;
+  }
+
+  /**
+   * One game, with every moment of it.
+   *
+   * The whole game in one request, deliberately: stepping should be instant,
+   * and a request per step would make the back button slower than the forward
+   * one — the wrong way round for a screen whose purpose is going back over
+   * something. Addressed by position, because two runs into one journal repeat
+   * a seed and a seed is then not an address.
+   */
+  async game(name: string, index: number): Promise<PlayedGame> {
+    const body = await this.get<unknown>(`/replays/${segment(name)}/${index}`);
+    if (!isPlayedGame(body)) {
+      throw new ServerError(0, "the server sent a game this app cannot read");
     }
     return body;
   }
@@ -136,12 +151,8 @@ export class Coach {
    * night's game. Nothing is re-asked to produce it -- the board is the one the
    * recorded events actually built.
    */
-  async stepInto(name: string, seed: number, index: number): Promise<NewGame> {
-    return this.send<NewGame>(
-      "POST",
-      `/replays/${segment(name)}/${seed}/at/${index}`,
-      {},
-    );
+  async stepInto(name: string, game: number, index: number): Promise<NewGame> {
+    return this.send<NewGame>("POST", `/replays/${segment(name)}/${game}/at/${index}`, {});
   }
 
   /**
@@ -156,23 +167,12 @@ export class Coach {
     // a WebSocket handshake. That is a real if small cost -- a query string
     // reaches logs and browser history in a way a header does not -- and the
     // alternative is a socket nobody can open from a browser.
-    const token = encodeURIComponent(this.token);
-    return `${socketBase(this.base)}/games/${segment(sessionId)}/watch?token=${token}`;
+    const token = encodeURIComponent(this.http.token);
+    return `${this.http.socketBase()}/games/${segment(sessionId)}/watch?token=${token}`;
   }
 
   private async get<T>(path: string): Promise<T> {
-    return unwrap<T>(await fetch(`${this.base}${path}`, { headers: this.headers() }));
-  }
-
-  /**
-   * What every request carries.
-   *
-   * The server has no other access control, so a request without this gets a
-   * 401 whoever sent it -- including a page the household happened to visit,
-   * which is the thing the token is actually for.
-   */
-  private headers(): Record<string, string> {
-    return { Authorization: `Bearer ${this.token}` };
+    return this.http.get<T>(path);
   }
 
   private async send<T>(
@@ -180,11 +180,6 @@ export class Coach {
     path: string,
     body: Record<string, unknown>,
   ): Promise<T> {
-    const response = await fetch(`${this.base}${path}`, {
-      method,
-      headers: { ...this.headers(), "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    return unwrap<T>(response);
+    return this.http.send<T>(method, path, body);
   }
 }

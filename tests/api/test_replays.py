@@ -12,10 +12,8 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
-import pytest
-
 from helpers_replay import ANSWER, NAME, SEED, board_at, journalled, recording
-from mtgcoach.api.replays import UnknownReplayError, games_in, journals
+from mtgcoach.api.replays import games_in, journals
 from mtgcoach.core.steps import Step
 
 if TYPE_CHECKING:
@@ -45,34 +43,6 @@ def test_journals_come_back_newest_first(tmp_path: Path) -> None:
     os.utime(older, (0, 1000))
     os.utime(newer, (0, 2000))
     assert journals(tmp_path) == ("aardvark", "zebra")
-
-
-def test_a_journal_that_is_not_there(tmp_path: Path) -> None:
-    with pytest.raises(UnknownReplayError, match="missing"):
-        games_in(tmp_path, "missing")
-
-
-def test_a_journal_that_is_not_json(tmp_path: Path) -> None:
-    """A half-written line is a shape a killed run leaves behind."""
-    path = tmp_path / "selfplay" / "broken.jsonl"
-    path.parent.mkdir(parents=True)
-    path.write_text('{"kind": "game"', encoding="utf-8")
-    with pytest.raises(UnknownReplayError, match="JSONDecodeError"):
-        games_in(tmp_path, "broken")
-
-
-def test_a_journal_of_decisions_with_no_game_says_so(tmp_path: Path) -> None:
-    """The shape the first overnight run left: advice, and no board for it.
-
-    Saying which is better than an empty screen. It can still be replayed
-    *inside* the harness, and it cannot be shown, and those are different
-    things a person needs to be able to tell apart.
-    """
-    path = tmp_path / "selfplay" / "decisions.jsonl"
-    path.parent.mkdir(parents=True)
-    path.write_text('{"seed": 7, "turn": 1, "step": "upkeep", "player": "you"}\n', encoding="utf-8")
-    with pytest.raises(UnknownReplayError, match="interrupted run"):
-        games_in(tmp_path, "decisions")
 
 
 def test_a_game_comes_back_with_its_decisions(tmp_path: Path) -> None:
@@ -141,36 +111,64 @@ def test_a_moment_with_no_answer_keeps_why(tmp_path: Path) -> None:
     assert refused.error == "no answer: the coach was not available"
 
 
-def test_decisions_from_another_game_are_not_borrowed(tmp_path: Path) -> None:
-    """A journal holds a whole season. Moments belong to one game in it."""
+def test_decisions_belong_to_the_game_they_were_written_during(tmp_path: Path) -> None:
+    """A journal holds a whole season, cut into games at each recording line.
+
+    Position, not seed. The harness appends a decision as it happens and the
+    recording when the game ends, so the lines between two recordings are one
+    game's -- which is the only join that survives two runs into the same
+    journal repeating a seed.
+    """
     path = journalled(tmp_path)
-    other = recording()
     with path.open("a", encoding="utf-8") as file:
-        file.write('{"seed": 99, "turn": 1, "step": "upkeep", "player": "you", "trusted": true}\n')
-        file.write(other.as_json().replace(f'"seed": {SEED}', '"seed": 99') + "\n")
-    played = {game.seed: game for game in games_in(tmp_path, NAME)}
-    assert len(played[SEED].moments) == DECISIONS
-    assert [one.step for one in played[99].moments] == [Step.UPKEEP]
+        file.write('{"seed": 7, "turn": 1, "step": "upkeep", "player": "you", "trusted": true}\n')
+        file.write(recording().as_json() + "\n")
+    first, second = games_in(tmp_path, NAME)
+    assert (first.index, second.index) == (0, 1)
+    assert len(first.moments) == DECISIONS
+    assert [one.step for one in second.moments] == [Step.UPKEEP]
+
+
+def test_two_games_with_the_same_seed_are_told_apart(tmp_path: Path) -> None:
+    """Which a season re-run into an existing journal produces immediately.
+
+    Keyed by seed, the second game's advice appeared beside the first game's
+    board -- one game's coaching explaining another game's position, with
+    nothing on screen saying so.
+    """
+    path = journalled(tmp_path)
+    with path.open("a", encoding="utf-8") as file:
+        file.write('{"seed": 7, "turn": 1, "step": "upkeep", "player": "you"}\n')
+        file.write(recording().as_json() + "\n")
+    first, second = games_in(tmp_path, NAME)
+    assert first.seed == second.seed == SEED
+    assert len(first.moments) != len(second.moments)
 
 
 def test_a_decision_at_a_step_that_is_not_one_is_ignored(tmp_path: Path) -> None:
     """A line from a newer engine, or a corrupted one. Either way, not a step."""
-    path = journalled(tmp_path)
-    with path.open("a", encoding="utf-8") as file:
-        file.write('{"seed": 7, "turn": 1, "step": "second_main", "player": "you"}\n')
-        file.write('{"seed": 7, "turn": "one", "step": "upkeep", "player": "you"}\n')
+    journalled(
+        tmp_path,
+        extra=[
+            '{"seed": 7, "turn": 1, "step": "second_main", "player": "you"}',
+            '{"seed": 7, "turn": "one", "step": "upkeep", "player": "you"}',
+        ],
+    )
     (game,) = games_in(tmp_path, NAME)
     assert len(game.moments) == DECISIONS
 
 
 def test_a_malformed_answer_still_makes_an_explanation(tmp_path: Path) -> None:
     """Every field is read defensively, because a journal is a file on a disk."""
-    path = journalled(tmp_path)
-    with path.open("a", encoding="utf-8") as file:
-        file.write(
-            '{"seed": 7, "turn": 1, "step": "end_step", "player": "you", '
-            '"answer": {"attack": "all of them"}, "problems": "none"}\n'
-        )
+    journalled(
+        tmp_path,
+        extra=[
+            (
+                '{"seed": 7, "turn": 1, "step": "end_step", "player": "you", '
+                '"answer": {"attack": "all of them"}, "problems": "none"}'
+            )
+        ],
+    )
     (game,) = games_in(tmp_path, NAME)
     late = game.moments[-1]
     assert late.said is not None
@@ -178,15 +176,21 @@ def test_a_malformed_answer_still_makes_an_explanation(tmp_path: Path) -> None:
     assert late.problems == ()
 
 
-def test_a_line_that_is_not_an_object_is_walked_past(tmp_path: Path) -> None:
-    """Valid JSON, and not a line this format has ever written.
+def test_the_word_false_is_not_a_verdict(tmp_path: Path) -> None:
+    """A JSON string is truthy, and "checked" is not a claim to make on that.
 
-    Skipped rather than fatal: a journal is appended to by a process that can
-    be killed, and refusing a whole season over one strange line would lose
-    every game in it.
+    Nothing the harness writes puts a string here. This is a file on a disk,
+    and labelling unchecked advice "checked" on a screen somebody learns the
+    rules from is the exact failure this project exists to avoid.
     """
-    path = journalled(tmp_path)
-    with path.open("a", encoding="utf-8") as file:
-        file.write("42\n")
+    journalled(
+        tmp_path,
+        extra=[
+            (
+                '{"seed": 7, "turn": 1, "step": "end_step", "player": "you", '
+                '"answer": {"in_short": "x"}, "trusted": "false"}'
+            )
+        ],
+    )
     (game,) = games_in(tmp_path, NAME)
-    assert len(game.moments) == DECISIONS
+    assert not game.moments[-1].trusted

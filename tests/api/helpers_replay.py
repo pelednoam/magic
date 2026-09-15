@@ -10,8 +10,13 @@ it can be read in one screen.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
+from helpers import facts
+from helpers_api import TOKEN
+from mtgcoach.api.app import create_app
+from mtgcoach.api.cards import Catalogue
 from mtgcoach.api.recording import Recording, dealt_as
 from mtgcoach.core.cards import CardInstance
 from mtgcoach.core.events import AdvanceStep, PlayLand
@@ -21,7 +26,10 @@ from mtgcoach.core.state import start_game
 from mtgcoach.core.steps import TURN_ORDER, Step
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from pathlib import Path
+
+    from fastapi import FastAPI
 
     from mtgcoach.core.events import Event
     from mtgcoach.core.state import GameState
@@ -32,11 +40,31 @@ SEED = 7
 #: And what it was called, so a route can ask for it by name.
 NAME = "demo"
 
-#: Ten cards each: seven for an opening hand and three to draw. Named rather
-#: than dealt from a catalogue, because a replay carries no card data -- the
-#: oracle id *is* the name on this wire, and a test that used real cards would
-#: be testing the catalogue instead of the replay.
-DECK = ("Forest", "Forest", "Forest", "Bear", "Bell", "Growth", "Forest", "Forest", "Bear", "Bell")
+#: The oracle ids a journal's libraries are dealt from. UUID-shaped on purpose:
+#: a real oracle id is Scryfall's UUID (``carddata.scryfall`` reads it straight
+#: off the card), *not* the printed name. A fixture that used names here let a
+#: board render every card as a raw id and still pass -- which is exactly what
+#: happened, and what ``CATALOGUE`` below now makes impossible.
+FOREST = "11111111-1111-1111-1111-111111111111"
+BEAR = "22222222-2222-2222-2222-222222222222"
+
+#: What those ids are called. A replay's board must print these words.
+NAMED = {FOREST: "Forest", BEAR: "Grizzly Bears"}
+
+#: A catalogue that knows them, for a server serving replays.
+CATALOGUE = Catalogue(
+    cards={
+        oracle: replace(
+            facts(name, land=name == "Forest", creature=name != "Forest"),
+            oracle_id=OracleId(oracle),
+        )
+        for oracle, name in NAMED.items()
+    },
+    rules=dict.fromkeys(NAMED, ()),
+)
+
+#: Ten cards each: seven for an opening hand and three to draw.
+DECK = (FOREST, FOREST, FOREST, BEAR, FOREST, BEAR, FOREST, FOREST, BEAR, BEAR)
 
 #: A full answer, so every field of the explanation view is exercised.
 ANSWER: dict[str, object] = {
@@ -52,7 +80,7 @@ ANSWER: dict[str, object] = {
 def library(seat: str) -> tuple[CardInstance, ...]:
     """One seat's deck, with ids that say which seat they came from."""
     return tuple(
-        CardInstance(InstanceId(f"{seat}-{n}"), OracleId(name)) for n, name in enumerate(DECK)
+        CardInstance(InstanceId(f"{seat}-{n}"), OracleId(oracle)) for n, oracle in enumerate(DECK)
     )
 
 
@@ -127,14 +155,31 @@ def _decision(
     }
 
 
-def journalled(data_root: Path, name: str = NAME) -> Path:
-    """Write the journal under a data root, and say where it went."""
+def journalled(data_root: Path, name: str = NAME, extra: Sequence[str] = ()) -> Path:
+    """Write the journal under a data root, and say where it went.
+
+    ``extra`` goes in with the decisions, *before* the recording line, because
+    that is where a line of this game belongs: a journal is cut into games at
+    each recording, so a decision appended after one is a decision of the next
+    game, not of this one.
+    """
     path = data_root / "selfplay" / f"{name}.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = [json.dumps(one, ensure_ascii=False) for one in decisions()]
+    lines.extend(extra)
     lines.append(recording().as_json())
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path
+
+
+def serving(data_root: Path) -> FastAPI:
+    """A server that can show the fixture journal, and name the cards in it.
+
+    Its own rather than ``helpers_api.server``'s, because a replay needs a
+    catalogue keyed by the oracle ids the journal holds -- which is the whole
+    point of the UUID-shaped ids above.
+    """
+    return create_app(CATALOGUE, {}, TOKEN, data_root=data_root)
 
 
 def board_at(step: Step) -> GameState:

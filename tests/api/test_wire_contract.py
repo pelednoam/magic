@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from helpers_api import RULES, Answering, Canned, server, talking
-from helpers_replay import NAME, SEED, journalled
+from helpers_replay import NAME, journalled, serving
 from mtgcoach.coach.advice import Explanation
 from mtgcoach.rules.answer import Answer
 from wire import decoded, named, rows, text
@@ -138,12 +138,13 @@ def _replayed(data_root: Path) -> set[str]:
     """
     journalled(data_root)
     found: set[str] = set()
-    with talking(server(data_root=data_root)) as client:
+    with talking(serving(data_root)) as client:
         found.update(keys(decoded(client.get("/replays").json())))
-        walk = client.get(f"/replays/{NAME}")
-        assert walk.status_code == HTTP_OK, walk.text
-        found.update(keys(decoded(walk.json())))
-        stepped = client.post(f"/replays/{NAME}/{SEED}/at/0")
+        for path in (f"/replays/{NAME}", f"/replays/{NAME}/0"):
+            got = client.get(path)
+            assert got.status_code == HTTP_OK, got.text
+            found.update(keys(decoded(got.json())))
+        stepped = client.post(f"/replays/{NAME}/0/at/0")
         assert stepped.status_code == HTTP_OK, stepped.text
         found.update(keys(decoded(stepped.json())))
     return found
@@ -189,5 +190,7 @@ def test_the_turn_actually_covers_the_payload(sent: frozenset[str]) -> None:
         "problems",
         "error",
         "trusted",
+        "decisions",
+        "index",
     }
     assert corners <= sent

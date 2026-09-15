@@ -12,10 +12,13 @@ machinery ``Session.consistent`` uses to prove a live game's cached state
 matches its log. Asking the model again would produce a *different* game and
 show a board that never existed; replaying the events cannot.
 
-Moments are joined to decisions by turn and step, which is unique within a
-game: a self-play game asks at most once per step, and the state a decision
-was made from is the state on entering that step -- which is exactly what the
-coach was shown.
+**A game is a stretch of the file, not a seed.** The harness appends each
+decision as it happens and the recording when the game ends, so the decisions
+belonging to a game are the ones between the previous recording and this one.
+That is what joins them -- not the seed, which two runs into the same journal
+will repeat, and which would then put one game's advice beside another game's
+board. Position cannot collide; a seed can, and did in the obvious way the
+moment anybody re-ran a season without deleting the journal first.
 """
 
 from __future__ import annotations
@@ -24,16 +27,15 @@ import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
+from mtgcoach.api.decisions import Moment, decisions, moment, order
 from mtgcoach.api.recording import KIND, Recording, recorded
-from mtgcoach.coach.advice import Explanation
 from mtgcoach.core.reduce import apply
-from mtgcoach.core.steps import Step
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
     from pathlib import Path
 
     from mtgcoach.core.state import GameState
+    from mtgcoach.core.steps import Step
 
 #: Where a journal lives, under the server's data root.
 FOLDER = "selfplay"
@@ -47,29 +49,23 @@ class UnknownReplayError(KeyError):
 
 
 @dataclass(frozen=True, slots=True)
-class Moment:
-    """One decision in a played game, and the board it was made from."""
-
-    turn: int
-    step: Step
-    player: str
-    state: GameState
-    #: What the coach said, as the thing the coach returns. None when the model
-    #: had no answer -- which is a real moment and worth showing, because the
-    #: game carried on without advice and a child can see that it did.
-    said: Explanation | None = None
-    trusted: bool = False
-    problems: tuple[str, ...] = ()
-    error: str = ""
-
-
-@dataclass(frozen=True, slots=True)
 class Replay:
     """One game from a journal, ready to walk."""
 
+    #: Where it is in the journal. Its address, because it is the only thing
+    #: about a game that is certainly unique.
+    index: int
     seed: int
     decks: tuple[str, str]
     moments: tuple[Moment, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class Written:
+    """One game's lines: the recording, and the decisions made during it."""
+
+    recording: Recording
+    decisions: tuple[dict[str, object], ...] = ()
 
 
 def journals(data_root: Path) -> tuple[str, ...]:
@@ -100,31 +96,79 @@ def games_in(data_root: Path, name: str) -> tuple[Replay, ...]:
     except (OSError, json.JSONDecodeError) as unreadable:
         msg = f"{name}: {type(unreadable).__name__}"
         raise UnknownReplayError(msg) from unreadable
-    played = tuple(_replay(recording, lines) for recording in _recordings(lines))
+    played = tuple(
+        game
+        for at, written in enumerate(_games(cast("list[object]", lines)))
+        if (game := _replay(at, written)) is not None
+    )
     if not played:
-        msg = f"{name} has no game recording in it; it may be from an interrupted run"
+        msg = f"{name} has no game in it that can be rebuilt; it may be from an interrupted run"
         raise UnknownReplayError(msg)
     return played
 
 
-def _recordings(lines: list[object]) -> Iterator[Recording]:
-    """The game lines, in order."""
+def _games(lines: list[object]) -> list[Written]:
+    """The journal, cut into games at each recording line.
+
+    Decisions that come after the last recording belong to a game that never
+    finished, and are dropped. That is the right way round: a recording is
+    written when a game ends, so decisions with none after them are a run that
+    was killed mid-game, and there is no board to show them against.
+    """
+    made: list[Written] = []
+    pending: list[dict[str, object]] = []
     for line in lines:
-        found = recorded(line)
+        if not isinstance(line, dict):
+            continue
+        entry = cast("dict[str, object]", line)
+        if entry.get("kind") != KIND:
+            pending.append(entry)
+            continue
+        found = _recording(entry)
         if found is not None:
-            yield found
+            made.append(Written(recording=found, decisions=tuple(pending)))
+        pending = []
+    return made
 
 
-def _replay(recording: Recording, lines: list[object]) -> Replay:
-    """One game, rebuilt, with its decisions attached."""
-    boards = _boards(recording)
-    said = _decisions(lines, recording.seed)
+def _recording(entry: dict[str, object]) -> Recording | None:
+    """A game line, or None if it cannot be trusted to rebuild one.
+
+    A damaged deal is refused rather than repaired. Dropping one card from a
+    library shifts every card after it, and the boards that then rebuild are
+    boards that never existed -- which is worse than a game the screen cannot
+    show, and much worse on this screen than anywhere else.
+    """
+    try:
+        return recorded(entry)
+    except ValueError:
+        return None
+
+
+def _replay(index: int, written: Written) -> Replay | None:
+    """One game, rebuilt, with its decisions attached.
+
+    None when the recording will not rebuild -- a library too short for an
+    opening hand, a seat missing. A journal is a file that a killed process may
+    have half-written, so one damaged game is not a reason to refuse the rest
+    of a season.
+    """
+    try:
+        boards = _boards(written.recording)
+    except ValueError:
+        return None
+    said = decisions(written.decisions)
     moments = tuple(
-        _moment(turn, step, boards[turn, step], said.get((turn, step)))
-        for (turn, step) in sorted(boards, key=lambda at: (at[0], _order(at[1])))
-        if (turn, step) in said
+        moment(turn, step, boards[turn, step], entry)
+        for (turn, step, _), entry in sorted(said.items(), key=lambda one: order(one[0]))
+        if (turn, step) in boards
     )
-    return Replay(seed=recording.seed, decks=recording.decks, moments=moments)
+    return Replay(
+        index=index,
+        seed=written.recording.seed,
+        decks=written.recording.decks,
+        moments=moments,
+    )
 
 
 def _boards(recording: Recording) -> dict[tuple[int, Step], GameState]:
@@ -132,6 +176,9 @@ def _boards(recording: Recording) -> dict[tuple[int, Step], GameState]:
 
     The *first* state seen at each turn and step, which is the board before
     anything was done there -- and so the board the coach was shown.
+
+    Raises:
+        ValueError: If the recording's libraries are not a game.
     """
     state = recording.opening()
     seen: dict[tuple[int, Step], GameState] = {(state.turn, state.step): state}
@@ -139,61 +186,3 @@ def _boards(recording: Recording) -> dict[tuple[int, Step], GameState]:
         state = apply(state, event)
         seen.setdefault((state.turn, state.step), state)
     return seen
-
-
-def _decisions(lines: list[object], seed: int) -> dict[tuple[int, Step], dict[str, object]]:
-    """Every decision of one game, by the moment it was made."""
-    found: dict[tuple[int, Step], dict[str, object]] = {}
-    for line in lines:
-        if not isinstance(line, dict):
-            continue
-        entry = cast("dict[str, object]", line)
-        if entry.get("kind") == KIND or entry.get("seed") != seed:
-            continue
-        turn, step = entry.get("turn"), entry.get("step")
-        if isinstance(turn, int) and isinstance(step, str) and step in set(Step):
-            found[turn, Step(step)] = entry
-    return found
-
-
-def _moment(turn: int, step: Step, state: GameState, entry: dict[str, object] | None) -> Moment:
-    """One decision, as something a screen can show."""
-    said = (entry or {}).get("answer")
-    problems = (entry or {}).get("problems")
-    return Moment(
-        turn=turn,
-        step=step,
-        player=str((entry or {}).get("player", "")),
-        state=state,
-        said=_explanation(cast("dict[str, object]", said)) if isinstance(said, dict) else None,
-        trusted=bool((entry or {}).get("trusted", False)),
-        problems=tuple(str(one) for one in _listed(problems)),
-        error=str((entry or {}).get("error", "")),
-    )
-
-
-def _explanation(answer: dict[str, object]) -> Explanation:
-    """A recorded answer, back as the thing the coach returns.
-
-    So a replayed moment goes out through ``views.explanation``, exactly like a
-    live one -- and the app renders last night's advice with the component it
-    already uses for this afternoon's.
-    """
-    return Explanation(
-        play=str(answer.get("play", "")),
-        attack=tuple(str(one) for one in _listed(answer.get("attack"))),
-        because=str(answer.get("because", "")),
-        in_short=str(answer.get("in_short", "")),
-        watch_out=tuple(str(one) for one in _listed(answer.get("watch_out"))),
-        check_yourself=tuple(str(one) for one in _listed(answer.get("check_yourself"))),
-    )
-
-
-def _listed(value: object) -> list[object]:
-    """A JSON array, or nothing."""
-    return cast("list[object]", value) if isinstance(value, list) else []
-
-
-def _order(step: Step) -> int:
-    """Where a step comes in a turn, so moments walk forwards."""
-    return list(Step).index(step)

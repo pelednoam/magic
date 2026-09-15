@@ -48,19 +48,32 @@ def test_a_recording_with_no_decks_still_reads() -> None:
     assert found.decks == ("", "")
 
 
-def test_a_library_entry_that_is_not_a_pair_is_dropped() -> None:
-    """A card is an instance and an oracle id. Anything else is not a card."""
-    found = recorded(
-        {
-            "kind": KIND,
-            "seed": SEED,
-            "first": "you",
-            "decks": ["green", "other"],
-            "libraries": {"you": [["a", "Forest"], ["b"], "c"], "them": "not a library"},
-        }
-    )
-    assert found is not None
-    assert found.libraries == {"you": (("a", "Forest"),)}
+@pytest.mark.parametrize(
+    "libraries",
+    [
+        {"you": [["a", "Forest"], ["b"]]},
+        {"you": [["a", "Forest"], "c"]},
+        {"you": "not a library"},
+    ],
+)
+def test_a_library_that_is_not_cards_is_refused(libraries: dict[str, object]) -> None:
+    """Refused, not repaired.
+
+    Dropping a malformed entry and carrying on shifts every card after it, so
+    the game that rebuilds has different hands and different draws from the one
+    that was played -- and nothing on screen says so. A game the screen refuses
+    to show is much the better failure, and ``games_in`` skips just that game.
+    """
+    with pytest.raises(ValueError, match="you"):
+        recorded(
+            {
+                "kind": KIND,
+                "seed": SEED,
+                "first": "you",
+                "decks": ["green", "other"],
+                "libraries": libraries,
+            }
+        )
 
 
 def test_a_truncated_event_log_stops_where_it_was_cut() -> None:
