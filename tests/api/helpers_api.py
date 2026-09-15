@@ -148,13 +148,15 @@ def server(
     explainer: Explainer | None = None,
     asker: Asker | None = None,
     rules: RuleIndex | None = None,
+    data_root: Path | None = None,
 ) -> FastAPI:
     """An app with the small catalogue and two identical decks.
 
     Both models default to the ones that refuse, so no test can accidentally
     spawn a real ``claude``. ``rules`` defaults to *absent*, which is the state
     a server without the Comprehensive Rules installed is in -- a test that
-    wants the question box working asks for ``RULES``.
+    wants the question box working asks for ``RULES``. ``data_root`` defaults
+    to absent too, which is a server with no journals to replay.
     """
     return create_app(
         CATALOGUE,
@@ -165,6 +167,7 @@ def server(
             asker=asker if asker is not None else NoAnswers(),
             rules=rules,
         ),
+        data_root=data_root,
     )
 
 

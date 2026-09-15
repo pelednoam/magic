@@ -14,18 +14,21 @@ game exactly, and reading what a bad piece of advice was actually asked.
 Keyed by turn, step and player rather than by order. Replaying in order would
 silently misalign the moment a game diverged; a key that is missing is a
 finding, and a loud one.
+
+This is the writing half. ``answers`` reads a journal back.
 """
 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, cast
-
-from mtgcoach.coach.advice import Explanation
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from mtgcoach.api.recording import Recording
+    from mtgcoach.coach.advice import Explanation
 
 #: One decision's identity: which game, when in it, and whose.
 type Moment = tuple[int, int, str, str]
@@ -86,91 +89,24 @@ class Journal:
 
     def write(self, decision: Decision) -> None:
         """Append one decision."""
+        self._append(decision.as_json())
+
+    def write_game(self, recording: Recording) -> None:
+        """Append the game itself: how it was dealt and what happened.
+
+        Written at the end rather than the start, because the event log is not
+        known until then. A run killed mid-game therefore keeps its decisions
+        and loses its recording, which is the right way round -- the decisions
+        are what the coach said, and the recording can be produced again by
+        replaying them.
+        """
+        self._append(recording.as_json())
+
+    def _append(self, line: str) -> None:
+        """One line, opened and closed around it."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8") as file:
-            file.write(decision.as_json() + "\n")
-
-
-@dataclass(frozen=True, slots=True)
-class Answers:
-    """Decisions read back, ready to be replayed."""
-
-    said: dict[Moment, Decision] = field(default_factory=dict[Moment, Decision])
-
-    def at(self, moment: Moment) -> Decision | None:
-        """What was decided then, or None if this journal does not say."""
-        return self.said.get(moment)
-
-    def __len__(self) -> int:
-        """How many decisions are in it."""
-        return len(self.said)
-
-
-def read(path: Path) -> Answers:
-    """Every decision in a journal.
-
-    A line that is not readable is skipped rather than fatal. A journal is
-    written by a process that may have been killed mid-write, and losing the
-    last line of a three-hour run is not a reason to refuse the other four
-    hundred.
-
-    Raises:
-        OSError: If the file cannot be read at all.
-    """
-    said: dict[Moment, Decision] = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
-        made = _decision(line)
-        if made is not None:
-            said[made.moment] = made
-    return Answers(said=said)
-
-
-def _decision(line: str) -> Decision | None:
-    """One line, or None if it is not one."""
-    if not line.strip():
-        return None
-    try:
-        loaded = json.loads(line)
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(loaded, dict):
-        return None
-    return _from(cast("dict[str, object]", loaded))
-
-
-def _from(loaded: dict[str, object]) -> Decision | None:
-    """A decision from a decoded line, or None if it is missing what it needs."""
-    seed, turn = loaded.get("seed"), loaded.get("turn")
-    step, player = loaded.get("step"), loaded.get("player")
-    if not (isinstance(seed, int) and isinstance(turn, int)):
-        return None
-    if not (isinstance(step, str) and isinstance(player, str)):
-        return None
-    answer = loaded.get("answer")
-    problems = loaded.get("problems")
-    return Decision(
-        seed=seed,
-        turn=turn,
-        step=step,
-        player=player,
-        briefing=str(loaded.get("briefing", "")),
-        answer=cast("dict[str, object]", answer) if isinstance(answer, dict) else None,
-        error=str(loaded.get("error", "")),
-        trusted=bool(loaded.get("trusted", False)),
-        problems=tuple(str(one) for one in _listed(problems)),
-    )
-
-
-def explanation(answer: dict[str, object]) -> Explanation:
-    """A journalled answer, back as the thing the coach returned."""
-    return Explanation(
-        play=str(answer.get("play", "")),
-        attack=tuple(str(one) for one in _listed(answer.get("attack"))),
-        because=str(answer.get("because", "")),
-        in_short=str(answer.get("in_short", "")),
-        watch_out=tuple(str(one) for one in _listed(answer.get("watch_out"))),
-        check_yourself=tuple(str(one) for one in _listed(answer.get("check_yourself"))),
-    )
+            file.write(line + "\n")
 
 
 def fields(said: Explanation) -> dict[str, object]:
@@ -183,8 +119,3 @@ def fields(said: Explanation) -> dict[str, object]:
         "watch_out": list(said.watch_out),
         "check_yourself": list(said.check_yourself),
     }
-
-
-def _listed(value: object) -> list[object]:
-    """A JSON array, or nothing."""
-    return cast("list[object]", value) if isinstance(value, list) else []

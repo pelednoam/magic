@@ -10,7 +10,7 @@ from typing import get_args
 
 import pytest
 
-from mtgcoach.api.eventspec import BadEventError, parse
+from mtgcoach.api.eventspec import BadEventError, parse, written
 from mtgcoach.core.events import (
     AdvanceStep,
     ChangeLife,
@@ -122,3 +122,32 @@ def test_every_event_type_the_engine_has_can_be_sent() -> None:
 def _wire_name(class_name: str) -> str:
     """``PlayLand`` as a client would spell it."""
     return "".join("_" + c.lower() if c.isupper() else c for c in class_name).lstrip("_")
+
+
+#: One of every event, for the round trip. Built with real values rather than
+#: defaults so a field dropped on the way out is visible on the way back.
+EVERY_EVENT: tuple[Event, ...] = (
+    AdvanceStep(),
+    DrawCard(PlayerId("you")),
+    PlayLand(PlayerId("you"), InstanceId("card-1")),
+    SetTapped(PlayerId("them"), InstanceId("card-2"), tapped=True),
+    MoveCard(PlayerId("you"), InstanceId("card-3"), ZoneName.GRAVEYARD),
+    ChangeLife(PlayerId("them"), -3),
+)
+
+
+@pytest.mark.parametrize("event", EVERY_EVENT)
+def test_an_event_survives_being_written_down_and_read_back(event: Event) -> None:
+    """The property a recorded game depends on.
+
+    A journal keeps the event log; a replay parses it back and folds it over
+    the opening board. If those two disagree about a single field, the board a
+    child is shown is not the board that was played -- silently, because both
+    halves would still be valid JSON.
+    """
+    assert parse(written(event)) == event
+
+
+def test_every_event_can_be_written_down() -> None:
+    """Guard on the guard: a new event with no round trip above."""
+    assert {type(event) for event in EVERY_EVENT} == set(get_args(Event.__value__))

@@ -15,8 +15,9 @@ from helpers_selfplay import BOOK, THEM, YOU, game, main_phase
 
 from mtgcoach.coach.advice import Explanation
 from mtgcoach.coach.report import advise
+from mtgcoach.selfplay.answers import Answers, read
 from mtgcoach.selfplay.coached import Coached
-from mtgcoach.selfplay.journal import Answers, Decision, Journal, fields, read
+from mtgcoach.selfplay.journal import Decision, Journal, fields
 from mtgcoach.selfplay.moves import Move, Seat
 from mtgcoach.selfplay.playing import play
 from mtgcoach.selfplay.replaying import DivergedError, Replayed

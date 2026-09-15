@@ -68,9 +68,22 @@ which is the only way bad advice shows up, since it compounds. That run reports 
 answers survived the engine's checks.
 
 A seed reproduces a deal exactly but not the coach, so a coached run writes a **journal** — every
-briefing, every answer, every verdict — and `--replay` plays it back: the identical game in a
-second instead of twenty minutes, and a way to ask what a change to the engine does to a game the
-coach already played. [docs/SELFPLAY.md](docs/SELFPLAY.md) has the whole thing.
+briefing, every answer, every verdict, and the game itself as the events it applied. `--replay`
+plays it back: the identical game in a second instead of twenty minutes, and a way to ask what a
+change to the engine does to a game the coach already played.
+[docs/SELFPLAY.md](docs/SELFPLAY.md) has the whole thing.
+
+## Walking a game that was played
+
+Start the server with a `--data` directory holding journals and the app grows a third screen:
+pick a run, pick a game, and step through it one decision at a time — the board, what the coach
+said, and the engine's objections beside it where it refused. "Ask about this" turns that moment
+into a real game on the server, so the question box and the coach both answer about *that*
+position rather than one like it.
+
+Nothing is re-asked to build it. Each moment is the recorded events folded over the opening
+board — `core` and nothing else — so what is on screen is what happened in the game, which is
+what it has to be for somebody to learn the rules from it.
 
 `sets fetch` is the only command that touches the network. It asks Scryfall for one set —
 771 printings for Foundations, five requests — and writes them to a file, so re-importing

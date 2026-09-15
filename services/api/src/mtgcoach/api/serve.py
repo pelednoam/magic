@@ -82,7 +82,7 @@ def assemble(db: Path, data_root: Path, set_code: SetCode) -> Serving:
 
     decks = {deck.key: _library(deck, names) for deck in load_set_decks(data_root, set_code)}
     token = token_at(data_root / TOKEN_PATH)
-    app = create_app(catalogue, decks, token, Claude(rules=_rules(data_root)))
+    app = create_app(catalogue, decks, token, Claude(rules=_rules(data_root)), data_root)
     return Serving(app=app, token=token)
 
 

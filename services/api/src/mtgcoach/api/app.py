@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 from fastapi import HTTPException, WebSocket
 from starlette.status import HTTP_400_BAD_REQUEST
 
-from mtgcoach.api import thinking
+from mtgcoach.api import thinking, walking
 from mtgcoach.api.access import MissingTokenError
 from mtgcoach.api.asker import ClaudeCliAsker
 from mtgcoach.api.context import Claude, Server, session, snapshot
@@ -33,6 +33,7 @@ from mtgcoach.core.ids import PlayerId
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+    from pathlib import Path
 
     from fastapi import FastAPI
 
@@ -45,6 +46,7 @@ def create_app(
     decks: Mapping[str, tuple[str, ...]],
     token: str,
     claude: Claude | None = None,
+    data_root: Path | None = None,
 ) -> FastAPI:
     """Build the application around a set of cards and the decks it can deal.
 
@@ -53,6 +55,9 @@ def create_app(
     run can deal the Beginner Box's ten.
 
     ``claude`` carries the two models and the rules index; see ``context.Claude``.
+
+    ``data_root`` is where the self-play journals live, for the replay routes.
+    Optional, because a test server has none and honestly has no replays.
 
     ``token`` is required and may not be empty. There is deliberately no open
     mode: an argument that can be left out is an argument that gets left out,
@@ -73,6 +78,7 @@ def create_app(
         explainer=asked.explainer if asked.explainer is not None else ClaudeCliExplainer(),
         asker=asked.asker if asked.asker is not None else ClaudeCliAsker(),
         rules=asked.rules,
+        data_root=data_root,
     )
     app = guarded(token)
     _routes(app, server)
@@ -88,6 +94,7 @@ def _routes(app: FastAPI, server: Server) -> None:
     _reading(app, server)
     _playing(app, server)
     thinking.routes(app, server)
+    walking.routes(app, server)
 
 
 def _reading(app: FastAPI, server: Server) -> None:

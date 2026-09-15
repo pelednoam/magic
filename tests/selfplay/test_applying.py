@@ -17,6 +17,7 @@ from mtgcoach.coach.report import advise
 from mtgcoach.core.combat.board import Outcome
 from mtgcoach.core.combat.model import Creature
 from mtgcoach.core.combat.search import Plan
+from mtgcoach.core.reduce import replay
 from mtgcoach.core.zones import ZoneName
 from mtgcoach.selfplay.applying import attacked, played
 
@@ -39,7 +40,7 @@ def test_a_land_is_played_with_the_land_drop() -> None:
     """
     state = main_phase()
     card = _playable(state)
-    after = played(state, YOU, card)
+    after = played(state, YOU, card).state
     assert after.player(YOU).lands_played_this_turn == 1
     assert card.instance_id in {p.instance_id for p in after.player(YOU).battlefield}
 
@@ -49,13 +50,13 @@ def test_casting_taps_the_sources_the_payment_named() -> None:
     with_lands = main_phase()
     # Two forests down and untapped, and a bear affordable.
     for _ in range(2):
-        with_lands = played(with_lands, YOU, _playable(with_lands))
+        with_lands = played(with_lands, YOU, _playable(with_lands)).state
         with_lands = with_lands.with_player(
             YOU, replace(with_lands.player(YOU), lands_played_this_turn=0)
         )
     bear = next(card for card in advise(with_lands, YOU, BOOK).playable if not card.is_land)
     assert bear.payment is not None
-    after = played(with_lands, YOU, bear)
+    after = played(with_lands, YOU, bear).state
     tapped = {p.instance_id for p in after.player(YOU).battlefield if p.tapped}
     assert tapped == set(bear.payment.tapped)
     assert bear.instance_id in {p.instance_id for p in after.player(YOU).battlefield}
@@ -66,12 +67,12 @@ def test_an_attack_applies_the_engines_own_numbers() -> None:
     state = game()
     before = state.player(THEM).life
     plan = Plan(attackers=(), outcome=Outcome(damage_to_defender=3), defender_life_after=before - 3)
-    after = attacked(state, YOU, plan)
+    after = attacked(state, YOU, plan).state
     assert after.player(THEM).life == before - 3
 
 
 def test_the_creatures_an_attack_loses_go_to_the_graveyard() -> None:
-    state = played(main_phase(), YOU, _playable(main_phase()))
+    state = played(main_phase(), YOU, _playable(main_phase())).state
     permanent = state.player(YOU).battlefield[0]
     facts = BOOK.facts(permanent.card.oracle_id)
     assert facts is not None
@@ -81,7 +82,7 @@ def test_the_creatures_an_attack_loses_go_to_the_graveyard() -> None:
         outcome=Outcome(attackers_lost=(creature,)),
         defender_life_after=state.player(THEM).life,
     )
-    after = attacked(state, YOU, plan)
+    after = attacked(state, YOU, plan).state
     assert after.player(YOU).battlefield == ()
     assert permanent.card.instance_id in {c.instance_id for c in after.player(YOU).graveyard}
 
@@ -99,7 +100,7 @@ def test_lifelink_on_either_side_is_applied() -> None:
         outcome=Outcome(attacker_life_gained=2, defender_life_gained=3),
         defender_life_after=theirs,
     )
-    after = attacked(state, YOU, plan)
+    after = attacked(state, YOU, plan).state
     assert after.player(YOU).life == mine + 2
     assert after.player(THEM).life == theirs + 3
 
@@ -107,7 +108,7 @@ def test_lifelink_on_either_side_is_applied() -> None:
 def test_an_attack_that_does_nothing_changes_nothing() -> None:
     state = game()
     plan = Plan(attackers=(), outcome=Outcome(), defender_life_after=state.player(THEM).life)
-    assert attacked(state, YOU, plan).players == state.players
+    assert attacked(state, YOU, plan).state.players == state.players
 
 
 def test_a_card_moved_to_the_battlefield_is_a_permanent() -> None:
@@ -116,5 +117,30 @@ def test_a_card_moved_to_the_battlefield_is_a_permanent() -> None:
     Spelled out, because `MoveCard` would take any of them.
     """
     state = main_phase()
-    after = played(state, YOU, _playable(state))
+    after = played(state, YOU, _playable(state)).state
     assert after.player(YOU).zone(ZoneName.BATTLEFIELD)
+
+
+def test_what_was_applied_comes_back_with_the_state() -> None:
+    """The log is what makes a game replayable by anything holding `core`.
+
+    The journal records it and the API rebuilds any moment from it, so the
+    board a child is shown is what the events produced rather than a
+    re-derivation a later engine change could alter.
+    """
+    state = main_phase()
+    done = played(state, YOU, _playable(state))
+    assert done.events, "a land drop is an event"
+    assert replay(state, done.events) == done.state, "the log rebuilds the state exactly"
+
+
+def test_an_attacks_whole_outcome_is_in_the_log() -> None:
+    state = game()
+    plan = Plan(
+        attackers=(),
+        outcome=Outcome(damage_to_defender=2, attacker_life_gained=1),
+        defender_life_after=state.player(THEM).life - 2,
+    )
+    done = attacked(state, YOU, plan)
+    assert len(done.events) == 2, "the damage and the lifelink"
+    assert replay(state, done.events) == done.state

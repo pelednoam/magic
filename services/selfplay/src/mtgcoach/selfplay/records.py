@@ -16,6 +16,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from mtgcoach.core.events import Event
     from mtgcoach.core.ids import PlayerId
     from mtgcoach.core.steps import Step
     from mtgcoach.selfplay.coached import Tally
@@ -100,6 +101,10 @@ class Game:
     #: is the single most useful number for deciding what to work on next.
     unknown: tuple[str, ...] = ()
     events: int = 0
+    #: Every event, in order. What makes the game replayable by anything
+    #: holding `core` -- the journal records it and the API rebuilds any
+    #: moment of it from there.
+    log: tuple[Event, ...] = ()
     #: What this game actually reached. Without it a season reports "300 clean
     #: games" when it might have played three hundred games in which nothing
     #: happened, and a harness that cannot tell those apart is not evidence.

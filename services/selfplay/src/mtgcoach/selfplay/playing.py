@@ -28,6 +28,7 @@ from mtgcoach.selfplay.records import Game, Kind, Reached, Trouble
 if TYPE_CHECKING:
     from mtgcoach.coach.lookup import CardLookup
     from mtgcoach.coach.report import TurnReport
+    from mtgcoach.core.events import Event
     from mtgcoach.core.ids import PlayerId
     from mtgcoach.core.state import GameState
     from mtgcoach.selfplay.moves import Seat
@@ -58,6 +59,10 @@ class Run:
     unknown: set[str] = field(default_factory=set[str])
     events: int = 0
     reached: Reached = field(default_factory=Reached)
+    #: Every event this game applied, in order. The record that makes a game
+    #: replayable by anything holding `core`: the journal stores it, and the
+    #: API rebuilds any moment of it with `reduce.replay` alone.
+    log: list[Event] = field(default_factory=list["Event"])
 
     def also(self, **more: int) -> None:
         """Add to what this game reached."""
@@ -106,13 +111,15 @@ def _decide(state: GameState, seat: Seat, report: TurnReport, run: Run) -> GameS
         move = seat.agent.act(state, report, seat.player)
         if move.play is not None:
             card = offered(report, move.play)
-            state = applying.played(state, seat.player, card)
+            done = applying.played(state, seat.player, card)
+            state = _logged(run, done)
             if card.is_land:
                 run.also(lands=1)
             else:
                 run.also(spells=1)
         elif move.attack:
-            state = applying.attacked(state, seat.player, planned(report, move.attack))
+            done = applying.attacked(state, seat.player, planned(report, move.attack))
+            state = _logged(run, done)
             run.also(attacks=1)
     except (IllegalEventError, LookupError) as refused:
         run.trouble.append(Trouble(Kind.REFUSED, str(refused), state.turn, state.step, seat.player))
@@ -145,6 +152,7 @@ def _stepped(state: GameState, run: Run) -> tuple[GameState, bool]:
     before = state
     try:
         state = apply(state, AdvanceStep())
+        run.log.append(AdvanceStep())
     except IllegalEventError:
         return before, False
     except Exception as crashed:  # noqa: BLE001 - see `_decide`
@@ -158,6 +166,12 @@ def _stepped(state: GameState, run: Run) -> tuple[GameState, bool]:
     )
     run.events += 1
     return state, True
+
+
+def _logged(run: Run, done: applying.Applied) -> GameState:
+    """Keep what was applied, and hand back where it got to."""
+    run.log.extend(done.events)
+    return done.state
 
 
 def _dead(state: GameState) -> PlayerId | None:
@@ -176,5 +190,6 @@ def _over(run: Run, state: GameState, dead: PlayerId | None, ending: str = "life
         trouble=tuple(run.trouble),
         unknown=tuple(sorted(run.unknown)),
         events=run.events,
+        log=tuple(run.log),
         reached=run.reached,
     )

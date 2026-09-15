@@ -22,6 +22,7 @@ from mtgcoach.coach.table import table
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+    from pathlib import Path
 
     from mtgcoach.api.cards import Catalogue
     from mtgcoach.api.hub import Hub
@@ -68,6 +69,10 @@ class Server:
     #: route then says so, and everything else works exactly as before -- the
     #: tracker and the turn coach do not need the rules document.
     rules: RuleIndex | None
+    #: Where this server's data lives, so the replay routes can find the
+    #: self-play journals under it. A server built by a test has no data root
+    #: and simply has no replays, which is the honest answer for one.
+    data_root: Path | None = None
     #: How often and how many at once the slow routes may be asked. Per-server
     #: rather than per-module: everything else the routes need is here, two
     #: servers in one process are two servers, and a module global made one

@@ -16,6 +16,7 @@ that the defender blocks as well as they can.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from mtgcoach.core.events import ChangeLife, MoveCard, PlayLand, SetTapped
@@ -23,13 +24,25 @@ from mtgcoach.core.reduce import apply
 from mtgcoach.core.zones import ZoneName
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from mtgcoach.coach.report import Playable
+    from mtgcoach.core.combat.model import Creature
     from mtgcoach.core.combat.search import Plan
+    from mtgcoach.core.events import Event
     from mtgcoach.core.ids import PlayerId
     from mtgcoach.core.state import GameState
 
 
-def played(state: GameState, player: PlayerId, card: Playable) -> GameState:
+@dataclass(frozen=True, slots=True)
+class Applied:
+    """A state, and the events that got it there."""
+
+    state: GameState
+    events: tuple[Event, ...]
+
+
+def played(state: GameState, player: PlayerId, card: Playable) -> Applied:
     """Put this card onto the battlefield, paying for it if it is not a land.
 
     Raises:
@@ -39,16 +52,16 @@ def played(state: GameState, player: PlayerId, card: Playable) -> GameState:
             itself, which is the most interesting thing this harness can find.
     """
     if card.is_land:
-        return apply(state, PlayLand(player=player, instance_id=card.instance_id))
-    for source in card.payment.tapped if card.payment else ():
-        state = apply(state, SetTapped(player=player, instance_id=source, tapped=True))
-    return apply(
-        state,
-        MoveCard(player=player, instance_id=card.instance_id, to=ZoneName.BATTLEFIELD),
-    )
+        return _done(state, [PlayLand(player=player, instance_id=card.instance_id)])
+    paying = [
+        SetTapped(player=player, instance_id=source, tapped=True)
+        for source in (card.payment.tapped if card.payment else ())
+    ]
+    casting = MoveCard(player=player, instance_id=card.instance_id, to=ZoneName.BATTLEFIELD)
+    return _done(state, [*paying, casting])
 
 
-def attacked(state: GameState, attacker: PlayerId, plan: Plan) -> GameState:
+def attacked(state: GameState, attacker: PlayerId, plan: Plan) -> Applied:
     """Resolve this attack, using the engine's own numbers for what it does.
 
     Order matters and is the order the rules use: damage, then deaths, then the
@@ -59,29 +72,38 @@ def attacked(state: GameState, attacker: PlayerId, plan: Plan) -> GameState:
     """
     defender = state.opponent_of(attacker)
     outcome = plan.outcome
+    events: list[Event] = []
     if outcome.damage_to_defender:
-        state = apply(state, ChangeLife(player=defender, amount=-outcome.damage_to_defender))
-    state = _died(state, attacker, plan)
-    state = _died(state, defender, plan, blockers=True)
-    for player, gained in (
-        (attacker, outcome.attacker_life_gained),
-        (defender, outcome.defender_life_gained),
-    ):
-        if gained:
-            state = apply(state, ChangeLife(player=player, amount=gained))
-    return state
-
-
-def _died(state: GameState, player: PlayerId, plan: Plan, *, blockers: bool = False) -> GameState:
-    """Move one side's losses to the graveyard."""
-    lost = plan.outcome.blockers_lost if blockers else plan.outcome.attackers_lost
-    for creature in lost:
-        state = apply(
-            state,
-            MoveCard(
-                player=player,
-                instance_id=creature.instance_id,
-                to=ZoneName.GRAVEYARD,
-            ),
+        events.append(ChangeLife(player=defender, amount=-outcome.damage_to_defender))
+    events += _died(attacker, outcome.attackers_lost)
+    events += _died(defender, outcome.blockers_lost)
+    events += [
+        ChangeLife(player=player, amount=gained)
+        for player, gained in (
+            (attacker, outcome.attacker_life_gained),
+            (defender, outcome.defender_life_gained),
         )
-    return state
+        if gained
+    ]
+    return _done(state, events)
+
+
+def _died(player: PlayerId, lost: Sequence[Creature]) -> list[Event]:
+    """One side's losses, on their way to the graveyard."""
+    return [
+        MoveCard(player=player, instance_id=creature.instance_id, to=ZoneName.GRAVEYARD)
+        for creature in lost
+    ]
+
+
+def _done(state: GameState, events: Sequence[Event]) -> Applied:
+    """Apply these in order, and hand back both the result and the log.
+
+    The log is what makes a game *replayable by anything*: the journal records
+    it, and the API rebuilds any moment with `core.reduce.replay` alone. That
+    keeps the replay exact -- the board is what the events produced, not a
+    re-derivation that a later change to the engine could quietly alter.
+    """
+    for event in events:
+        state = apply(state, event)
+    return Applied(state, tuple(events))

@@ -104,6 +104,24 @@ class SessionStore:
         self.games[session.session_id] = session
         return session
 
+    def adopt(self, state: GameState) -> Session:
+        """Remember a game that is already in progress.
+
+        For stepping into a moment of a *replayed* game: the board is rebuilt
+        from a recording's event log, and adopting it makes every route that
+        already exists work on it -- asking a rules question about the
+        position, getting the coach's view of it, or simply playing on from
+        there to see what would have happened.
+
+        Its log starts empty and its ``initial`` is where it was adopted, so
+        ``consistent`` still holds and undo reaches back to the moment stepped
+        into and no further. Undoing into somebody else's game would be a
+        stranger thing than not being able to.
+        """
+        session = Session(uuid4().hex, initial=state, events=(), state=state)
+        self.games[session.session_id] = session
+        return session
+
     def get(self, session_id: str) -> Session:
         """The game by that name.
 

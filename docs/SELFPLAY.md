@@ -172,17 +172,48 @@ Journals are not committed — they hold the full briefing for every decision an
 Keep the ones that found something; the command that produced each is in the table above, and the
 `.log` beside it has the summary that run printed.
 
-## What the journal is for next
+## What the journal is also for: stepping through a game
 
-A journal is a played game with every board and every piece of advice in it, keyed by turn, step
-and player. That is exactly what a **step-through replay** needs — walk a game one decision at a
-time in the UI, so a child can see what happened and ask about it. The engine half is done: a
-journal already replays deterministically. What is missing is a route that serves one as an
-ordered list of moments and a screen with forward and back. See §10 of PLAN.md.
+A coached journal is what the **step-through replay** reads. The app lists the journals a server
+has, then the games in one, then walks a game a decision at a time — board, what the coach said,
+and the engine's objections when it refused. See §10 of PLAN.md for the routes and the screens.
 
-Two properties make it teaching rather than logging, and the data already has both: every position
-can be re-asked, because the board is right there; and the advice recorded is the advice that was
-*checked*, so what he reads was true when it was shown.
+For that to work a journal has to hold the *game* as well as the decisions, and it does: at the
+end of each game the harness appends one more line — the libraries it was dealt and every event it
+applied, in order. Rebuilding a moment is then `start_game` plus `reduce.replay`, which is `core`
+and nothing else. Nothing is re-asked, so the board shown is the board that was played.
+
+```
+{"seed": 100, "turn": 7, "step": "declare_attackers", ...}   ← a decision
+{"seed": 100, "turn": 7, "step": "postcombat_main",  ...}    ← a decision
+{"kind": "game", "seed": 100, "libraries": {...}, "events": [...]}  ← the game
+```
+
+**The recording is written last**, because the event log is not known until then. A run killed
+mid-game therefore keeps its decisions and loses its recording, which is the right way round: the
+decisions are what the coach said and cannot be produced again, and the recording can be, by
+replaying them. It does mean such a journal cannot be *shown* — `GET /replays/{name}` answers 404
+saying so, rather than showing an empty screen.
+
+`data/selfplay/overnight.jsonl` is in exactly that state: it was launched before the harness
+learned to record games, so it has games of advice and no boards to hang them on. Re-run it with
+`--replay` to get a journal that can be walked:
+
+```bash
+uv run python -m mtgcoach.selfplay --games 12 --seed 100 \
+  --replay data/selfplay/overnight.jsonl --journal data/selfplay/walkable.jsonl
+```
+
+That replays the recorded answers rather than asking Claude again, so it costs seconds rather than
+hours, and it writes a full journal of its own: the same advice, a recording of each game, and
+**today's verdict on each answer**. The verdict is the run's own rather than the old journal's on
+purpose — the new journal describes the game that just happened, and if the engine has grown
+stricter since, a move that was played the first time is refused this time and the game diverges.
+That divergence is the finding; `--replay`'s summary carries the comparison
+(`… (journal said trusted=True)`), and a moment the old journal cannot answer stops that game
+rather than being guessed at.
+
+Three games of `overnight` rebuilt this way produced 81, 56 and 71 walkable moments.
 
 Which is a reason to keep the journals of games worth walking through, even though they are
 gitignored by default.

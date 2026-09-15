@@ -18,6 +18,12 @@ Two things to do with that, and they answer different questions:
 A moment the journal does not have is refused rather than guessed. Replay whose
 gaps are quietly filled with "do nothing" is not a replay, and the divergence
 it hides is the most interesting thing that could have happened.
+
+A replay writes a journal of its own when given one, and that journal is about
+*this* run: the same answers, today's verdicts, and a recording of the game
+they actually produced. Which is how a coached run from before the harness
+recorded games becomes one that can be stepped through -- in seconds, without
+asking the model anything.
 """
 
 from __future__ import annotations
@@ -27,15 +33,17 @@ from typing import TYPE_CHECKING
 
 from mtgcoach.coach.advice import verify
 from mtgcoach.core.ids import InstanceId
-from mtgcoach.selfplay import journal
+from mtgcoach.selfplay import answers
 from mtgcoach.selfplay.coached import Tally
+from mtgcoach.selfplay.journal import Decision
 from mtgcoach.selfplay.moves import Move
 
 if TYPE_CHECKING:
     from mtgcoach.coach.report import TurnReport
     from mtgcoach.core.ids import PlayerId
     from mtgcoach.core.state import GameState
-    from mtgcoach.selfplay.journal import Answers
+    from mtgcoach.selfplay.answers import Answers
+    from mtgcoach.selfplay.journal import Journal
 
 
 class DivergedError(LookupError):
@@ -55,6 +63,9 @@ class Replayed:
     seed: int = 0
     name: str = "replay"
     tally: Tally = field(default_factory=Tally)
+    #: Where to write this run's decisions. None keeps nothing, which is what
+    #: a test wants and what a run nobody intends to walk through can have.
+    journal: Journal | None = None
 
     def act(self, state: GameState, report: TurnReport, player: PlayerId) -> Move:
         """Whatever the coach said at this exact moment, the first time.
@@ -77,9 +88,11 @@ class Replayed:
         if found.answer is None:
             self.tally.refused += 1
             self.tally.disagreements.append(f"no answer: {found.error}")
+            self._wrote(state, player, found, ())
             return Move()
-        said = journal.explanation(found.answer)
+        said = answers.explanation(found.answer)
         problems = verify(said, report)
+        self._wrote(state, player, found, problems)
         if problems:
             self.tally.untrusted += 1
             self.tally.disagreements.extend(
@@ -90,4 +103,34 @@ class Replayed:
             play=InstanceId(said.play) if said.play else None,
             attack=tuple(InstanceId(one) for one in said.attack),
             because=said.because,
+        )
+
+    def _wrote(
+        self,
+        state: GameState,
+        player: PlayerId,
+        found: Decision,
+        problems: tuple[str, ...],
+    ) -> None:
+        """Put this decision in the journal, if there is one.
+
+        The answer is the one the coach gave; the *verdict* is today's. That is
+        deliberate and is the whole point of replaying against a changed
+        engine: the new journal describes the run that just happened, and the
+        tally carries the comparison with what the old one said.
+        """
+        if self.journal is None:
+            return
+        self.journal.write(
+            Decision(
+                seed=self.seed,
+                turn=state.turn,
+                step=str(state.step),
+                player=str(player),
+                briefing=found.briefing,
+                answer=found.answer,
+                error=found.error,
+                trusted=found.answer is not None and not problems,
+                problems=problems,
+            )
         )

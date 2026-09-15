@@ -13,7 +13,7 @@ is the first point that can make it.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, assert_never
 
 from mtgcoach.core.events import (
     AdvanceStep,
@@ -29,6 +29,7 @@ from mtgcoach.core.zones import ZoneName
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from mtgcoach.api.views import Json
     from mtgcoach.core.events import Event
 
 
@@ -118,3 +119,48 @@ def _zone(payload: Mapping[str, object]) -> ZoneName:
         allowed = ", ".join(sorted(zone.value for zone in ZoneName))
         msg = f"unknown zone {name!r}; expected one of {allowed}"
         raise BadEventError(msg) from exc
+
+
+def written(event: Event) -> dict[str, Json]:
+    """One event as the JSON object ``parse`` would read back.
+
+    The other direction, and it exists so a game can be *recorded*: a self-play
+    journal stores the event log, and the replay route rebuilds any moment of
+    the game from it with nothing but ``core.reduce.replay``. That is what
+    keeps the replay exact -- the board a child is shown is the one the events
+    actually produced, not a re-derivation that a later change to the engine
+    could quietly alter.
+
+    ``test_eventspec`` round-trips every event through both, so a new field on
+    an event that this forgets is a failing test rather than a game that
+    replays wrong -- and ``assert_never`` below makes a whole new *event* a
+    type error rather than either.
+    """
+    match event:
+        case AdvanceStep():
+            return {"type": "advance_step"}
+        case DrawCard(player):
+            return {"type": "draw_card", "player": str(player)}
+        case PlayLand(player, instance_id):
+            return {
+                "type": "play_land",
+                "player": str(player),
+                "instance_id": str(instance_id),
+            }
+        case SetTapped(player, instance_id, tapped):
+            return {
+                "type": "set_tapped",
+                "player": str(player),
+                "instance_id": str(instance_id),
+                "tapped": tapped,
+            }
+        case MoveCard(player, instance_id, to):
+            return {
+                "type": "move_card",
+                "player": str(player),
+                "instance_id": str(instance_id),
+                "to": str(to),
+            }
+        case ChangeLife(player, amount):
+            return {"type": "change_life", "player": str(player), "amount": amount}
+    assert_never(event)

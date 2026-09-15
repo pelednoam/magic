@@ -7,10 +7,11 @@
  * not "400").
  */
 
-import { ServerError, detailOf } from "./failures";
+import { ServerError } from "./failures";
+import { segment, socketBase, unwrap } from "./transport";
 
-import type { Asked, Coaching, NewGame, Snapshot } from "./wire";
-import { isAsked, isCoaching } from "./wire";
+import type { Asked, Coaching, NewGame, Snapshot, Walkthrough } from "./wire";
+import { isAsked, isCoaching, isJournals, isWalkthrough } from "./wire";
 
 // Re-exported: every caller already imports it from here, and where the class
 // happens to live is not their business.
@@ -103,6 +104,46 @@ export class Coach {
     return body;
   }
 
+  /** The played games this server has kept, newest first. */
+  async replays(): Promise<readonly string[]> {
+    const body = await this.get<unknown>("/replays");
+    if (!isJournals(body)) {
+      throw new ServerError(0, "the server sent a list this app cannot read");
+    }
+    return body.replays;
+  }
+
+  /**
+   * One journal, as games with every moment of each.
+   *
+   * The whole thing in one request, deliberately: a game is a few hundred
+   * kilobytes, stepping through it should be instant, and a request per step
+   * would make the back button slower than the forward one.
+   */
+  async walkthrough(name: string): Promise<Walkthrough> {
+    const body = await this.get<unknown>(`/replays/${segment(name)}`);
+    if (!isWalkthrough(body)) {
+      throw new ServerError(0, "the server sent a replay this app cannot read");
+    }
+    return body;
+  }
+
+  /**
+   * Open one moment of a played game as a game of its own.
+   *
+   * Which is what makes a replay answer questions: from here it is an ordinary
+   * session, so `ask`, `explain` and `event` all work on a position out of last
+   * night's game. Nothing is re-asked to produce it -- the board is the one the
+   * recorded events actually built.
+   */
+  async stepInto(name: string, seed: number, index: number): Promise<NewGame> {
+    return this.send<NewGame>(
+      "POST",
+      `/replays/${segment(name)}/${seed}/at/${index}`,
+      {},
+    );
+  }
+
   /**
    * The address to watch a game on, for whoever owns the socket.
    *
@@ -111,17 +152,16 @@ export class Coach {
    * `http` -- including `HTTPS://`, which browsers accept.
    */
   watchUrl(sessionId: string): string {
-    const socketBase = this.base.replace(/^https:/i, "wss:").replace(/^http:/i, "ws:");
     // The token goes in the query string because a page cannot set headers on
     // a WebSocket handshake. That is a real if small cost -- a query string
     // reaches logs and browser history in a way a header does not -- and the
     // alternative is a socket nobody can open from a browser.
     const token = encodeURIComponent(this.token);
-    return `${socketBase}/games/${segment(sessionId)}/watch?token=${token}`;
+    return `${socketBase(this.base)}/games/${segment(sessionId)}/watch?token=${token}`;
   }
 
   private async get<T>(path: string): Promise<T> {
-    return this.unwrap<T>(await fetch(`${this.base}${path}`, { headers: this.headers() }));
+    return unwrap<T>(await fetch(`${this.base}${path}`, { headers: this.headers() }));
   }
 
   /**
@@ -145,19 +185,6 @@ export class Coach {
       headers: { ...this.headers(), "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    return this.unwrap<T>(response);
+    return unwrap<T>(response);
   }
-
-  private async unwrap<T>(response: Response): Promise<T> {
-    if (response.ok) {
-      return (await response.json()) as T;
-    }
-    throw new ServerError(response.status, await detailOf(response));
-  }
-}
-
-/** One path segment, escaped. A session id comes from the server, but a URL
- *  built by concatenation is a habit worth not having. */
-function segment(value: string): string {
-  return encodeURIComponent(value);
 }

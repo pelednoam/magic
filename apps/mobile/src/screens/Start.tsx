@@ -22,10 +22,13 @@ import { THEM, YOU } from "../wire";
 export function Start({
   coach,
   onStarted,
+  onReplays,
   onToken,
 }: {
   readonly coach: Coach;
   readonly onStarted: (game: NewGame, seat: string) => void;
+  /** Open the games this server has already played. */
+  readonly onReplays: () => void;
   /** Called with a token typed in by hand; see `needsToken` below. */
   readonly onToken: (token: string) => void;
 }) {
@@ -154,6 +157,9 @@ export function Start({
             onPress={() => { void join(); }}
           >
             <Text style={styles.back}>join as the other player →</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={onReplays}>
+            <Text style={styles.back}>…or step through a game already played →</Text>
           </Pressable>
         </View>
       ) : null}

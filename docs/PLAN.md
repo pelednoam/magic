@@ -1254,15 +1254,39 @@ ask about it. The substrate is `services/selfplay`'s journal — every decision 
 with the exact board the model was shown and what it said, keyed by turn, step and player. A game
 already replays from one deterministically, so the engine half is done.
 
-What is missing is a route and a screen: an endpoint that serves a journal as an ordered list of
-moments, and a view with a step forward and back. Two things make it a teaching tool rather than
-a log viewer, and both are already true of the data — every position can be re-asked ("why?" on
-any step, because the board is there), and the advice shown is the advice that was *checked*, so
-what he reads was true.
+**Built.** Three routes and two screens:
 
-Worth noting what it does *not* need: no new engine work, no camera, and no rules the engine does
-not already have. It is the cheapest large win on the list, and it gets better every time a
-coached season runs, because each one is another game to walk through.
+| | |
+|---|---|
+| `GET /replays` | Every journal this server has, newest first. |
+| `GET /replays/{name}` | Every game in one, with every moment of each. |
+| `POST /replays/{name}/{seed}/at/{index}` | Adopt one moment as a real game. |
+| `screens/Replays.tsx` | Which run, then which game. |
+| `screens/Walk.tsx` | Back, forward, and "ask about this". |
+
+The third route is what makes it teaching rather than a log viewer. Stepping *into* a moment
+creates an ordinary session from its board, so every route that already exists works on it: the
+question box answers about turn seven's position, the coach gives its view of the same board, and
+playing on from there shows what the other line would have done. Not one of those routes knows it
+is looking at a replay.
+
+**Exactness, which is the whole point.** A journal line records the libraries a game was dealt and
+every event it applied. A moment is `start_game` then `reduce.replay` up to that point — `core`
+and nothing else, the same machinery `Session.consistent` uses to prove a live game's cached
+state matches its log. Nothing is re-asked: asking the model again would produce a *different*
+game and show a board that never existed. The advice shown is what the coach actually said, with
+the engine's objections beside it when it was refused — shown, not hidden, because a moment where
+the coach was wrong and the engine caught it is the rule being stated out loud.
+
+`recording.py` lives in the API rather than in the harness that writes it, because the API has to
+*read* a journal and the harness already depends on the API; the other way round is a cycle.
+`tests/selfplay/test_journal_is_readable.py` is what keeps the two hand-written halves of that
+format honest — without it a renamed field would go quiet, since the reader has to be defensive
+about a file a killed process may have truncated.
+
+Worth noting what it did *not* need: no new engine work, no camera, and no rules the engine did
+not already have. It gets better every time a coached season runs, because each one is another
+game to walk through.
 
 **One app, not two.** The tree above listed `apps/mobile` and `apps/web` separately. Expo's web
 target builds the same source to a browser bundle (370 kB, one page), so M5 shipped one app that
