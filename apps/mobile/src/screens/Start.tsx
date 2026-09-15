@@ -17,7 +17,6 @@ import { messageOf } from "../errors";
 import { Trouble } from "../components/Trouble";
 import { colour, space, text } from "../theme";
 import type { NewGame } from "../wire";
-import { THEM, YOU } from "../wire";
 
 export function Start({
   coach,
@@ -26,7 +25,7 @@ export function Start({
   onToken,
 }: {
   readonly coach: Coach;
-  readonly onStarted: (game: NewGame, seat: string) => void;
+  readonly onStarted: (game: NewGame) => void;
   /** Open the games this server has already played. */
   readonly onReplays: () => void;
   /** Called with a token typed in by hand; see `needsToken` below. */
@@ -64,24 +63,28 @@ export function Start({
       return;
     }
     try {
-      onStarted(await coach.start(yours, theirs), YOU);
+      onStarted(await coach.start(yours, theirs));
     } catch (error: unknown) {
       refused(error);
     }
   }
 
   /**
-   * Open a game someone else started, as the other player.
+   * Open a game the other device started.
    *
-   * A game is a session id and anyone on the LAN who has it can open it. This
-   * is what makes the second device a second *seat* rather than a second game
-   * -- without it the WebSocket and the both-players advice had nothing to be
-   * for, because only one device could ever act.
+   * A game is a session id and anyone on the LAN who has a token can open it.
+   * This is what makes the second device a second *seat* rather than a second
+   * game -- without it the WebSocket had nothing to be for, because only one
+   * device could ever act.
+   *
+   * Which seat it opens as is not this screen's to decide: the server reads
+   * that off the token. This used to pass "them", so a phone holding the first
+   * seat's token showed one player's board under the other's name.
    */
   async function join(): Promise<void> {
     try {
       const existing = await coach.look(joining.trim());
-      onStarted({ ...existing, session_id: joining.trim() }, THEM);
+      onStarted({ ...existing, session_id: joining.trim() });
     } catch (error: unknown) {
       refused(error);
     }
@@ -156,7 +159,7 @@ export function Start({
             disabled={joining.trim() === ""}
             onPress={() => { void join(); }}
           >
-            <Text style={styles.back}>join as the other player →</Text>
+            <Text style={styles.back}>join this game →</Text>
           </Pressable>
           <Pressable accessibilityRole="button" onPress={onReplays}>
             <Text style={styles.back}>…or step through a game already played →</Text>

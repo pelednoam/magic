@@ -32,7 +32,7 @@ HTTP_REFUSED = 400
 
 
 def _game(client: TestClient) -> str:
-    created = decoded(client.post("/games", json={"you": "green", "them": "other"}).json())
+    created = decoded(client.post("/games", json={"mine": "green", "theirs": "other"}).json())
     session = created["session_id"]
     assert isinstance(session, str)
     return session
@@ -73,10 +73,13 @@ def test_a_finished_game_accepts_nothing_more() -> None:
     with talking(server()) as client:
         session = _game(client)
         _emptied(client, session)
+        # All from this device's own seat: an event for the other one is
+        # refused before the engine is asked anything (403, `test_seats`), so
+        # it would pass this test without the game having ended at all.
         anything: tuple[dict[str, object], ...] = (
             {"type": "advance_step"},
             {"type": "draw_card", "player": "you"},
-            {"type": "change_life", "player": "them", "amount": -1},
+            {"type": "change_life", "player": "you", "amount": -1},
         )
         for event in anything:
             refused = _send(client, session, event)

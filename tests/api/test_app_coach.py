@@ -19,8 +19,9 @@ from typing import TYPE_CHECKING
 
 from driving import stepped
 from helpers import facts
-from helpers_api import BEAR, FOREST, TOKEN, Canned, NoAnswers, server, talking
+from helpers_api import BEAR, FOREST, SEATING, server, talking
 from helpers_coach import taps_for
+from helpers_fakes import Canned, NoAnswers
 from mtgcoach.api.app import create_app
 from mtgcoach.api.cards import Catalogue
 from mtgcoach.api.context import Claude
@@ -31,7 +32,7 @@ if TYPE_CHECKING:
     from fastapi.testclient import TestClient
 
 HTTP_OK = 200
-HTTP_BAD_REQUEST = 400
+HTTP_FORBIDDEN = 403
 HTTP_NOT_FOUND = 404
 HTTP_UNAVAILABLE = 503
 
@@ -45,7 +46,7 @@ SENSIBLE = Explanation(
 
 
 def _game(client: TestClient) -> str:
-    body = client.post("/games", json={"you": "green", "them": "other"}).json()
+    body = client.post("/games", json={"mine": "green", "theirs": "other"}).json()
     session_id: str = body["session_id"]
     return session_id
 
@@ -128,15 +129,20 @@ def test_coaching_a_game_that_is_not_there() -> None:
         assert response.status_code == HTTP_NOT_FOUND
 
 
-def test_coaching_a_player_who_is_not_in_the_game() -> None:
+def test_coaching_a_player_this_device_is_not_is_refused() -> None:
+    """403, not 400: the request is well formed and the seat is not this one.
+
+    `test_seats` covers the case that matters -- naming the *other* seat, which
+    is a way to read their hand out of a model's answer.
+    """
     with talking(server(explainer=Canned(SENSIBLE))) as client:
         session_id = _game(client)
         response = client.post(f"/games/{session_id}/coach", json={"player": "nobody"})
-        assert response.status_code == HTTP_BAD_REQUEST
+        assert response.status_code == HTTP_FORBIDDEN
 
 
-def test_the_player_defaults_to_you() -> None:
-    """The app's own seat, which is what a phone with one player will send."""
+def test_the_player_defaults_to_the_token_s_own_seat() -> None:
+    """A body that names nobody is asking about itself, which is the usual case."""
     with talking(server(explainer=Canned(SENSIBLE))) as client:
         session_id = _game(client)
         response = client.post(f"/games/{session_id}/coach", json={})
@@ -169,7 +175,7 @@ def test_saying_nothing_about_an_unmodelled_card_is_refused() -> None:
     )
     deck = ("Forest",) * 6 + ("Strange",) * 4
     app = create_app(
-        catalogue, {"green": deck, "other": deck}, TOKEN, Claude(Canned(SENSIBLE), NoAnswers())
+        catalogue, {"green": deck, "other": deck}, SEATING, Claude(Canned(SENSIBLE), NoAnswers())
     )
     with talking(app) as client:
         session_id = _game(client)

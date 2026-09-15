@@ -12,8 +12,8 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from helpers_api import TOKEN
-from helpers_replay import CATALOGUE, NAME, SEED, recording
+from helpers_api import SEATING
+from helpers_replay import CATALOGUE, NAME, SEED, SOURCES, recording
 from mtgcoach.api.app import create_app
 from mtgcoach.core.steps import Step
 
@@ -22,6 +22,8 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from fastapi import FastAPI
+
+    from mtgcoach.api.sources import Sources
 
 
 #: A full answer, so every field of the explanation view is exercised.
@@ -70,7 +72,12 @@ def _decision(
     }
 
 
-def journalled(data_root: Path, name: str = NAME, extra: Sequence[str] = ()) -> Path:
+def journalled(
+    data_root: Path,
+    name: str = NAME,
+    extra: Sequence[str] = (),
+    sources: Sources = SOURCES,
+) -> Path:
     """Write the journal under a data root, and say where it went.
 
     ``extra`` goes in with the decisions, *before* the recording line, because
@@ -82,7 +89,7 @@ def journalled(data_root: Path, name: str = NAME, extra: Sequence[str] = ()) -> 
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = [json.dumps(one, ensure_ascii=False) for one in decisions()]
     lines.extend(extra)
-    lines.append(recording().as_json())
+    lines.append(recording(sources).as_json())
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path
 
@@ -94,4 +101,4 @@ def serving(data_root: Path) -> FastAPI:
     catalogue keyed by the oracle ids the journal holds -- which is the whole
     point of the UUID-shaped ids above.
     """
-    return create_app(CATALOGUE, {}, TOKEN, data_root=data_root)
+    return create_app(CATALOGUE, {}, SEATING, data_root=data_root)

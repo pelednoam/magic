@@ -15,7 +15,7 @@ about a card after the card had left the zone it read it from.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 from mtgcoach.core import priority
 from mtgcoach.core.zones import ZoneName
@@ -31,8 +31,27 @@ if TYPE_CHECKING:
     from mtgcoach.core.state import GameState
 
 
-def state(game: GameState, cards: CardLookup) -> dict[str, Json]:
-    """The board, as much of it as a client may see.
+#: What to pass as ``seat`` for a game nobody is playing: a recording being
+#: stepped through, where every hand is shown.
+#:
+#: A named constant rather than a default, so that every call site says which
+#: it is. A default of "hide nothing" is the one that leaks when somebody adds
+#: a route and forgets, and it is not the kind of mistake this project gets to
+#: make once.
+RECORDED: Final = None
+
+
+def state(game: GameState, cards: CardLookup, seat: str | None) -> dict[str, Json]:
+    """The board, as much of it as this seat may see.
+
+    ``seat`` is the player this payload is *for*, taken from the token the
+    request carried and never from its body -- see ``gatekeeper.seat_of``. The
+    other player's hand is withheld (CR 400.2: a hand is a hidden zone), which
+    used to be true of the room and not of the server: both hands went to both
+    devices and "you cannot see your opponent's hand" held because nobody
+    looked. Pass ``RECORDED`` for a finished game being walked through, where
+    there is no hidden information left to protect and showing both hands is
+    the whole point.
 
     Every player's *library* is a count, never a list. A tracker that shows you
     the top of your own deck is a cheating tool, and one that shows your
@@ -46,7 +65,10 @@ def state(game: GameState, cards: CardLookup) -> dict[str, Json]:
         "turn": game.turn,
         "step": game.step.value,
         "active_player": str(game.active_player),
-        "players": {str(pid): _player(player, cards) for pid, player in game.players.items()},
+        "players": {
+            str(pid): _player(player, cards, hidden=seat is not None and str(pid) != seat)
+            for pid, player in game.players.items()
+        },
         # One ordered stack for both seats, bottom first (CR 405.2). It was a
         # tuple inside each player instead, which gave two devices two orders
         # and no way to agree which spell resolves first.
@@ -113,8 +135,18 @@ def _named(player: PlayerId | None) -> Json:
     return str(player) if player is not None else None
 
 
-def _player(player: PlayerState, cards: CardLookup) -> dict[str, Json]:
+def _player(player: PlayerState, cards: CardLookup, *, hidden: bool) -> dict[str, Json]:
     """One player's half of the board.
+
+    ``hidden`` is whether this is somebody else's half, in which case the hand
+    is a count and not a list. Null rather than an empty list, because an empty
+    list says "this player is holding nothing" and that is a different fact
+    about the game -- one a player would act on.
+
+    ``hand_size`` either way. How many cards an opponent is holding is public
+    (CR 400.2 makes the *contents* hidden, not the number), it is the thing a
+    player at a table actually counts, and sending it alongside means hiding
+    the list costs the tracker nothing it should have had.
 
     No stack here any more. It was a field on each player -- see
     ``core.stack`` for why two of them could not answer which spell resolves
@@ -125,7 +157,8 @@ def _player(player: PlayerState, cards: CardLookup) -> dict[str, Json]:
         "life": player.life,
         "library": len(player.library),
         "lands_played_this_turn": player.lands_played_this_turn,
-        "hand": [_card(card, cards) for card in player.hand],
+        "hand_size": len(player.hand),
+        "hand": None if hidden else [_card(card, cards) for card in player.hand],
         "battlefield": [_permanent(p, cards) for p in player.battlefield],
         "graveyard": [_card(card, cards) for card in player.graveyard],
         "exile": [_card(card, cards) for card in player.exile],

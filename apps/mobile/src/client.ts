@@ -36,9 +36,16 @@ export class Coach {
     return body.decks;
   }
 
-  /** Start a game between two of them. */
-  async start(you: string, them: string): Promise<NewGame> {
-    return this.send<NewGame>("POST", "/games", { you, them });
+  /**
+   * Start a game: this device's deck, and the one for the other player.
+   *
+   * Named from this side rather than by seat, because this app does not know
+   * which seat it holds until the server tells it -- and the server does, from
+   * the token. The body used to be `{you, them}`, which dealt a phone holding
+   * the other token the deck it had picked *for its opponent*.
+   */
+  async start(mine: string, theirs: string): Promise<NewGame> {
+    return this.send<NewGame>("POST", "/games", { mine, theirs });
   }
 
   /**

@@ -1,36 +1,40 @@
 """The token file: making one, reading it back, keeping it to its owner.
 
-Split from ``access`` because the two halves have nothing in common. That
-module is about a string in an HTTP header. This one is about a file on disk,
-which is where all the care is: a lock held across read-decide-write, a mode
-that has to be right, a symlink that must not be followed, a write that has to
-be complete, and content that has to be checked before it becomes the thing the
-server trusts.
+Split from ``access`` because the halves have nothing in common. That module is
+about a string in an HTTP header and ``seating`` about which seat it names.
+This one is about a file on disk, which is where all the care is: a lock held
+across read-decide-write, a mode that has to be right, a symlink that must not
+be followed, a write that has to be complete, and content that has to be
+checked before it becomes the thing the server trusts.
+
+What the file holds is now a *seating* -- one line per seat, ``you <token>`` --
+rather than a single token. Everything below is unchanged by that except what
+counts as content worth keeping: ``seating.parsed`` decides, and it refuses the
+old single-token file on purpose. See its docstring for why keeping it would
+have kept the hole.
 """
 
 from __future__ import annotations
 
 import fcntl
 import os
-import secrets
 import stat
 from typing import TYPE_CHECKING
 
-from mtgcoach.api.access import usable
+from mtgcoach.api.seating import fresh, parsed, written
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-#: How many random bytes. 32 is 256 bits, which is not going to be guessed on a
-#: home network or anywhere else.
-STRENGTH = 32
+    from mtgcoach.api.seating import Seating
 
 #: Who may read the token file: its owner. The server runs as the person who
 #: started it, and everyone else on that laptop is not part of the game.
 OWNER_ONLY = 0o600
 
-#: How much to read at a time. A token is 43 characters, so this is the whole
-#: file in one call; the loop is there because `os.read` may return less.
+#: How much to read at a time. Two seats of 43 characters is a hundred bytes,
+#: so this is the whole file in one call; the loop is there because `os.read`
+#: may return less.
 READ_CHUNK = 4096
 
 
@@ -38,13 +42,8 @@ class TokenPathError(ValueError):
     """The token file is something a token file may not be."""
 
 
-def new_token() -> str:
-    """A fresh token."""
-    return secrets.token_urlsafe(STRENGTH)
-
-
-def token_at(path: Path) -> str:
-    """The token in this file, making one if there is none yet.
+def seating_at(path: Path) -> Seating:
+    """The seating in this file, making one if there is none yet.
 
     Everything happens under an exclusive ``flock`` on the file itself, which
     is what makes two servers starting at the same instant agree. Creating
@@ -79,7 +78,7 @@ def token_at(path: Path) -> str:
     handle = _opened(path)
     try:
         fcntl.flock(handle, fcntl.LOCK_EX)
-        return _settled(handle)
+        return _seated(handle)
     finally:
         # Closing releases the lock. Explicit rather than `os.fdopen`, because
         # a file object would close the descriptor on garbage collection at
@@ -108,7 +107,7 @@ def _opened(path: Path) -> int:
         # `os.supports_follow_symlinks` on Linux, where passing it can raise
         # `NotImplementedError` -- which this `except OSError` would not catch,
         # so the recovery would crash instead of recovering. The symlink is
-        # already refused at the top of `token_at`, and `O_NOFOLLOW` on the
+        # already refused at the top of `seating_at`, and `O_NOFOLLOW` on the
         # line below refuses one that appeared since: if that happens, the
         # chmod touched somebody else's mode but no token is read or written.
         os.chmod(path, OWNER_ONLY)  # noqa: PTH101 - no descriptor to use yet
@@ -118,12 +117,12 @@ def _opened(path: Path) -> int:
         raise TokenPathError(msg) from exc
 
 
-def _settled(handle: int) -> str:
-    """The token, read or written, on a descriptor already locked.
+def _seated(handle: int) -> Seating:
+    """The seating, read or written, on a descriptor already locked.
 
-    Split out because the lock is the interesting part of ``token_at`` and this
-    is the boring part, and because a function that must only ever be called
-    under a lock is easier to see when it is one function.
+    Split out because the lock is the interesting part of ``seating_at`` and
+    this is the boring part, and because a function that must only ever be
+    called under a lock is easier to see when it is one function.
     """
     # Not `& ~OWNER_ONLY`: that is false for 0400 and 0000, so a file missing
     # its *owner* bits was never put right -- and the only thing covering that
@@ -131,15 +130,16 @@ def _settled(handle: int) -> str:
     # broken. Any mode that is not exactly 0600 is made 0600.
     if stat.S_IMODE(os.fstat(handle).st_mode) != OWNER_ONLY:
         os.fchmod(handle, OWNER_ONLY)
-    found = _read(handle).strip()
-    if usable(found):
+    found = parsed(_read(handle))
+    if found is not None:
         return found
-    # Empty, or not a token: this call created the file, or something else did
-    # and left it that way, or what is in it is damaged. Under the lock there
-    # is no fourth possibility and no need to look again.
-    token = new_token()
-    _replace(handle, (token + "\n").encode("utf-8"))
-    return token
+    # Empty, or not a seating: this call created the file, or something else did
+    # and left it that way, or what is in it is damaged, or it is the single
+    # token this file held before seats existed. Under the lock there is no
+    # fifth possibility and no need to look again.
+    made = fresh()
+    _replace(handle, written(made).encode("utf-8"))
+    return made
 
 
 def _replace(handle: int, payload: bytes) -> None:
@@ -149,11 +149,11 @@ def _replace(handle: int, payload: bytes) -> None:
     ``os.write`` may write fewer than it was given, which would leave a prefix
     on disk and the whole token in memory. **Flushed**: without ``fsync`` the
     file can be empty after a power cut while the server answers happily.
-    **Read back**: truncate-then-write is not atomic, and a prefix of a token
-    is printable ASCII with no spaces -- exactly what ``usable`` accepts -- so
-    a crash part-way would leave a short, guessable credential to be trusted at
-    the next start. Reading it back makes that a refusal now, while somebody is
-    watching.
+    **Read back**: truncate-then-write is not atomic, and a prefix of the file
+    is a first line and half a second one -- one seat with a usable token and
+    one with a guessable one, which ``seating.parsed`` would refuse but only
+    after the good half had been thrown away with it. Reading it back makes that
+    a refusal now, while somebody is watching.
 
     Raises:
         TokenPathError: If what is on disk afterwards is not what was written.
@@ -172,9 +172,9 @@ def _replace(handle: int, payload: bytes) -> None:
 def _read(handle: int) -> str:
     """Everything on this descriptor, from the start.
 
-    A token is 43 characters, so one read is the whole file -- but `os.read`
-    is allowed to return less than asked for, and a short read that silently
-    became "no token here" would write over a perfectly good one.
+    The file is about a hundred bytes, so one read is the whole of it -- but
+    `os.read` is allowed to return less than asked for, and a short read that
+    silently became "no seating here" would write over a perfectly good one.
     """
     os.lseek(handle, 0, os.SEEK_SET)
     chunks: list[bytes] = []

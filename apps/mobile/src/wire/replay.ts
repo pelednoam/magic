@@ -15,7 +15,7 @@
 
 import { asObject } from "./shapes";
 
-import type { GameState } from "./game";
+import type { GameState, Sources } from "./game";
 import type { Explanation } from "./claude";
 
 /** One decision: where in the game, the board, and what was said about it. */
@@ -44,6 +44,27 @@ export interface GameLine {
   readonly seed: number;
   readonly decks: readonly string[];
   readonly decisions: number;
+  /** What the game was played under, as recorded. See `Sources`. */
+  readonly sources: Sources;
+  /**
+   * Which of those have moved since — `engine`, `card data`, `rules`.
+   *
+   * Empty for a game played under this server's own versions, and empty for
+   * one that recorded none: an old journal reads as old rather than as three
+   * things having changed. A non-empty list is the sentence to show beside a
+   * game that will not open.
+   */
+  readonly differs: readonly string[];
+  /**
+   * Why this game cannot be stepped through, when it cannot. Empty otherwise.
+   *
+   * The engine refuses an event it no longer considers legal, so a game
+   * recorded before a rule was tightened has no board to show. It is listed
+   * anyway, with this and with `differs`, because the list is where somebody
+   * finds out — and "played under a different engine" is the half that
+   * explains it.
+   */
+  readonly problem: string;
 }
 
 /** One game, with every moment of it. */
@@ -100,7 +121,13 @@ function isGameLine(value: unknown): boolean {
     typeof line["index"] === "number" &&
     typeof line["seed"] === "number" &&
     Array.isArray(line["decks"]) &&
-    line["decks"].every(isString)
+    line["decks"].every(isString) &&
+    // `differs` too, because `format.lineNote` calls `.join` on it: a field
+    // declared and dereferenced but unchecked is a crash one render later,
+    // which is the whole reason these guards exist.
+    Array.isArray(line["differs"]) &&
+    line["differs"].every(isString) &&
+    typeof line["problem"] === "string"
   );
 }
 

@@ -30,7 +30,7 @@ def test_everything_it_produces_is_json() -> None:
     """The one property that matters: it has to survive `json.dumps`."""
     state = game(hand=("Bear", "Forest"), battlefield=("Forest", "Forest"))
     payload = {
-        "state": boardview.state(state, BOOK),
+        "state": boardview.state(state, BOOK, str(ME)),
         "advice": views.report(advise(state, ME, BOOK)),
     }
     assert json.loads(json.dumps(payload)) == json.loads(json.dumps(payload))
@@ -39,7 +39,7 @@ def test_everything_it_produces_is_json() -> None:
 def test_a_library_is_a_count_and_never_a_list() -> None:
     """A tracker that shows you the top of a deck is a cheating tool."""
     state = start_game({ME: deck("m"), YOU: deck("y")}, ME)
-    rendered = boardview.state(state, BOOK)
+    rendered = boardview.state(state, BOOK, str(ME))
     for name in ("me", "you"):
         assert isinstance(at(rendered, "players", name, "library"), int)
 
@@ -62,7 +62,7 @@ def test_a_spell_on_the_stack_says_whose_it_is_and_where_it_is_going() -> None:
     remember it from the hand advice -- holding a fact about a card after the
     card had left the zone it read it from.
     """
-    (spell,) = rows(boardview.state(_waiting("Bear"), BOOK), "stack")
+    (spell,) = rows(boardview.state(_waiting("Bear"), BOOK, str(ME)), "stack")
     assert text(spell, "name") == "Grizzly Bears"
     assert text(spell, "controller") == "me"
     assert text(spell, "resolves_to") == "battlefield"
@@ -76,7 +76,7 @@ def test_a_spell_the_coach_cannot_name_gets_no_destination_guessed_for_it() -> N
     ``api.guard`` refuses that resolution for the same reason, so a client
     offering the button would only be offering a refusal.
     """
-    (spell,) = rows(boardview.state(_waiting("Mystery"), BOOK), "stack")
+    (spell,) = rows(boardview.state(_waiting("Mystery"), BOOK, str(ME)), "stack")
     assert spell["resolves_to"] is None
     assert text(spell, "name") == "Mystery"
 
@@ -87,7 +87,7 @@ def test_the_board_says_who_may_act_and_who_has_passed() -> None:
     Both devices need all three: one to know it is waiting, the other to know
     it is being waited for, and either to know when nobody may act at all.
     """
-    rendered = boardview.state(game(), BOOK)
+    rendered = boardview.state(game(), BOOK, str(ME))
     assert text(rendered, "priority") == "me"
     assert words(rendered, "passed") == []
     assert words(rendered, "yet_to_pass") == ["me", "you"]
@@ -95,14 +95,14 @@ def test_the_board_says_who_may_act_and_who_has_passed() -> None:
 
 def test_nobody_holding_priority_is_null_rather_than_missing() -> None:
     """CR 502.4: the untap step hands it to nobody, which is an answer."""
-    rendered = boardview.state(game(step=Step.UNTAP), BOOK)
+    rendered = boardview.state(game(step=Step.UNTAP), BOOK, str(ME))
     assert rendered["priority"] is None
     assert words(rendered, "yet_to_pass") == []
 
 
 def test_a_card_carries_both_of_its_identities_and_its_name() -> None:
     state = game(hand=("Bear",))
-    (card,) = rows(boardview.state(state, BOOK), "players", "me", "hand")
+    (card,) = rows(boardview.state(state, BOOK, str(ME)), "players", "me", "hand")
     assert text(card, "oracle_id") == "Bear"
     assert text(card, "name") == "Grizzly Bears"
     assert text(card, "instance_id").startswith("Bear")
@@ -110,7 +110,7 @@ def test_a_card_carries_both_of_its_identities_and_its_name() -> None:
 
 def test_a_permanent_carries_the_two_states_a_tracker_has_to_show() -> None:
     state = game(battlefield=("Forest",))
-    (permanent,) = rows(boardview.state(state, BOOK), "players", "me", "battlefield")
+    (permanent,) = rows(boardview.state(state, BOOK, str(ME)), "players", "me", "battlefield")
     assert flag(permanent, "tapped") is False
     assert flag(permanent, "summoning_sick") is False
 
@@ -118,7 +118,7 @@ def test_a_permanent_carries_the_two_states_a_tracker_has_to_show() -> None:
 def test_an_unnamed_card_falls_back_to_its_identifier() -> None:
     """Better than a blank, which a player would read as a bug."""
     state = game(hand=("Mystery",))
-    (card,) = rows(boardview.state(state, BOOK), "players", "me", "hand")
+    (card,) = rows(boardview.state(state, BOOK, str(ME)), "players", "me", "hand")
     assert text(card, "name") == "Mystery"
 
 

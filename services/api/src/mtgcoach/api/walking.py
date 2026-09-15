@@ -16,6 +16,10 @@ A game is addressed by its **position** in the journal. Two runs into the same
 journal repeat a seed, and a seed is then not an address: it would put one
 game's moments under another game's name. The seed still travels, because it is
 what re-runs the game, and it is a label rather than a key.
+
+Four routes and the finding of a game; ``walked`` is how one is rendered. Split
+at the line limit, and the seam is a real one -- these are the refusals (404s, a
+403 for a seat that is not in the game) and that is the JSON.
 """
 
 from __future__ import annotations
@@ -25,9 +29,10 @@ from typing import TYPE_CHECKING
 from fastapi import HTTPException
 from starlette.status import HTTP_404_NOT_FOUND
 
-from mtgcoach.api import boardview, views
-from mtgcoach.api.context import snapshot
+from mtgcoach.api.context import Seated, snapshot
 from mtgcoach.api.replays import UnknownReplayError, games_in, journals
+from mtgcoach.api.seats import seated_in
+from mtgcoach.api.walked import listed, walked
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -57,7 +62,7 @@ def routes(app: FastAPI, server: Server) -> None:
         route answers "which game?" -- a question that needs the decks, the
         length and nothing else. The chosen game is then one more request.
         """
-        return {"games": [listed(game) for game in _found(server, name)]}
+        return {"games": [listed(server, game) for game in _found(server, name)]}
 
     @app.get("/replays/{name}/{game}", response_model=None)
     def read_game(name: str, game: int) -> dict[str, Json]:
@@ -70,17 +75,27 @@ def routes(app: FastAPI, server: Server) -> None:
         return walked(server, _game(_found(server, name), game))
 
     @app.post("/replays/{name}/{game}/at/{index}", response_model=None)
-    def step_into(name: str, game: int, index: int) -> dict[str, Json]:
+    def step_into(name: str, game: int, index: int, seat: Seated) -> dict[str, Json]:
         """Adopt one moment as a game, so it can be asked about.
 
         Returns the same shape as starting a game, because it *is* one from
         here on -- which is what lets the question box, the coach and the
         board all work on a position out of somebody else's game without a
         single route knowing it came from a replay.
+
+        And because it is a game from here on, it is played from a seat: this
+        device is shown its own hand, though the moment it stepped in from
+        showed both. Reading a finished game is not playing one, and the
+        instant somebody can *act* on a position the rules about who may see
+        what apply again.
         """
         stepped = _moment(_game(_found(server, name), game), index)
+        # Before adopting, not after. A moment out of somebody else's journal
+        # can be between seats this server has no token for, and adopting it
+        # first left a game in the store that nobody could ever read.
+        seated_in(stepped.state, seat)
         started = server.store.adopt(stepped.state)
-        return {"session_id": started.session_id, **snapshot(server, started)}
+        return {"session_id": started.session_id, **snapshot(server, started, seat)}
 
 
 def _found(server: Server, name: str) -> tuple[Replay, ...]:
@@ -128,46 +143,3 @@ def _moment(game: Replay, index: int) -> Moment:
         msg = f"no moment {index} in game {game.index}"
         raise HTTPException(HTTP_404_NOT_FOUND, msg)
     return game.moments[index]
-
-
-def listed(game: Replay) -> dict[str, Json]:
-    """One game, as a line to choose from."""
-    return {
-        "index": game.index,
-        "seed": game.seed,
-        "decks": list(game.decks),
-        "decisions": len(game.moments),
-    }
-
-
-def walked(server: Server, game: Replay) -> dict[str, Json]:
-    """One game, as something a screen can page through."""
-    return {**listed(game), "moments": [moment(server, one) for one in game.moments]}
-
-
-def moment(server: Server, one: Moment) -> dict[str, Json]:
-    """One moment: where in the game, the board, and what was said about it.
-
-    The board goes out as ``boardview.state`` -- the same shape a live game sends
-    -- so the app renders a replayed position with the components it already
-    has, and a position looks the same whether it is happening now or happened
-    last night.
-
-    Named from the server's catalogue, for the same reason. A journal holds
-    oracle ids, which are Scryfall's UUIDs; without the catalogue every card on
-    the walk screen reads ``b2c6aa39-...`` while the *same* position one tap
-    later, under "ask about this", reads "Forest". ``Catalogue.name`` falls
-    back to the id for a card this server never imported -- which a replay of
-    another set really can contain -- and that is the honest answer: this is a
-    card the server cannot name.
-    """
-    return {
-        "turn": one.turn,
-        "step": str(one.step),
-        "player": one.player,
-        "state": boardview.state(one.state, server.catalogue),
-        "said": views.explanation(one.said) if one.said is not None else None,
-        "trusted": one.trusted,
-        "problems": list(one.problems),
-        "error": one.error,
-    }

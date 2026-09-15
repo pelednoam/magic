@@ -23,8 +23,34 @@ import { Board } from "../components/Board";
 import { Said } from "../components/Said";
 import { placeOf, seatName } from "../format";
 import { colour, space, text } from "../theme";
-import type { PlayedGame } from "../wire";
+import type { PlayedGame, Player } from "../wire";
 import { THEM, YOU } from "../wire";
+
+/**
+ * What this player was holding at this moment of the recorded game.
+ *
+ * Shown for *both* sides, which a live board never is: a hand is a hidden zone
+ * (CR 400.2) and the server withholds the other one while a game is being
+ * played. A recording is not a game in progress — nobody can act on what it
+ * shows — and knowing what each side held is most of why a decision it made
+ * makes sense. It is the thing a child asks about: "why didn't they block?"
+ *
+ * Null only for a *live* board, so the fallback here is for a shape this
+ * screen should never be given rather than for anything a replay sends.
+ */
+function Held({ player }: { readonly player: Player }) {
+  if (player.hand === null) {
+    return <Text style={styles.held}>Their hand is not recorded here.</Text>;
+  }
+  if (player.hand.length === 0) {
+    return <Text style={styles.held}>Holding nothing.</Text>;
+  }
+  return (
+    <Text style={styles.held}>
+      {`Holding: ${player.hand.map((card) => card.name).join(", ")}`}
+    </Text>
+  );
+}
 
 export function Walk({
   game,
@@ -45,9 +71,11 @@ export function Walk({
     return (
       <View style={styles.page}>
         <Text style={styles.nothing}>
-          {moment === undefined
-            ? "Nothing was asked in this game, so there is nothing to step through."
-            : "This game is not one this app can show."}
+          {moment !== undefined
+            ? "This game is not one this app can show."
+            : game.problem === ""
+              ? "Nothing was asked in this game, so there is nothing to step through."
+              : `This game cannot be stepped through: ${game.problem}`}
         </Text>
         <Leave onLeave={onLeave} />
       </View>
@@ -64,7 +92,9 @@ export function Walk({
       <ScrollView contentContainerStyle={styles.scroll}>
         <Said moment={moment} />
         <Board title={seatName(YOU, "You", moment.player)} player={mine} />
+        <Held player={mine} />
         <Board title={seatName(THEM, "Them", moment.player)} player={theirs} />
+        <Held player={theirs} />
       </ScrollView>
 
       <View style={styles.feet}>
@@ -114,6 +144,13 @@ function Step({
 }
 
 const styles = StyleSheet.create({
+  held: {
+    color: colour.quiet,
+    fontSize: text.small,
+    marginBottom: space.medium,
+    marginTop: -space.small,
+    paddingHorizontal: space.small,
+  },
   page: { flex: 1, padding: space.medium },
   where: { color: colour.text, fontSize: text.title, fontWeight: "700" },
   counter: { color: colour.quiet, fontSize: text.small, paddingBottom: space.small },

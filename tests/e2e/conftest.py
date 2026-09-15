@@ -19,7 +19,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from helpers_api import TOKEN, NoCoach, talking
+from helpers_api import SEATING, talking
+from helpers_fakes import NoCoach
 from mtgcoach.api.app import create_app
 from mtgcoach.api.cards import build
 from mtgcoach.api.context import Claude
@@ -72,6 +73,6 @@ def client(catalogue: Catalogue) -> Iterator[TestClient]:
     quota, and would pass or fail for reasons this repository does not control.
     ``test_coaching`` supplies its own.
     """
-    app = create_app(catalogue, {"green": GREEN, "white": WHITE}, TOKEN, Claude(NoCoach()))
+    app = create_app(catalogue, {"green": GREEN, "white": WHITE}, SEATING, Claude(NoCoach()))
     with talking(app) as connected:
         yield connected

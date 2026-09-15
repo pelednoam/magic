@@ -1,4 +1,4 @@
-"""Who is watching, and what happens when one of them goes away."""
+"""Who is watching, from which seat, and what happens when one goes away."""
 
 from __future__ import annotations
 
@@ -9,10 +9,25 @@ from unittest.mock import patch
 
 from starlette.websockets import WebSocketDisconnect
 
-from mtgcoach.api.hub import Hub
+from mtgcoach.api.hub import Hub, Seated
 
 if TYPE_CHECKING:
-    from collections.abc import Coroutine
+    from collections.abc import Coroutine, Mapping
+
+    from mtgcoach.api.views import Json
+
+#: The seats two watchers sit in. The hub does not care what they are called;
+#: it cares that a payload built for one is not sent to the other.
+MINE, THEIRS = "you", "them"
+
+
+def boards(seat: str) -> Mapping[str, Json]:
+    """A payload per seat, as `acting._boards` hands the hub one.
+
+    It says which seat it was built for, which is what makes "each watcher got
+    its own" an assertion rather than a hope.
+    """
+    return {"turn": 1, "seat": seat}
 
 
 def run(work: Coroutine[object, object, int]) -> int:
@@ -22,12 +37,6 @@ def run(work: Coroutine[object, object, int]) -> int:
     and its tests should not need one either.
     """
     return asyncio.run(work)
-
-
-if TYPE_CHECKING:
-    from collections.abc import Mapping
-
-    from mtgcoach.api.views import Json
 
 
 class DisconnectedError(Exception):
@@ -58,26 +67,26 @@ class Client:
 
 def test_a_watcher_is_told() -> None:
     hub, client = Hub(), Client()
-    hub.join("g", client)
-    assert run(hub.broadcast("g", {"turn": 1})) == 1
-    assert client.heard == [{"turn": 1}]
+    hub.join("g", client, MINE)
+    assert run(hub.broadcast("g", boards)) == 1
+    assert client.heard == [{"turn": 1, "seat": MINE}]
 
 
 def test_everyone_watching_is_told() -> None:
     """The phone and the laptop are two views of one game."""
     hub = Hub()
     phone, laptop = Client(), Client()
-    hub.join("g", phone)
-    hub.join("g", laptop)
-    assert run(hub.broadcast("g", {"turn": 1})) == 2
+    hub.join("g", phone, MINE)
+    hub.join("g", laptop, THEIRS)
+    assert run(hub.broadcast("g", boards)) == 2
 
 
 def test_only_the_watchers_of_that_game() -> None:
     hub = Hub()
     ours, theirs = Client(), Client()
-    hub.join("ours", ours)
-    hub.join("theirs", theirs)
-    run(hub.broadcast("ours", {"turn": 1}))
+    hub.join("ours", ours, MINE)
+    hub.join("theirs", theirs, MINE)
+    run(hub.broadcast("ours", boards))
     assert theirs.heard == []
 
 
@@ -85,20 +94,20 @@ def test_a_dead_connection_is_dropped_and_the_rest_still_hear() -> None:
     """A phone going to sleep must not stop the laptop being told."""
     hub = Hub()
     asleep, awake = Client(broken=True), Client()
-    hub.join("g", asleep)
-    hub.join("g", awake)
-    assert run(hub.broadcast("g", {"turn": 1})) == 1
-    assert awake.heard == [{"turn": 1}]
-    assert hub.watchers("g") == (awake,)
+    hub.join("g", asleep, MINE)
+    hub.join("g", awake, THEIRS)
+    assert run(hub.broadcast("g", boards)) == 1
+    assert awake.heard == [{"turn": 1, "seat": THEIRS}]
+    assert hub.watchers("g") == (Seated(awake, THEIRS),)
 
 
 def test_broadcasting_to_a_game_nobody_watches() -> None:
-    assert run(Hub().broadcast("g", {"turn": 1})) == 0
+    assert run(Hub().broadcast("g", boards)) == 0
 
 
 def test_leaving_removes_the_room_when_it_empties() -> None:
     hub, client = Hub(), Client()
-    hub.join("g", client)
+    hub.join("g", client, MINE)
     hub.leave("g", client)
     assert hub.rooms == {}
 
@@ -106,7 +115,7 @@ def test_leaving_removes_the_room_when_it_empties() -> None:
 def test_leaving_twice_is_silent() -> None:
     """It is called from a `finally`; a raise there would hide the real error."""
     hub, client = Hub(), Client()
-    hub.join("g", client)
+    hub.join("g", client, MINE)
     hub.leave("g", client)
     hub.leave("g", client)
     hub.leave("never", client)
@@ -131,10 +140,10 @@ def test_a_disconnection_is_caught_whatever_type_it_is() -> None:
     """
     hub = Hub()
     gone, here = Dropped(), Client()
-    hub.join("g", gone)
-    hub.join("g", here)
-    assert run(hub.broadcast("g", {"turn": 1})) == 1
-    assert hub.watchers("g") == (here,)
+    hub.join("g", gone, MINE)
+    hub.join("g", here, THEIRS)
+    assert run(hub.broadcast("g", boards)) == 1
+    assert hub.watchers("g") == (Seated(here, THEIRS),)
 
 
 def test_the_real_disconnect_type_is_not_one_we_could_have_named() -> None:
@@ -161,9 +170,9 @@ def test_a_stalled_watcher_does_not_hold_up_the_game() -> None:
     """
     hub = Hub()
     stuck, here = Stalled(), Client()
-    hub.join("g", stuck)
-    hub.join("g", here)
+    hub.join("g", stuck, MINE)
+    hub.join("g", here, THEIRS)
     with patch("mtgcoach.api.hub.SEND_TIMEOUT", 0.01):
-        assert run(hub.broadcast("g", {"turn": 1})) == 1
-    assert here.heard == [{"turn": 1}]
-    assert hub.watchers("g") == (here,)
+        assert run(hub.broadcast("g", boards)) == 1
+    assert here.heard == [{"turn": 1, "seat": THEIRS}]
+    assert hub.watchers("g") == (Seated(here, THEIRS),)

@@ -7,12 +7,12 @@ import {
   nameOf,
   paymentLine,
   permanentNote,
+  lineNote,
   planLine,
   planTitle,
   stepName,
   turnLine,
 } from "../src/format";
-import { isSnapshot } from "../src/wire";
 import type { Permanent, Plan, Player } from "../src/wire";
 
 const board: Player = {
@@ -20,6 +20,7 @@ const board: Player = {
   library: 30,
   lands_played_this_turn: 0,
   hand: [{ instance_id: "h1", oracle_id: "bear", name: "Grizzly Bears" }],
+  hand_size: 1,
   battlefield: [
     { instance_id: "f1", oracle_id: "forest", name: "Forest", tapped: false, summoning_sick: false },
     { instance_id: "f2", oracle_id: "forest", name: "Forest", tapped: true, summoning_sick: false },
@@ -139,53 +140,35 @@ describe("permanent notes", () => {
   });
 });
 
-describe("a response is not a snapshot because we said so", () => {
-  const good = {
-    version: 0,
-    rules_available: true,
-    state: { players: { you: {}, them: {} } },
-    advice: { you: {}, them: {} },
+describe("what a replayed game's line says", () => {
+  const line = {
+    index: 0,
+    seed: 7,
+    decks: ["green", "white"],
+    decisions: 3,
+    sources: { engine: "e1", cards: "c1", rules: "August 7, 2026" },
+    differs: [] as readonly string[],
+    problem: "",
   };
 
-  it("accepts the real shape", () => {
-    expect(isSnapshot(good)).toBe(true);
+  it("says how much there is to walk through", () => {
+    expect(lineNote(line)).toBe("3 decisions · game 7");
   });
 
-  it("rejects null, which a cast used to let through", () => {
-    expect(isSnapshot(null)).toBe(false);
+  it("says when the game was played under something else", () => {
+    // The sentence that turns a game the server will not open from a puzzle
+    // into a fact.
+    expect(lineNote({ ...line, differs: ["engine"] })).toContain("a different engine");
   });
 
-  it("rejects a string", () => {
-    expect(isSnapshot("ok")).toBe(false);
+  it("names every version that moved", () => {
+    const moved = lineNote({ ...line, differs: ["engine", "card data"] });
+    expect(moved).toContain("engine, card data");
   });
 
-  it("rejects an array, which is an object to `typeof`", () => {
-    expect(isSnapshot([])).toBe(false);
-  });
-
-  it("rejects a snapshot with no version, because ordering depends on it", () => {
-    expect(isSnapshot({ ...good, version: undefined })).toBe(false);
-  });
-
-  it("rejects a snapshot that does not say whether rules questions work", () => {
-    // A server too old to send it would otherwise render the question box as
-    // though it worked, which is the thing the flag exists to prevent.
-    expect(isSnapshot({ ...good, rules_available: undefined })).toBe(false);
-  });
-
-  it("rejects a board with no players, which is what the screen reads", () => {
-    expect(isSnapshot({ ...good, state: {} })).toBe(false);
-  });
-
-  it("rejects a board missing a seat", () => {
-    expect(isSnapshot({ ...good, state: { players: { you: {} } } })).toBe(false);
-  });
-
-  it("rejects advice missing a seat", () => {
-    expect(isSnapshot({ ...good, advice: { you: {} } })).toBe(false);
-  });
-
-  it("rejects players that is an array", () => {
-    expect(isSnapshot({ ...good, state: { players: [] } })).toBe(false);
+  it("says a game cannot be walked rather than counting decisions it has none of", () => {
+    const refused = lineNote({ ...line, decisions: 0, problem: "IllegalEventError: ..." });
+    expect(refused).toContain("cannot be stepped through");
+    expect(refused).not.toContain("0 decisions");
   });
 });

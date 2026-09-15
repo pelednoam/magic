@@ -27,9 +27,11 @@ The file is UTF-8 with a byte-order mark, which ``utf-8-sig`` handles.
 from __future__ import annotations
 
 import shlex
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from mtgcoach.rules.corpus import CorpusError, passages_in
+from mtgcoach.rules.effective import effective_from
 from mtgcoach.rules.search import RuleIndex
 
 if TYPE_CHECKING:
@@ -50,13 +52,40 @@ class RulesNotInstalledError(FileNotFoundError):
     """The Comprehensive Rules are not on disk, so no question can be answered."""
 
 
+@dataclass(frozen=True, slots=True)
+class Installed:
+    """The rules this server has, and which revision they are.
+
+    Together because they come out of one read of one file, and because a
+    revision without the document it describes is a claim nothing backs. The
+    revision is the document's own sentence -- "These rules are effective as of
+    August 7, 2026" -- read by ``effective``; empty when the file does not say.
+    """
+
+    index: RuleIndex
+    revision: str
+
+
 def rules_path(data_root: Path) -> Path:
     """Where the rules document should be."""
     return data_root / RULES_FILE
 
 
 def index_at(path: Path, least: int = LEAST_CREDIBLE) -> RuleIndex:
-    """Read and index the rules document.
+    """Read and index the rules document, without its revision.
+
+    For a caller that only searches. ``installed_at`` is the one the server
+    uses, because a game records which revision it was played under.
+
+    Raises:
+        RulesNotInstalledError: If the file is not there.
+        CorpusError: If it is there but is not the rules.
+    """
+    return installed_at(path, least).index
+
+
+def installed_at(path: Path, least: int = LEAST_CREDIBLE) -> Installed:
+    """Read and index the rules document, and read off which revision it is.
 
     Raises:
         RulesNotInstalledError: If the file is not there, with the command that
@@ -75,11 +104,12 @@ def index_at(path: Path, least: int = LEAST_CREDIBLE) -> RuleIndex:
             f'  curl -L -o {shlex.quote(str(path))} "$URL"'
         )
         raise RulesNotInstalledError(msg)
-    found = passages_in(path.read_text(encoding="utf-8-sig"))
+    text = path.read_text(encoding="utf-8-sig")
+    found = passages_in(text)
     if len(found) < least:
         msg = (
             f"{path} parses to only {len(found)} rules; the Comprehensive Rules "
             "have a few thousand, so this is probably a truncated download"
         )
         raise CorpusError(msg)
-    return RuleIndex.build(found)
+    return Installed(index=RuleIndex.build(found), revision=effective_from(text))

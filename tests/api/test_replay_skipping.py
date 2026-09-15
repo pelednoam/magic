@@ -5,6 +5,11 @@ at all. These are about a journal that reads fine and holds one game that will
 not rebuild -- the shape a killed run leaves, and the shape a game recorded
 before the engine grew stricter leaves. Neither may be a 500, and neither may
 quietly move the games around it.
+
+Such a game is *listed*, with no moments and the reason it has none. It used to
+be dropped, which threw away the one thing that explains it: the recording says
+which engine played it, and "played under a different engine" is what turns a
+game that will not open from a puzzle into a fact.
 """
 
 from __future__ import annotations
@@ -16,9 +21,10 @@ from typing import TYPE_CHECKING
 import pytest
 
 from helpers_journal import journalled
-from helpers_replay import NAME, SEED, recording
+from helpers_replay import NAME, SEED, SOURCES, recording
 from mtgcoach.api.recording import KIND
 from mtgcoach.api.replays import UnknownReplayError, games_in
+from mtgcoach.api.sources import Sources
 from mtgcoach.core.events import PlayLand
 from mtgcoach.core.ids import InstanceId, PlayerId
 from mtgcoach.core.steps import Step
@@ -30,12 +36,13 @@ if TYPE_CHECKING:
 DECISIONS = 3
 
 
-def test_a_game_that_will_not_rebuild_is_skipped_not_fatal(tmp_path: Path) -> None:
-    """One damaged game must not take a season with it.
+def test_a_game_that_will_not_rebuild_does_not_take_the_season_with_it(
+    tmp_path: Path,
+) -> None:
+    """A library too short for an opening hand raises out of ``start_game``.
 
-    A library too short for an opening hand raises out of ``start_game``. It
-    used to raise all the way out of the route, so a journal with one bad game
-    in it answered 500 and every good game in it became unreadable.
+    It used to raise all the way out of the route, so a journal with one bad
+    game in it answered 500 and every good game in it became unreadable.
     """
     path = journalled(tmp_path)
     broken = recording()
@@ -55,27 +62,26 @@ def test_a_game_that_will_not_rebuild_is_skipped_not_fatal(tmp_path: Path) -> No
         )
         file.write(broken.as_json() + "\n")
     played = games_in(tmp_path, NAME)
-    assert [game.seed for game in played] == [SEED, SEED]
+    assert [game.seed for game in played] == [SEED, 8, SEED]
+    damaged = played[1]
+    assert damaged.moments == (), "nothing to walk"
+    assert "opening hand" in damaged.problem, "and the reason, where it is read"
+    # This one was written by hand above with no revisions in it, which is what
+    # every journal on disk looks like; the one below records them.
+    assert damaged.sources == Sources()
 
 
-def test_a_journal_of_only_damaged_games_says_so(tmp_path: Path) -> None:
-    """Rather than an empty screen, or a 500."""
+def test_a_journal_with_no_recording_in_it_says_so(tmp_path: Path) -> None:
+    """The shape a killed run leaves: decisions, and no game written down.
+
+    Rather than an empty screen, or a 500. A journal whose recordings are
+    *there* and will not rebuild is a different thing and is listed -- this is
+    about one that never got as far as recording a game.
+    """
     path = tmp_path / "selfplay" / "wrecked.jsonl"
     path.parent.mkdir(parents=True)
-    path.write_text(
-        json.dumps(
-            {
-                "kind": KIND,
-                "seed": 8,
-                "decks": [],
-                "first": "you",
-                "libraries": {"you": [["a", "Forest"]]},
-            }
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    with pytest.raises(UnknownReplayError, match="can be rebuilt"):
+    path.write_text('{"seed": 8, "turn": 1, "step": "upkeep", "player": "you"}\n', encoding="utf-8")
+    with pytest.raises(UnknownReplayError, match="no game recorded"):
         games_in(tmp_path, "wrecked")
 
 
@@ -95,6 +101,11 @@ def test_a_damaged_deal_takes_only_its_own_game(tmp_path: Path) -> None:
             )
             + "\n"
         )
+    # Not listed at all, unlike a game that *reads* and will not rebuild: a
+    # library with a non-card in it is refused while the line is being read,
+    # so there is no recording to list. Dropping one card and carrying on
+    # would deal different hands and different draws from the game that was
+    # played, with nothing on screen saying so.
     played = games_in(tmp_path, NAME)
     assert [game.seed for game in played] == [SEED]
 
@@ -139,7 +150,14 @@ def test_a_game_whose_events_the_engine_now_refuses_is_skipped(tmp_path: Path) -
     )
     with path.open("a", encoding="utf-8") as file:
         file.write(refused.as_json() + "\n")
-    assert [game.index for game in games_in(tmp_path, NAME)] == [0]
+    played = games_in(tmp_path, NAME)
+    assert [game.index for game in played] == [0, 1]
+    assert played[1].moments == ()
+    # The engine's own words, which name the card it refused...
+    assert "nobody" in played[1].problem
+    # ...and what the game was played under, which is the thing that explains
+    # it. Dropping the game from the list threw this away with it.
+    assert played[1].sources == SOURCES
 
 
 def test_orphaned_decisions_do_not_attach_to_a_later_game(tmp_path: Path) -> None:

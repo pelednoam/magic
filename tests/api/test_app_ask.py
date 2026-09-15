@@ -18,7 +18,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from helpers_api import RULES, Answering, server, talking
+from helpers_api import RULES, server, talking
+from helpers_fakes import Answering
 from mtgcoach.rules.answer import Answer
 from wire import flag, obj, rows, text, words
 
@@ -35,7 +36,7 @@ GOOD = Answer(
 
 
 def new_game(client: TestClient) -> str:
-    body = client.post("/games", json={"you": "green", "them": "other"}).json()
+    body = client.post("/games", json={"mine": "green", "theirs": "other"}).json()
     session_id: str = body["session_id"]
     return session_id
 

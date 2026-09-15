@@ -6,7 +6,7 @@
 # strict pyright cannot see through them. Confined to this module, like every
 # other test that drives a real client.
 
-"""Answering a spell, over HTTP, from both seats.
+"""Answering a spell, over HTTP, from both seats -- and from both devices.
 
 Split from ``test_app_casting`` because it is a different claim. That file says
 one player can cast a spell and let it resolve; this one says the *other*
@@ -18,14 +18,19 @@ finding. The old engine accepted a cast and a resolution back to back, and
 accepted resolving the spell cast *first* when there were two -- so a test that
 skipped to "there are two spells on the stack" would be assuming away exactly
 what was broken.
+
+Two clients, one per seat. It used to be one, reading both hands and both
+players' advice off a single board and acting for either player -- which is
+what a token per seat took away. This is the test that most needed two devices
+and is the closest thing here to a real table.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from driving import HTTP_OK, HTTP_REFUSED, forests, sent, started, walked
-from helpers_api import server, talking
+from driving import HTTP_OK, HTTP_REFUSED, device, forests, sent, started, walked
+from helpers_api import THEIRS, server, talking
 from wire import decoded, named, rows
 
 if TYPE_CHECKING:
@@ -75,7 +80,12 @@ def test_the_other_player_can_answer_before_the_spell_resolves() -> None:
                 "to": "battlefield",
             },
         )
-        # A Forest for them too, so they can afford the answer.
+        # A Forest for them too, so they can afford the answer -- read from
+        # *their* device, because the board this one is sent does not carry
+        # their hand.
+        answering = device(client, THEIRS)
+        mine = body
+        body = decoded(answering.get(f"/games/{session}").json())
         theirs = named(rows(body, "state", "players", "them", "hand"), "Forest")
         body = sent(
             client,
@@ -88,7 +98,7 @@ def test_the_other_player_can_answer_before_the_spell_resolves() -> None:
             },
         )
 
-        bear = named(rows(body, "advice", "you", "hand"), "Grizzly Bears")
+        bear = named(rows(mine, "advice", "you", "hand"), "Grizzly Bears")
         assert isinstance(bear["payment"], dict)
         body = sent(
             client,
@@ -100,7 +110,8 @@ def test_the_other_player_can_answer_before_the_spell_resolves() -> None:
                 "payment": bear["payment"]["tap"],
             },
         )
-        body = sent(client, session, {"type": "pass_priority", "player": "you"})
+        sent(client, session, {"type": "pass_priority", "player": "you"})
+        body = decoded(answering.get(f"/games/{session}").json())
         growth = named(rows(body, "advice", "them", "hand"), "Giant Growth")
         assert growth["playable"] is True, growth["reasons"]
         assert isinstance(growth["payment"], dict)
@@ -126,7 +137,7 @@ def test_the_other_player_can_answer_before_the_spell_resolves() -> None:
         assert out_of_order.status_code == HTTP_REFUSED
         assert "not the top of the stack" in out_of_order.text
 
-        answered = client.post(
+        answered = answering.post(
             f"/games/{session}/events",
             json={
                 "type": "resolve_spell",

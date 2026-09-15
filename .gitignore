@@ -26,8 +26,9 @@ gate-output.txt
 data/cache/
 data/*.sqlite3
 
-# The server's bearer token. Made on first run, per installation, and the
-# whole of the access control -- see services/api/src/mtgcoach/api/access.py.
+# The server's bearer tokens, one per seat. Made on first run, per
+# installation, and the whole of the access control -- see
+# services/api/src/mtgcoach/api/seating.py.
 data/token
 
 # Self-play journals: one line per coach decision, holding the full briefing,
@@ -38,6 +39,12 @@ data/selfplay/
 # Downloaded card data. Four megabytes of Scryfall's JSON per set, and it is
 # theirs rather than ours -- `mtgcoach sets fetch` puts it back.
 data/scryfall/
+
+# The Comprehensive Rules. Wizards' document, revised with every set, and not
+# ours to redistribute -- the operator installs it and CI fetches its own copy.
+# Which revision a game or a check used is recorded rather than vendored; see
+# packages/rules/src/mtgcoach/rules/effective.py.
+data/rules/
 
 # Unreviewed extractor output. Only the sealed fixture and its manifest are
 # data; `mtgcoach effects seal` is the only way across that line.

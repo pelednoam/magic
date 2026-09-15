@@ -16,10 +16,14 @@ from typing import TYPE_CHECKING
 import pytest
 
 from mtgcoach.api.access import usable
-from mtgcoach.api.tokenfile import TokenPathError, token_at
+from mtgcoach.api.seating import SEATS, Seating, written
+from mtgcoach.api.tokenfile import TokenPathError, seating_at
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+#: A seating a test can write to a file and expect back unchanged.
+KNOWN = Seating({SEATS[0]: "hunter2", SEATS[1]: "hunter3"})
 
 
 @pytest.mark.parametrize(
@@ -38,23 +42,23 @@ def test_a_damaged_file_is_replaced_rather_than_becoming_the_token(
     """
     where = tmp_path / "token"
     where.write_bytes(content.encode("utf-8", errors="replace"))
-    made = token_at(where)
-    assert made != content
-    assert usable(made)
-    assert where.read_text(encoding="utf-8").strip() == made
+    made = seating_at(where)
+    assert content not in set(made.tokens.values())
+    assert all(usable(made.token(seat)) for seat in SEATS)
+    assert where.read_text(encoding="utf-8") == written(made)
 
 
 def test_a_short_token_somebody_chose_is_left_alone(tmp_path: Path) -> None:
     """Not a strength check.
 
-    A short token is a weak one, but an operator who put it there chose it,
+    A short token is a weak one, but an operator who put one there chose it,
     it is their LAN, and the server prints it at every start where they can
     see it. Silently replacing a deliberate choice is a worse surprise than
     the one this guards against.
     """
     where = tmp_path / "token"
-    where.write_text("hunter2\n", encoding="utf-8")
-    assert token_at(where) == "hunter2"
+    where.write_text(written(KNOWN), encoding="utf-8")
+    assert seating_at(where) == KNOWN
 
 
 def test_a_file_with_no_write_bit_is_tightened_rather_than_refused(tmp_path: Path) -> None:
@@ -65,9 +69,9 @@ def test_a_file_with_no_write_bit_is_tightened_rather_than_refused(tmp_path: Pat
     right gets put right.
     """
     where = tmp_path / "token"
-    where.write_text("already-here\n", encoding="utf-8")
+    where.write_text(written(KNOWN), encoding="utf-8")
     where.chmod(0o400)
-    assert token_at(where) == "already-here"
+    assert seating_at(where) == KNOWN
     assert stat.S_IMODE(where.stat().st_mode) == 0o600
 
 
@@ -88,8 +92,8 @@ def test_a_token_is_written_whole_even_when_the_write_is_short(
 
     monkeypatch.setattr(os, "write", grudging)
     where = tmp_path / "token"
-    made = token_at(where)
-    assert where.read_text(encoding="utf-8").strip() == made
+    made = seating_at(where)
+    assert where.read_text(encoding="utf-8") == written(made)
 
 
 def test_a_file_that_cannot_be_opened_at_all_says_so(tmp_path: Path) -> None:
@@ -104,7 +108,7 @@ def test_a_file_that_cannot_be_opened_at_all_says_so(tmp_path: Path) -> None:
     where.parent.chmod(0o500)
     try:
         with pytest.raises(TokenPathError, match="cannot be opened for writing"):
-            token_at(where)
+            seating_at(where)
     finally:
         where.parent.chmod(0o700)
 
@@ -114,10 +118,10 @@ def test_a_write_the_disk_did_not_keep_is_refused(
 ) -> None:
     """Truncate-then-write is not atomic.
 
-    A crash or a full disk part-way leaves a prefix -- and a prefix of a token
-    is printable ASCII with no spaces, which is exactly what `usable` accepts,
-    so it would become a short guessable credential trusted at the next start.
-    Reading it back makes that a refusal now, while somebody is watching.
+    A crash or a full disk part-way leaves a prefix -- one seat with a usable
+    token and one with a guessable one, which `seating.parsed` would refuse
+    only after throwing the good half away with it. Reading it back makes that
+    a refusal now, while somebody is watching.
     """
     real = os.write
 
@@ -128,4 +132,4 @@ def test_a_write_the_disk_did_not_keep_is_refused(
 
     monkeypatch.setattr(os, "write", losing)
     with pytest.raises(TokenPathError, match="did not keep what was written"):
-        token_at(tmp_path / "token")
+        seating_at(tmp_path / "token")

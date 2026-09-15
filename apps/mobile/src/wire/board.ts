@@ -1,5 +1,6 @@
 /**
- * The board and the engine's advice, written out to match `services/api/views.py`.
+ * What the engine computed about a position, written out to match
+ * `services/api/views.py`.
  *
  * Hand-written, like the Python side it mirrors, and for the same reason: the
  * wire is a contract two people agreed on, not a dump of either side's types.
@@ -10,10 +11,6 @@
  * Nothing here interprets anything. `reasons` are sentences the engine wrote
  * and this app prints; it does not know what a land is, and must not learn.
  */
-
-import { asObject } from "./shapes";
-
-import type { GameState } from "./game";
 
 /** One card in hand, and the engine's verdict on it. */
 export interface Playable {
@@ -113,68 +110,4 @@ export interface Advice {
    * not a rule of Magic. Shown, never hidden, for the same reason.
    */
   readonly not_modelled: readonly string[];
-}
-
-/** What every route returns: the board, plus advice for both players. */
-export interface Snapshot {
-  /**
-   * How many events this game has seen. Monotonic, and the only ordering the
-   * client has: HTTP replies and socket broadcasts arrive in whatever order
-   * the network chooses, and without this an older one silently won.
-   */
-  readonly version: number;
-  /**
-   * Whether this server can answer rules questions.
-   *
-   * The Comprehensive Rules are an optional install. False means the question
-   * box has nothing behind it, and saying so up front beats letting somebody
-   * type a question and wait for a 503.
-   */
-  readonly rules_available: boolean;
-  readonly state: GameState;
-  readonly advice: Readonly<Record<string, Advice>>;
-}
-
-/** A new game also says what to call it. */
-export interface NewGame extends Snapshot {
-  readonly session_id: string;
-}
-
-/** The two seats. The server names them, and this app only ever displays them. */
-export const YOU = "you";
-export const THEM = "them";
-
-/**
- * Whether a decoded response is shaped like a snapshot.
- *
- * A cast is a claim, not a check: `JSON.parse(...) as Snapshot` accepted `null`
- * and any object without `state`, and the crash arrived one render later at
- * `snapshot.state.players`, far from the frame that caused it. This is the
- * boundary, so this is where the claim gets tested.
- */
-export function isSnapshot(value: unknown): value is Snapshot {
-  const body = asObject(value);
-  if (
-    body === null ||
-    typeof body["version"] !== "number" ||
-    typeof body["rules_available"] !== "boolean"
-  ) {
-    return false;
-  }
-  const state = asObject(body["state"]);
-  const advice = asObject(body["advice"]);
-  if (state === null || advice === null) {
-    return false;
-  }
-  // Down to what the screen actually dereferences. Checking only that `state`
-  // is an object let `{state: {}}` through, and the crash arrived one render
-  // later inside `snapshot.state.players[YOU]` -- far from the frame that
-  // caused it, which is the worst place for a type error to surface.
-  const players = asObject(state["players"]);
-  return players !== null && hasSeats(players) && hasSeats(advice);
-}
-
-/** Both seats present, because the screen reads both. */
-function hasSeats(value: Record<string, unknown>): boolean {
-  return asObject(value[YOU]) !== null && asObject(value[THEM]) !== null;
 }

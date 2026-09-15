@@ -24,44 +24,46 @@ from mtgcoach.api.address import reachable
 from mtgcoach.api.app import create_app
 from mtgcoach.api.cards import build
 from mtgcoach.api.context import Claude
-from mtgcoach.api.tokenfile import token_at
+from mtgcoach.api.seating import SEATS
+from mtgcoach.api.tokenfile import seating_at
 from mtgcoach.carddata.decks import load_set_decks
 from mtgcoach.carddata.paths import effects_path
 from mtgcoach.carddata.store import CardStore
 from mtgcoach.core.ids import SetCode
 from mtgcoach.rules.corpus import CorpusError
-from mtgcoach.rules.library import RulesNotInstalledError, index_at, rules_path
+from mtgcoach.rules.library import Installed, RulesNotInstalledError, installed_at, rules_path
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
     from fastapi import FastAPI
 
+    from mtgcoach.api.seating import Seating
     from mtgcoach.carddata.decks import Decklist
     from mtgcoach.core.ids import OracleId
-    from mtgcoach.rules.search import RuleIndex
 
 DEFAULT_PORT = 8000
 
 
-#: Where the server's token lives, relative to the data directory. Beside the
-#: card database, because it belongs to this installation rather than to a run.
-#: A filename, not a secret -- the secret is what `access.token_at` puts in it.
+#: Where the server's tokens live, relative to the data directory. Beside the
+#: card database, because they belong to this installation rather than to a
+#: run. A filename, not a secret -- the secrets are what `tokenfile.seating_at`
+#: puts in it, one per seat.
 TOKEN_PATH = Path("token")
 
 
 @dataclass(frozen=True, slots=True)
 class Serving:
-    """A built app and the token it will ask for.
+    """A built app and the seating it will ask for.
 
-    Together because the token is read from a file and printing it is the only
-    way it reaches the phone. Returning it beside the app means one read and
-    one place that knows where the file is; the first version read it twice and
-    left two call sites able to disagree.
+    Together because the tokens are read from a file and printing them is the
+    only way they reach the two devices. Returning them beside the app means
+    one read and one place that knows where the file is; the first version read
+    it twice and left two call sites able to disagree.
     """
 
     app: FastAPI
-    token: str
+    seating: Seating
 
 
 def assemble(db: Path, data_root: Path, set_code: SetCode) -> Serving:
@@ -81,13 +83,18 @@ def assemble(db: Path, data_root: Path, set_code: SetCode) -> Serving:
         names = {card.name: card.oracle_id for card in cards}
 
     decks = {deck.key: library(deck, names) for deck in load_set_decks(data_root, set_code)}
-    token = token_at(data_root / TOKEN_PATH)
-    app = create_app(catalogue, decks, token, Claude(rules=_rules(data_root)), data_root)
-    return Serving(app=app, token=token)
+    seating = seating_at(data_root / TOKEN_PATH)
+    rules = _rules(data_root)
+    asked = Claude(
+        rules=rules.index if rules is not None else None,
+        rules_revision=rules.revision if rules is not None else "",
+    )
+    app = create_app(catalogue, decks, seating, asked, data_root)
+    return Serving(app=app, seating=seating)
 
 
-def _rules(data_root: Path) -> RuleIndex | None:
-    """The Comprehensive Rules index, or None with a line saying why not.
+def _rules(data_root: Path) -> Installed | None:
+    """The rules index and its revision, or None with a line saying why not.
 
     Not installing the rules is a legitimate way to run this: the tracker, the
     engine and the turn coach all work without them, and only the question box
@@ -97,7 +104,7 @@ def _rules(data_root: Path) -> RuleIndex | None:
     off.
     """
     try:
-        return index_at(rules_path(data_root))
+        return installed_at(rules_path(data_root))
     except RulesNotInstalledError as missing:
         print(f"rules questions are off: {missing}")  # noqa: T201 - this is a console script
         return None
@@ -144,27 +151,37 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     serving = assemble(args.db, args.data, SetCode(args.set_code))
-    _announce(serving.token, reachable(args.host, args.port))
+    _announce(serving.seating, reachable(args.host, args.port))
     uvicorn.run(serving.app, host=args.host, port=args.port)
     return 0
 
 
-def _announce(token: str, url: str) -> None:
-    """Print the address and the token, because nothing else will.
+def _announce(seating: Seating, url: str) -> None:
+    """Print the address and a token per seat, because nothing else will.
 
-    The token is the whole of the server's access control and the app needs it.
-    Printing it at startup is how it gets from the laptop to the phone -- there
-    is nobody to email it to. The address is here for the same reason: the app
-    defaults to ``localhost``, which on a phone is the phone.
+    The tokens are the whole of the server's access control and each device
+    needs its own. Printing them at startup is how they get from the laptop to
+    the two devices -- there is nobody to email them to. The address is here for
+    the same reason: the app defaults to ``localhost``, which on a phone is the
+    phone.
+
+    **One token to each device, and not the other.** A token *is* the seat: the
+    device that holds the one marked ``them`` is that player, sees that hand
+    and may act only for it. Giving both to one device puts the arrangement back
+    the way it was before seats existed.
     """
     print(f"Magic Coach on {url}")  # noqa: T201 - a console script
-    print(f"  token: {token}")  # noqa: T201
-    print("  paste it into the app when it asks.")  # noqa: T201
+    for seat in SEATS:
+        print(f"  token for {seat}: {seating.token(seat)}")  # noqa: T201
+    print("  give each device one of them, and paste it in when the app asks.")  # noqa: T201
+    print("  whichever seat it holds is the player it plays, and the only")  # noqa: T201
+    print("  hand it is shown.")  # noqa: T201
     print(f"  the app needs the address too: EXPO_PUBLIC_COACH_URL={url}")  # noqa: T201
     print(  # noqa: T201
-        "  EXPO_PUBLIC_COACH_TOKEN works for a localhost-only session, but Expo "
-        "bakes it into the bundle Metro serves unauthenticated -- so on a LAN, "
-        "set the URL and paste the token."
+        f"  EXPO_PUBLIC_COACH_TOKEN works for a localhost-only session -- it "
+        f"would be the {SEATS[0]!r} one -- but Expo bakes it into the bundle "
+        f"Metro serves unauthenticated, so on a LAN set the URL and paste the "
+        f"token."
     )
 
 

@@ -75,7 +75,24 @@ def test_a_journal_lists_its_games_without_their_boards(tmp_path: Path) -> None:
     with talking(serving(tmp_path)) as client:
         body = decoded(client.get(f"/replays/{NAME}").json())
         (game,) = rows(body, "games")
-        assert game == {"index": 0, "seed": SEED, "decks": ["green", "other"], "decisions": 3}
+        assert game == {
+            "index": 0,
+            "seed": SEED,
+            "decks": ["green", "other"],
+            "decisions": 3,
+            # What it was played under, and which of those have moved since.
+            # "This journal was made by a different engine" is the sentence
+            # that turns an unopenable game from a puzzle into a fact.
+            "sources": {
+                "engine": "0the-old-one",
+                "cards": "0the-old-cards",
+                "rules": "July 1, 2024",
+            },
+            "differs": ["engine"],
+            # Empty: this one rebuilt. A game that does not carries the reason
+            # here, which is what makes the list the place somebody finds out.
+            "problem": "",
+        }
 
 
 def test_a_game_comes_back_as_moments(tmp_path: Path) -> None:
@@ -158,7 +175,8 @@ def test_a_damaged_game_does_not_shift_the_ones_after_it(tmp_path: Path) -> None
     answer while numbering by position in the answer made those two disagree,
     so `at/2` opened game 1 and `at/1` was a 404 -- silently showing one game
     under another game's name, which is the failure this whole format exists
-    to prevent.
+    to prevent. A damaged game is listed now, with the reason it cannot be
+    walked, which removes the gap the numbering used to have to survive.
     """
     path = journalled(tmp_path)
     broken = replace(recording(), seed=8, events=(PlayLand(PlayerId("you"), InstanceId("nobody")),))
@@ -169,10 +187,14 @@ def test_a_damaged_game_does_not_shift_the_ones_after_it(tmp_path: Path) -> None
     with talking(serving(tmp_path)) as client:
         body = decoded(client.get(f"/replays/{NAME}").json())
         listed = {row["index"]: row["seed"] for row in rows(body, "games")}
-        assert listed == {0: SEED, 2: 9}
+        assert listed == {0: SEED, 1: 8, 2: 9}
         # Every index the list gave out opens the game the list named.
         for index, seed in listed.items():
             got = decoded(client.get(f"/replays/{NAME}/{index}").json())
             assert got["seed"] == seed
-        # And the one it did not give out is honestly missing.
-        assert client.get(f"/replays/{NAME}/1").status_code == HTTP_NOT_FOUND
+        # And the damaged one says why it cannot be stepped through, rather
+        # than being absent from a list that numbers by file position.
+        damaged = decoded(client.get(f"/replays/{NAME}/1").json())
+        assert damaged["moments"] == []
+        assert "nobody" in text(damaged, "problem")
+        assert client.post(f"/replays/{NAME}/1/at/0").status_code == HTTP_NOT_FOUND

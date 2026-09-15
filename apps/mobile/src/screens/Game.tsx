@@ -33,17 +33,17 @@ import { THEM, YOU } from "../wire";
 export function Game({
   coach,
   game,
-  seat,
 }: {
   readonly coach: Coach;
   readonly game: NewGame;
-  /** Which side of the table this device is. Both are real seats; the app
-   *  used to assume it was always "you", so a second device could only ever
-   *  start its own game and neither could act as the other player. */
-  readonly seat: string;
 }) {
   const [snapshot, setSnapshot] = useState<Snapshot>(game);
   const [problem, setProblem] = useState("");
+  // Which side of the table this device is: the server's answer, read off the
+  // token this app's requests carry. It used to be a prop chosen by which
+  // button was pressed on the start screen, and a device set to the wrong seat
+  // was a device acting as the other player.
+  const seat = snapshot.seat;
 
   /**
    * Take a snapshot only if it is not older than the one on screen.
