@@ -18,12 +18,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from mtgcoach.api import guard
 from mtgcoach.core.events import (
     CastSpell,
     ChangeLife,
     MoveCard,
     PlayLand,
     ResolveSpell,
+    SetTapped,
 )
 from mtgcoach.core.reduce import apply
 from mtgcoach.core.zones import ZoneName
@@ -31,6 +33,7 @@ from mtgcoach.core.zones import ZoneName
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from mtgcoach.coach.lookup import CardLookup
     from mtgcoach.coach.report import Playable
     from mtgcoach.core.combat.model import Creature
     from mtgcoach.core.combat.search import Plan
@@ -47,7 +50,9 @@ class Applied:
     events: tuple[Event, ...]
 
 
-def played(state: GameState, player: PlayerId, card: Playable) -> Applied:
+def played(
+    state: GameState, player: PlayerId, card: Playable, lookup: CardLookup | None = None
+) -> Applied:
     """Put this card onto the battlefield, paying for it if it is not a land.
 
     Raises:
@@ -57,8 +62,8 @@ def played(state: GameState, player: PlayerId, card: Playable) -> Applied:
             itself, which is the most interesting thing this harness can find.
     """
     if card.is_land:
-        return _done(state, [PlayLand(player=player, instance_id=card.instance_id)])
-    return _done(state, cast_and_resolve(player, card))
+        return _done(state, [PlayLand(player=player, instance_id=card.instance_id)], lookup)
+    return _done(state, cast_and_resolve(player, card), lookup)
 
 
 def cast_and_resolve(player: PlayerId, card: Playable) -> list[Event]:
@@ -91,7 +96,9 @@ def cast_and_resolve(player: PlayerId, card: Playable) -> list[Event]:
     ]
 
 
-def attacked(state: GameState, attacker: PlayerId, plan: Plan) -> Applied:
+def attacked(
+    state: GameState, attacker: PlayerId, plan: Plan, lookup: CardLookup | None = None
+) -> Applied:
     """Resolve this attack, using the engine's own numbers for what it does.
 
     Order matters and is the order the rules use: damage, then deaths, then the
@@ -102,7 +109,7 @@ def attacked(state: GameState, attacker: PlayerId, plan: Plan) -> Applied:
     """
     defender = state.opponent_of(attacker)
     outcome = plan.outcome
-    events: list[Event] = []
+    events: list[Event] = list(_tapped_to_attack(attacker, plan))
     if outcome.damage_to_defender:
         events.append(ChangeLife(player=defender, amount=-outcome.damage_to_defender))
     events += _died(attacker, outcome.attackers_lost)
@@ -115,7 +122,28 @@ def attacked(state: GameState, attacker: PlayerId, plan: Plan) -> Applied:
         )
         if gained
     ]
-    return _done(state, events)
+    return _done(state, events, lookup)
+
+
+def _tapped_to_attack(attacker: PlayerId, plan: Plan) -> list[Event]:
+    """Attacking taps the attackers (CR 508.1f), unless they have vigilance.
+
+    The declaration itself is not an event this engine has -- there is no
+    "attacking" state on a permanent yet -- but its most visible consequence
+    is, and leaving it out was worse than modelling it partly: a creature that
+    attacked and survived stayed untapped, so the recorded game showed it
+    available for a second attack, or to pay for a spell, on a board where it
+    was lying sideways on the table.
+
+    Vigilance is checked rather than assumed. Thirteen of the Beginner Box's
+    creatures have it, so tapping unconditionally would have been a new wrong
+    answer in place of the old one.
+    """
+    return [
+        SetTapped(player=attacker, instance_id=creature.instance_id, tapped=True)
+        for creature in plan.attackers
+        if not creature.card.has("vigilance")
+    ]
 
 
 def _died(player: PlayerId, lost: Sequence[Creature]) -> list[Event]:
@@ -126,14 +154,27 @@ def _died(player: PlayerId, lost: Sequence[Creature]) -> list[Event]:
     ]
 
 
-def _done(state: GameState, events: Sequence[Event]) -> Applied:
+def _done(state: GameState, events: Sequence[Event], lookup: CardLookup | None) -> Applied:
     """Apply these in order, and hand back both the result and the log.
 
     The log is what makes a game *replayable by anything*: the journal records
     it, and the API rebuilds any moment with `core.reduce.replay` alone. That
     keeps the replay exact -- the board is what the events produced, not a
     re-derivation that a later change to the engine could quietly alter.
+
+    **Through the same guard the server puts in front of a player.** The
+    harness used to call the reducer directly, so it exercised every check in
+    ``core`` and none of the card-aware ones in ``api.guard`` -- and a whole
+    class of defect could pass a three-hundred-game season while failing the
+    first tap in the app. One did: casting was refused over HTTP for every
+    paid spell, and a season had just applied three thousand of them.
+
+    ``lookup`` is optional only so that a test building one event by hand need
+    not have a catalogue. A real game always passes one, and
+    ``test_applying_is_guarded`` is what keeps that true.
     """
     for event in events:
+        if lookup is not None:
+            guard.check(event, state, lookup)
         state = apply(state, event)
     return Applied(state, tuple(events))

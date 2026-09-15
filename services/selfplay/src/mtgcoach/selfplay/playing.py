@@ -55,6 +55,12 @@ class Run:
 
     seed: int
     seats: tuple[Seat, Seat]
+    #: The card data, so applying an action can go through the server's own
+    #: guard rather than straight to the reducer. Without it the harness
+    #: exercised every check in ``core`` and none of the card-aware ones, and
+    #: a defect could pass a three-hundred-game season while failing the first
+    #: tap in the app.
+    catalogue: CardLookup | None = None
     trouble: list[Trouble] = field(default_factory=list[Trouble])
     unknown: set[str] = field(default_factory=set[str])
     events: int = 0
@@ -72,7 +78,7 @@ class Run:
 def play(seats: tuple[Seat, Seat], state: GameState, catalogue: CardLookup, seed: int) -> Game:
     """Play until somebody wins, somebody decks, or the cap is reached."""
     table = {seat.player: seat for seat in seats}
-    run = Run(seed=seed, seats=seats)
+    run = Run(seed=seed, seats=seats, catalogue=catalogue)
 
     while state.turn <= TURN_CAP:
         report = advise(state, state.active_player, catalogue)
@@ -115,14 +121,16 @@ def _decide(state: GameState, seat: Seat, report: TurnReport, run: Run) -> GameS
         move = seat.agent.act(state, report, seat.player)
         if move.play is not None:
             card = offered(report, move.play)
-            done = applying.played(state, seat.player, card)
+            done = applying.played(state, seat.player, card, run.catalogue)
             state = _logged(run, done)
             if card.is_land:
                 run.also(lands=1)
             else:
                 run.also(spells=1)
         elif move.attack:
-            done = applying.attacked(state, seat.player, planned(report, move.attack))
+            done = applying.attacked(
+                state, seat.player, planned(report, move.attack), run.catalogue
+            )
             state = _logged(run, done)
             run.also(attacks=1)
     except (IllegalEventError, LookupError) as refused:
