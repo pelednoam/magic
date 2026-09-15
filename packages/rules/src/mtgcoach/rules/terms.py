@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 
-from mtgcoach.rules import negation, phrasing
+from mtgcoach.rules import instead, negation, phrasing
 from mtgcoach.rules.keywords import NONE, Keywords, ordinary
 
 #: A word worth searching for. Apostrophes are kept inside a word ("player's")
@@ -99,8 +99,10 @@ def query(question: str, keywords: Keywords = NONE) -> str:
     be looked up for this", and a query built only from a guess would be a
     guess with nothing to check it.
 
-    Minus anything ``keywords`` says is a Magic keyword being used as ordinary
-    English. Those are dropped rather than down-weighted: a keyword name is
+    Minus two kinds of word. Anything ``phrasing`` says a paraphrase *replaces*
+    -- one case, "die", whose only uses in the document are the planar die and
+    the heading of rule 706 -- and anything ``keywords`` says is a Magic keyword
+    being used as ordinary English. Those are dropped rather than down-weighted: a keyword name is
     rare in the document and so scores heavily, and the document has no other
     use for the word, so keeping it can only pull the wrong passages up. The
     names come from the index, which read them off the rules -- see
@@ -108,7 +110,7 @@ def query(question: str, keywords: Keywords = NONE) -> str:
     """
     words = [word.lower() for word in _WORD.findall(question)]
     searchable = [word for word in words if word not in _NOISE and len(word) > 1]
-    english = ordinary(question, keywords)
+    english = ordinary(question, keywords) | instead.instead_of(question)
     wanted = [word for word in searchable if word not in english]
     if not wanted:
         # Setting words aside may not leave nothing. "Does it trample?" is

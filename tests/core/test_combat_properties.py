@@ -14,8 +14,9 @@ from hypothesis import strategies as st
 
 from helpers import creature
 from mtgcoach.core.combat.damage import resolve
+from mtgcoach.core.combat.defending import best_defence
 from mtgcoach.core.combat.model import Blocks, Creature
-from mtgcoach.core.combat.search import best_defence, plans
+from mtgcoach.core.combat.search import plans
 
 KEYWORDS = [
     "Flying",

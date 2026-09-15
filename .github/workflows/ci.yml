@@ -130,7 +130,11 @@ jobs:
             exit 1
           fi
           echo "Fetched: $url"
-          curl -fsSL --max-time 120 -o data/rules/comprehensive.txt -- "$url"
+          # The filename has a space in it ("MagicCompRules 20260819.txt"), and
+          # curl rejects an unencoded one outright -- "URL rejected: Malformed
+          # input to a URL function". Found by running this by hand.
+          curl -fsSL --max-time 120 --path-as-is -o data/rules/comprehensive.txt \
+            -- "${url// /%20}"
           echo "$url" > data/rules/SOURCE
           wc -l data/rules/comprehensive.txt
 

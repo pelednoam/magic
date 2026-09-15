@@ -19,14 +19,9 @@ import itertools
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from mtgcoach.core.combat.assignments import (
-    block_assignments,
-    damage_orders,
-    identity,
-)
-from mtgcoach.core.combat.budget import check_defence_size, check_plan_size
-from mtgcoach.core.combat.damage import resolve
-from mtgcoach.core.combat.model import Blocks, check_stats
+from mtgcoach.core.combat.budget import check_plan_size
+from mtgcoach.core.combat.defending import best_defence
+from mtgcoach.core.combat.model import check_stats
 from mtgcoach.core.legality import can_attack
 
 if TYPE_CHECKING:
@@ -34,10 +29,6 @@ if TYPE_CHECKING:
 
     from mtgcoach.core.combat.board import Outcome
     from mtgcoach.core.combat.model import Creature
-
-#: How a candidate outcome is ranked. The last term is a total order over the
-#: creatures involved, so that a tie is never broken by list position.
-type _Key = tuple[int, int, int, int, int, tuple[tuple[str, ...], tuple[str, ...]]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,78 +62,6 @@ class Plan:
             + 2 * len(self.outcome.blockers_lost)
             - 2 * len(self.outcome.attackers_lost)
         )
-
-
-def _best_for_attacker(
-    attackers: Sequence[Creature], blocks: Blocks, defender_life: int
-) -> Outcome:
-    """The outcome when the attacker assigns damage as well as they can.
-
-    Mirror image of ``best_defence``: win if you can, then kill more than you
-    lose, then push damage through -- and, where those tie, kill the bigger
-    creature. That last term is what makes the answer independent of the order
-    the caller happened to pass the blockers in.
-    """
-    best: Outcome | None = None
-    best_key: _Key | None = None
-    for order in damage_orders(attackers, blocks):
-        outcome = resolve(attackers, order, defender_life)
-        key = (
-            0 if outcome.defender_life_after(defender_life) <= 0 else 1,
-            len(outcome.attackers_lost) - len(outcome.blockers_lost),
-            outcome.defender_life_after(defender_life),
-            -outcome.attacker_life_gained,
-            -sum(c.power + c.toughness for c in outcome.blockers_lost),
-            identity(outcome),
-        )
-        if best_key is None or key < best_key:
-            best, best_key = outcome, key
-    return best if best is not None else resolve(attackers, blocks, defender_life)
-
-
-def best_defence(
-    attackers: Sequence[Creature], blockers: Sequence[Creature], defender_life: int
-) -> Outcome:
-    """The outcome when the defender blocks as well as they can.
-
-    In order: do not die; do not lose creatures for nothing; end on as much life
-    as possible; let the attacker gain as little as possible. The second has to
-    outrank the third or the defender chump-blocks every attack at twenty life,
-    which would make the coach far too timid -- an attack that only *looks* bad
-    because the model assumed a panicked opponent is exactly the advice a
-    beginner cannot afford.
-
-    The third term is the life *total*, not the damage. They differ by lifelink,
-    and ranking on damage alone left two blocks that differed only in a
-    lifelinker exactly tied -- so the defender declined a free point of life
-    whenever the caller happened to list the other blocker first.
-
-    Creature quality is weighed only as power plus toughness, and only as the
-    last tiebreak: trading a 5/5 for a 1/1 with deathtouch still counts as an
-    even swap on the terms above it. That is why a ``Plan`` carries the whole
-    ``Outcome`` and not just its score.
-
-    Raises:
-        ValueError: If a creature has no fixed power or toughness, or this board
-            is too large to search exactly.
-    """
-    check_stats(attackers, blockers)
-    check_defence_size(attackers, blockers)
-    best: Outcome | None = None
-    best_key: _Key | None = None
-    for blocks in block_assignments(attackers, blockers):
-        outcome = _best_for_attacker(attackers, blocks, defender_life)
-        key = (
-            1 if outcome.defender_life_after(defender_life) <= 0 else 0,
-            len(outcome.blockers_lost) - len(outcome.attackers_lost),
-            -outcome.defender_life_after(defender_life),
-            outcome.attacker_life_gained,
-            sum(c.power + c.toughness for c in outcome.blockers_lost),
-            identity(outcome),
-        )
-        if best_key is None or key < best_key:
-            best, best_key = outcome, key
-    return best if best is not None else resolve(attackers, Blocks(), defender_life)
 
 
 def plans(

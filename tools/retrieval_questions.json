@@ -11,54 +11,272 @@
     "`gap` marks a question retrieval does not answer yet. Those do not fail",
     "the check -- they are written down so the list stays honest about what is",
     "still broken, and the check says so when one starts passing. There are",
-    "none at the moment: the last one, the tapped/untapped polarity gap, is",
-    "what `rules/negation.py` was written for."
+    "none at the moment: the last ones were the three the ensemble review",
+    "found (R06) -- a creature dying, a deck running out, and a spell with nothing to target. All three now pass."
   ],
   "questions": [
-    {"ask": "what happens when my hit points reach zero?", "any": ["104.3b", "704.5a", "119.6"],
-     "why": "the keyword collision: reach is an ability and a verb"},
-    {"ask": "what happens when my life total reaches zero?", "any": ["104.3b", "704.5a", "119.6"],
-     "why": "the rules write 0, a person writes zero"},
-    {"ask": "what happens if I reach zero life?", "any": ["104.3b", "704.5a", "119.6"],
-     "why": "both at once"},
-    {"ask": "how many creatures can the defender block with?", "any": ["509.1a", "509.2", "Block"],
-     "why": "defender is a keyword and also the person blocking"},
-    {"ask": "does the attacker or the defender choose blockers?", "any": ["509.1a", "Block"]},
-
-    {"ask": "what does reach do?", "any": ["702.17a", "702.17b", "Reach"],
-     "why": "the keyword sense must survive the fix above"},
-    {"ask": "can a creature with reach block a flyer?", "any": ["702.17b", "702.9b", "Reach"]},
-    {"ask": "what does deathtouch do?", "any": ["702.2a", "702.2b", "Deathtouch"]},
-    {"ask": "how does trample work when blocked?", "any": ["702.19b", "702.19d", "Trample"]},
-    {"ask": "what does flying do?", "any": ["702.9b", "Flying"]},
-    {"ask": "what is first strike?", "any": ["702.7a", "702.7b", "First Strike"]},
-    {"ask": "does defender mean it cannot attack?", "any": ["702.3a", "702.3b", "Defender"]},
-    {"ask": "what does haste do?", "any": ["702.10a", "702.10b", "Haste"]},
-    {"ask": "what does vigilance do?", "any": ["702.20a", "702.20b", "Vigilance"]},
-    {"ask": "what does menace do?", "any": ["702.111a", "702.111b", "Menace"]},
-
-    {"ask": "can a creature that came into play this turn block?",
-     "any": ["302.6", "Summoning Sickness Rule"],
-     "why": "the paraphrase map: 302.6 shares no words with the question"},
-    {"ask": "can I attack with a creature I just played?",
-     "any": ["302.6", "Summoning Sickness Rule"]},
-    {"ask": "how many hit points do we start with?", "any": ["103.4", "Starting Life Total"]},
-
-    {"ask": "when do I untap my creatures?", "any": ["502.1", "503.1", "Untap Step"]},
-    {"ask": "can two creatures block the same attacker?", "any": ["509.2", "509.1a", "Block"]},
-    {"ask": "what happens to damage at the end of the turn?",
-     "any": ["514.2", "120.3", "Cleanup Step"]},
-
-    {"ask": "can a tapped creature block?", "any": ["509.1a"],
-     "why": "the polarity gap: the rule says blockers must be *untapped*"},
-    {"ask": "can I attack with a tapped creature?", "any": ["508.1a"]},
-    {"ask": "can a tapped creature attack?", "any": ["508.1a"]},
-    {"ask": "what does tapped mean?", "any": ["Tap", "Tapped", "701.21a", "Tap Symbol"],
-     "why": "the same word without the combat context, which must not get the restriction"},
-    {"ask": "what happens if nobody blocks my creature?", "any": ["510.1b"],
-     "why": "the rules have one word for this and a person has three. The glossary entry defining `unblocked` is deliberately NOT accepted: it says what the term means, not what happens, and a run that retrieved only definitions was refused by the answerer for want of a rule to cite."},
-    {"ask": "what happens if my creature is not blocked?", "any": ["510.1b"]},
-    {"ask": "how much damage does an unblocked creature do?", "any": ["510.1b"],
-     "why": "already in the rules' words, and must stay working"}
+    {
+      "ask": "what happens when my hit points reach zero?",
+      "any": [
+        "104.3b",
+        "704.5a",
+        "119.6"
+      ],
+      "why": "the keyword collision: reach is an ability and a verb"
+    },
+    {
+      "ask": "what happens when my life total reaches zero?",
+      "any": [
+        "104.3b",
+        "704.5a",
+        "119.6"
+      ],
+      "why": "the rules write 0, a person writes zero"
+    },
+    {
+      "ask": "what happens if I reach zero life?",
+      "any": [
+        "104.3b",
+        "704.5a",
+        "119.6"
+      ],
+      "why": "both at once"
+    },
+    {
+      "ask": "how many creatures can the defender block with?",
+      "any": [
+        "509.1a",
+        "509.2",
+        "Block"
+      ],
+      "why": "defender is a keyword and also the person blocking"
+    },
+    {
+      "ask": "does the attacker or the defender choose blockers?",
+      "any": [
+        "509.1a",
+        "Block"
+      ]
+    },
+    {
+      "ask": "what does reach do?",
+      "any": [
+        "702.17a",
+        "702.17b",
+        "Reach"
+      ],
+      "why": "the keyword sense must survive the fix above"
+    },
+    {
+      "ask": "can a creature with reach block a flyer?",
+      "any": [
+        "702.17b",
+        "702.9b",
+        "Reach"
+      ]
+    },
+    {
+      "ask": "what does deathtouch do?",
+      "any": [
+        "702.2a",
+        "702.2b",
+        "Deathtouch"
+      ]
+    },
+    {
+      "ask": "how does trample work when blocked?",
+      "any": [
+        "702.19b",
+        "702.19d",
+        "Trample"
+      ]
+    },
+    {
+      "ask": "what does flying do?",
+      "any": [
+        "702.9b",
+        "Flying"
+      ]
+    },
+    {
+      "ask": "what is first strike?",
+      "any": [
+        "702.7a",
+        "702.7b",
+        "First Strike"
+      ]
+    },
+    {
+      "ask": "does defender mean it cannot attack?",
+      "any": [
+        "702.3a",
+        "702.3b",
+        "Defender"
+      ]
+    },
+    {
+      "ask": "what does haste do?",
+      "any": [
+        "702.10a",
+        "702.10b",
+        "Haste"
+      ]
+    },
+    {
+      "ask": "what does vigilance do?",
+      "any": [
+        "702.20a",
+        "702.20b",
+        "Vigilance"
+      ]
+    },
+    {
+      "ask": "what does menace do?",
+      "any": [
+        "702.111a",
+        "702.111b",
+        "Menace"
+      ]
+    },
+    {
+      "ask": "can a creature that came into play this turn block?",
+      "any": [
+        "302.6",
+        "Summoning Sickness Rule"
+      ],
+      "why": "the paraphrase map: 302.6 shares no words with the question"
+    },
+    {
+      "ask": "can I attack with a creature I just played?",
+      "any": [
+        "302.6",
+        "Summoning Sickness Rule"
+      ]
+    },
+    {
+      "ask": "how many hit points do we start with?",
+      "any": [
+        "103.4",
+        "Starting Life Total"
+      ]
+    },
+    {
+      "ask": "when do I untap my creatures?",
+      "any": [
+        "502.1",
+        "503.1",
+        "Untap Step"
+      ]
+    },
+    {
+      "ask": "can two creatures block the same attacker?",
+      "any": [
+        "509.2",
+        "509.1a",
+        "Block"
+      ]
+    },
+    {
+      "ask": "what happens to damage at the end of the turn?",
+      "any": [
+        "514.2",
+        "120.3",
+        "Cleanup Step"
+      ]
+    },
+    {
+      "ask": "can a tapped creature block?",
+      "any": [
+        "509.1a"
+      ],
+      "why": "the polarity gap: the rule says blockers must be *untapped*"
+    },
+    {
+      "ask": "can I attack with a tapped creature?",
+      "any": [
+        "508.1a"
+      ]
+    },
+    {
+      "ask": "can a tapped creature attack?",
+      "any": [
+        "508.1a"
+      ]
+    },
+    {
+      "ask": "what does tapped mean?",
+      "any": [
+        "Tap",
+        "Tapped",
+        "701.21a",
+        "Tap Symbol"
+      ],
+      "why": "the same word without the combat context, which must not get the restriction"
+    },
+    {
+      "ask": "what happens if nobody blocks my creature?",
+      "any": [
+        "510.1b"
+      ],
+      "why": "the rules have one word for this and a person has three. The glossary entry defining `unblocked` is deliberately NOT accepted: it says what the term means, not what happens, and a run that retrieved only definitions was refused by the answerer for want of a rule to cite."
+    },
+    {
+      "ask": "what happens if my creature is not blocked?",
+      "any": [
+        "510.1b"
+      ]
+    },
+    {
+      "ask": "how much damage does an unblocked creature do?",
+      "any": [
+        "510.1b"
+      ],
+      "why": "already in the rules' words, and must stay working"
+    },
+    {
+      "ask": "when does my creature die from damage?",
+      "any": [
+        "700.4",
+        "704.5g",
+        "704.5h",
+        "Lethal Damage",
+        "120.6"
+      ],
+      "why": "die collides with the planar die; all eight results were about dice"
+    },
+    {
+      "ask": "what happens if I run out of cards?",
+      "any": [
+        "121.4",
+        "704.5b"
+      ],
+      "why": "the rules say 'a library with no cards in it'; 'empty library' is not in the document"
+    },
+    {
+      "ask": "can I cast Giant Growth without a creature?",
+      "any": [
+        "601.2c",
+        "115.7a",
+        "601.2"
+      ],
+      "why": "the target-choice rule is long, so bm25 ranked short keyword rules above it"
+    },
+    {
+      "ask": "my deck is empty, what now?",
+      "any": [
+        "121.4",
+        "704.5b"
+      ],
+      "why": "the same question in the other words a person uses"
+    },
+    {
+      "ask": "does my creature dying trigger anything?",
+      "any": [
+        "700.4",
+        "603.6c",
+        "603.10"
+      ],
+      "why": "the word has to reach 700.4 rather than rule 706, Rolling a Die"
+    }
   ]
 }

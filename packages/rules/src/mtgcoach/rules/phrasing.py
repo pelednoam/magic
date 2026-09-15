@@ -43,26 +43,17 @@ from __future__ import annotations
 
 import re
 
-#: The rules' own name for "this creature only just turned up", which is the
-#: thing rule 302.6 is about and the thing 302.6 never says. The rules use the
-#: phrase twice -- in 302.6 itself and in the glossary entry that points back
-#: to it -- so it survives one of them being reworded.
-SUMMONING_SICKNESS = "summoning sickness"
-
-#: What the rules call the number a child calls hit points.
-LIFE_TOTAL = "life total"
-
-#: The current wording for what a card printed before 2009 called coming into
-#: play. Rule 403.5 covers the bare phrase; this finds the rules about the
-#: event, which is usually what is being asked about.
-ENTERED = "entered the battlefield"
-
-#: The rules' phrase for a player running out of life, which is the one thing
-#: a beginner most wants to know and the rules describe in digits: "0 or less
-#: life", in 119.6 and 704.5a. A question saying "zero" matched neither, and
-#: adding the bare digit was worse -- it pulled in every rule that mentions the
-#: {0} mana symbol. The whole phrase is specific enough to rank.
-OUT_OF_LIFE = "0 or less life"
+from mtgcoach.rules.wording import (
+    DIES,
+    ENTERED,
+    LEGAL_TARGET,
+    LETHAL,
+    LIFE_TOTAL,
+    NO_CARDS,
+    OUT_OF_LIFE,
+    SUMMONING_SICKNESS,
+    TARGET_CHOICE,
+)
 
 #: Each entry: something a beginner types, and the rules' words for it. Matched
 #: case-insensitively against the whole question, and the original words are
@@ -107,6 +98,50 @@ PHRASES: tuple[tuple[re.Pattern[str], tuple[str, ...]], ...] = (
     # Running out of life, in the words a person uses for it. The rules say
     # "0 or less life" and a question says "reaches zero", "runs out", "hits
     # nothing left" -- and the digit is why none of them matched.
+    # A creature dying, which is the commonest question in the box and returned
+    # eight passages about *dice*. The rules define "dies" (700.4) and explain
+    # why (704.5g/h), and the bare word cannot reach either: with porter
+    # stemming "die" and "dies" are one term, and the document's own uses of it
+    # are the planar die and rule 706, "Rolling a Die" -- a heading, which
+    # outranks everything. So the phrases are added and the word is dropped;
+    # see ``INSTEAD``.
+    (
+        re.compile(
+            r"(?=.*\b(?:creature|creatures|guy|guys|bear|it|damage|combat|fight"
+            r"|attacks?|attacking|blocks?|blocking|toughness)\b)"
+            r".*\b(?:dies?|died|dying|dead|death|killed?|destroyed?)\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        (DIES, LETHAL),
+    ),
+    # A deck running out, in the words a person uses. "I run out of cards" and
+    # "my deck is empty" share no phrase with 121.4, which is the rule.
+    (
+        re.compile(
+            r"\b(?:"
+            r"run(?:s|ning)?\s+out\s+of\s+cards|"
+            r"(?:deck|library)\s+(?:is\s+)?(?:empty|runs?\s+out|has\s+no\s+cards)|"
+            r"no\s+cards?\s+(?:left|in\s+my\s+(?:deck|library))|"
+            r"out\s+of\s+cards"
+            r")\b",
+            re.IGNORECASE,
+        ),
+        (NO_CARDS,),
+    ),
+    # A spell that needs something to point at and has nothing. The question
+    # says "without a creature"; the rules say "legal target".
+    (
+        re.compile(
+            r"\b(?:"
+            r"without\s+(?:a\s+|any\s+)?(?:creature|creatures|target|targets)|"
+            r"(?:no|nothing|none)\s+(?:\w+\s+){0,2}?to\s+target|"
+            r"no\s+(?:legal\s+)?targets?|"
+            r"nothing\s+to\s+(?:point|aim|cast)\s+(?:it\s+)?at"
+            r")\b",
+            re.IGNORECASE,
+        ),
+        (TARGET_CHOICE, LEGAL_TARGET),
+    ),
     (
         re.compile(
             r"\b(?:"

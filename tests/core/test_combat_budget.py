@@ -23,7 +23,8 @@ from mtgcoach.core.combat.budget import (
     check_plan_size,
     resolutions_for,
 )
-from mtgcoach.core.combat.search import best_defence, plans
+from mtgcoach.core.combat.defending import best_defence
+from mtgcoach.core.combat.search import plans
 
 if TYPE_CHECKING:
     from mtgcoach.core.combat.model import Creature

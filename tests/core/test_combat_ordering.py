@@ -11,8 +11,8 @@ import pytest
 from helpers import creature, facts
 from mtgcoach.core.cards import CardInstance
 from mtgcoach.core.combat.damage import resolve
+from mtgcoach.core.combat.defending import best_defence
 from mtgcoach.core.combat.model import Blocks, Creature
-from mtgcoach.core.combat.search import best_defence
 from mtgcoach.core.ids import InstanceId, OracleId
 from mtgcoach.core.permanents import Permanent
 
