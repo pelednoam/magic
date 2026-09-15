@@ -221,6 +221,19 @@ decisions are what the coach said and cannot be produced again, and the recordin
 replaying them. It does mean such a journal cannot be *shown* — `GET /replays/{name}` answers 404
 saying so, rather than showing an empty screen.
 
+**A journal recorded before priority arrived cannot be walked at all.** The
+engine refuses a bare `AdvanceStep` now -- CR 500.2 needs an empty stack *and*
+both players passing -- and that is what every log recorded earlier is made of.
+`replays._replay` catches the refusal and skips that game, so the route answers
+404 rather than showing a board the events did not produce; the failure is
+safe, and the journal is still dead. Re-run it with `--replay`, which needs no
+model, and the new journal walks.
+
+Expect the re-run to report disagreements where the first run reported none.
+That is the point of it: an answer the coach gave before R02 and R03 landed did
+not disclose what the engine now insists is disclosed, and `--replay` is how
+you find out which of last night's advice today's engine would refuse.
+
 `data/selfplay/overnight.jsonl` is in exactly that state: it was launched before the harness
 learned to record games, so it has games of advice and no boards to hang them on. Re-run it with
 `--replay` to get a journal that can be walked:
