@@ -13,6 +13,7 @@ from mtgcoach.core.events import (
     ChangeLife,
     DrawCard,
     MoveCard,
+    PassPriority,
     PlayLand,
     SetTapped,
 )
@@ -51,20 +52,39 @@ def test_move_card(game: GameState) -> None:
     assert state.player(ME).graveyard == (deck("m")[0],)
 
 
-def test_play_land(game: GameState) -> None:
-    state = apply(game, PlayLand(ME, card_id("m", 0)))
+def test_play_land(main: GameState) -> None:
+    state = apply(main, PlayLand(ME, card_id("m", 0)))
     assert state.player(ME).battlefield[0].instance_id == card_id("m", 0)
     assert state.player(ME).lands_played_this_turn == 1
     assert len(state.player(ME).hand) == 6
+    assert state.priority == ME, "a land does not use the stack (CR 117.3c)"
 
 
-def test_a_land_must_be_in_hand(game: GameState) -> None:
+def test_a_land_must_be_in_hand(main: GameState) -> None:
     with pytest.raises(IllegalEventError, match=r"not in .* hand"):
-        apply(game, PlayLand(ME, card_id("m", 19)))
+        apply(main, PlayLand(ME, card_id("m", 19)))
 
 
-def test_only_one_land_per_turn(game: GameState) -> None:
-    state = apply(game, PlayLand(ME, card_id("m", 0)))
+def test_a_land_needs_priority(game: GameState) -> None:
+    """CR 116.2a: playing a land is a special action, taken with priority.
+
+    Checked in the reducer rather than only where the card data is, because it
+    needs none: whatever the card turns out to be, a player who may not act may
+    not act. Nobody receives priority in the untap step (CR 502.4), which is
+    where a game starts and where this used to be accepted.
+    """
+    with pytest.raises(IllegalEventError, match="nobody gets priority"):
+        apply(game, PlayLand(ME, card_id("m", 0)))
+
+
+def test_the_other_player_cannot_play_a_land_on_your_turn(main: GameState) -> None:
+    """Not because it is not their turn -- because it is not their priority."""
+    with pytest.raises(IllegalEventError, match="you do not have priority"):
+        apply(main, PlayLand(YOU, card_id("y", 0)))
+
+
+def test_only_one_land_per_turn(main: GameState) -> None:
+    state = apply(main, PlayLand(ME, card_id("m", 0)))
     with pytest.raises(IllegalEventError, match="already played a land"):
         apply(state, PlayLand(ME, card_id("m", 1)))
 
@@ -95,14 +115,37 @@ def test_replay_of_an_empty_log_is_the_starting_position(game: GameState) -> Non
     assert replay(game, []) == game
 
 
-def test_replay_matches_step_by_step_application(game: GameState) -> None:
+def test_replay_matches_step_by_step_application(main: GameState) -> None:
     log: list[Event] = [
         PlayLand(ME, card_id("m", 0)),
         ChangeLife(YOU, -3),
+        PassPriority(ME),
+        PassPriority(YOU),
         AdvanceStep(),
         SetTapped(ME, card_id("m", 0), tapped=True),
     ]
-    stepwise = game
+    stepwise = main
     for event in log:
         stepwise = apply(stepwise, event)
-    assert replay(game, log) == stepwise
+    assert replay(main, log) == stepwise
+
+
+def test_a_pass_needs_priority(main: GameState) -> None:
+    """One device must not be able to pass on the other seat's behalf.
+
+    The whole point of carrying the player on the event. A pass that anybody
+    could send for anybody would be the app's cast-and-resolve shortcut
+    wearing a new name.
+    """
+    with pytest.raises(IllegalEventError, match="you do not have priority"):
+        apply(main, PassPriority(YOU))
+
+
+def test_passing_hands_priority_on_and_then_to_nobody(main: GameState) -> None:
+    """CR 117.3d, then CR 117.4."""
+    one = apply(main, PassPriority(ME))
+    assert one.priority == YOU
+    assert one.passed == (ME,)
+    both = apply(one, PassPriority(YOU))
+    assert both.priority is None, "nobody acts while the step is ending"
+    assert both.passed == (ME, YOU)

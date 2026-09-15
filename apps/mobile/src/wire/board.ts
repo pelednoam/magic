@@ -104,6 +104,15 @@ export interface Advice {
   readonly reminders: readonly Reminder[];
   /** Cards the coach cannot speak for. Shown, never hidden. */
   readonly unknown: readonly string[];
+  /**
+   * What the *rules engine* does not model at this moment, in its own words.
+   *
+   * The same admission `unknown` makes about cards, made about the rules. A
+   * stack that holds only spells looks complete, and a child who learned from
+   * it that a trigger cannot be answered would have learned something that is
+   * not a rule of Magic. Shown, never hidden, for the same reason.
+   */
+  readonly not_modelled: readonly string[];
 }
 
 /** What every route returns: the board, plus advice for both players. */

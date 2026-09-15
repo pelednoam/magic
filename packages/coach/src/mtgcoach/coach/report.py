@@ -28,6 +28,7 @@ from mtgcoach.coach import mana
 from mtgcoach.coach.attacks import Attacks, attacks_for
 from mtgcoach.coach.speaking import named_by, unknown_to
 from mtgcoach.coach.warnings import reminders as warnings_for
+from mtgcoach.core.disclosure import disclosures
 from mtgcoach.core.legality import why_not_cast, why_not_play_land
 from mtgcoach.core.manasolver import payments
 
@@ -98,6 +99,16 @@ class TurnReport:
     #: hidden: the honest failure is "I can't speak for this one", and a beginner
     #: who is not told that will read silence as "there is nothing to do".
     unknown: tuple[str, ...] = ()
+    #: What the *rules engine* does not model at this moment, in its own words.
+    #:
+    #: The same disclosure ``unknown`` makes about cards, made about the rules.
+    #: ``unknown`` and ``Playable.not_carried_out`` cover a card the engine
+    #: cannot speak for; nothing covered a rule it cannot, and the priority
+    #: model is the first place that gap is visible to a player -- a stack that
+    #: holds only spells looks complete, and a child who learned from it that a
+    #: trigger cannot be answered would have learned something that is not a
+    #: rule of Magic. See ``core.disclosure``.
+    not_modelled: tuple[str, ...] = ()
 
     @property
     def playable(self) -> tuple[Playable, ...]:
@@ -125,6 +136,7 @@ def advise(state: GameState, player_id: PlayerId, lookup: CardLookup) -> TurnRep
             state, player, lookup, partial(named_by, lookup), your_turn=your_turn
         ),
         unknown=unknown_to(state, player_id, lookup),
+        not_modelled=disclosures(state),
     )
 
 

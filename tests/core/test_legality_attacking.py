@@ -7,11 +7,9 @@ asked only the second was told a tapped creature could attack at the upkeep.
 
 from __future__ import annotations
 
-from dataclasses import replace
-
 import pytest
 
-from helpers import ME, YOU, deck, facts
+from helpers import ME, YOU, at_step, deck, facts
 from mtgcoach.core.cards import CardInstance
 from mtgcoach.core.errors import IllegalEventError
 from mtgcoach.core.ids import InstanceId, OracleId, PlayerId
@@ -31,9 +29,19 @@ FOREST = ManaSource(InstanceId("forest"), frozenset("G"))
 GIANT_GROWTH = facts("Giant Growth", "{G}", instant=True)
 
 
-def _game(step: Step = Step.PRECOMBAT_MAIN, active: PlayerId = ME) -> GameState:
+def _game(
+    step: Step = Step.PRECOMBAT_MAIN, active: PlayerId = ME, holder: PlayerId | None = None
+) -> GameState:
+    """A board at one step, with priority handed out the way the step hands it.
+
+    ``holder`` says otherwise. The active player gets priority first
+    (CR 117.3a), so a test about casting an instant on the *opponent's* turn
+    has to say that the opponent has already passed (CR 117.3d) -- which is
+    the moment that actually happens at a table, and which this helper could
+    not express while nothing recorded a holder at all.
+    """
     game = start_game({ME: deck("m"), YOU: deck("y")}, ME)
-    return replace(game, step=step, active_player=active)
+    return at_step(game, step, active, holder)
 
 
 def test_an_attack_can_be_declared_in_your_declare_attackers_step() -> None:

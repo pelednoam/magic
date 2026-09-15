@@ -7,30 +7,30 @@
 
 """The two payload shapes one played turn never reaches.
 
-``test_wire_contract`` plays a turn and unions every field it sees. Two shapes
-are not in a turn: a *replay*, which needs a journal on disk, and a game that
-has *ended*, which needs one player out. Both are in the contract, so both have
-to be walked -- and a contract test that never finished a game would have
-declared `over` covered while only ever seeing null.
+``wireturn`` plays a turn and unions every field it sees. Two shapes are not in
+a turn: a *replay*, which needs a journal on disk, and a game that has *ended*,
+which needs one player out. Both are in the contract, so both have to be walked
+-- and a contract test that never finished a game would have declared `over`
+covered while only ever seeing null.
 
-Split out of that module at the line limit; it is the same test, in two files.
+Split out of ``test_wire_contract`` at the line limit; it is all the same test,
+across four files, and that one is where the two sets get compared.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from driving import HTTP_OK, stepped
 from helpers_api import server, talking
-from helpers_replay import NAME, journalled, serving
+from helpers_journal import journalled, serving
+from helpers_replay import NAME
 from mtgcoach.core.player import STARTING_LIFE
 from wire import decoded, text
 from wirefields import keys
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-#: The status the server returns when an event was accepted.
-HTTP_OK = 200
 
 
 def replayed(data_root: Path) -> set[str]:
@@ -49,9 +49,9 @@ def replayed(data_root: Path) -> set[str]:
             got = client.get(path)
             assert got.status_code == HTTP_OK, got.text
             found.update(keys(decoded(got.json())))
-        stepped = client.post(f"/replays/{NAME}/0/at/0")
-        assert stepped.status_code == HTTP_OK, stepped.text
-        found.update(keys(decoded(stepped.json())))
+        moment = client.post(f"/replays/{NAME}/0/at/0")
+        assert moment.status_code == HTTP_OK, moment.text
+        found.update(keys(decoded(moment.json())))
     return found
 
 
@@ -68,14 +68,15 @@ def finished() -> set[str]:
         session = created["session_id"]
         assert isinstance(session, str)
         # Twenty life, gone. Then one step, which is the priority boundary
-        # where CR 704.5a is checked.
-        for event in (
-            {"type": "change_life", "player": "you", "amount": -STARTING_LIFE},
-            {"type": "advance_step"},
-        ):
-            sent = client.post(f"/games/{session}/events", json=event)
-            assert sent.status_code == HTTP_OK, sent.text
-            found.update(keys(decoded(sent.json())))
+        # where CR 704.5a is checked -- and ending a step takes both players
+        # passing first (CR 500.2), so `stepped` sends all three events.
+        sent = client.post(
+            f"/games/{session}/events",
+            json={"type": "change_life", "player": "you", "amount": -STARTING_LIFE},
+        )
+        assert sent.status_code == HTTP_OK, sent.text
+        found.update(keys(decoded(sent.json())))
+        found.update(keys(stepped(client, session)))
         body = decoded(client.get(f"/games/{session}").json())
         assert text(body, "state", "over", "winner") == "them"
     return found

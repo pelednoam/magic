@@ -23,6 +23,7 @@ from mtgcoach.core.events import (
     CastSpell,
     ChangeLife,
     MoveCard,
+    PassPriority,
     PlayLand,
     ResolveSpell,
     SetTapped,
@@ -63,27 +64,38 @@ def played(
     """
     if card.is_land:
         return _done(state, [PlayLand(player=player, instance_id=card.instance_id)], lookup)
-    return _done(state, cast_and_resolve(player, card), lookup)
+    return _done(state, cast_and_resolve(state, player, card), lookup)
 
 
-def cast_and_resolve(player: PlayerId, card: Playable) -> list[Event]:
-    """The two events a spell nobody answers produces.
+def cast_and_resolve(state: GameState, player: PlayerId, card: Playable) -> list[Event]:
+    """The four events a spell nobody answers produces.
 
     Casting is one event including its payment, because CR 601.2 is one action:
     announcing the spell and paying for it happen without stopping, and a spell
-    half-cast is not a state the game can be in. Resolution is the second, and
+    half-cast is not a state the game can be in. Resolution is the last, and
     takes it off the stack -- onto the battlefield if it is a permanent spell
     (CR 608.3), into its owner's graveyard if it is an instant or a sorcery
     (CR 608.2m).
 
-    Two, back to back, because nothing here can respond: neither agent holds
-    priority and the engine has none to hold. When a player can answer a spell,
-    the gap between these two is where that happens -- which is why it is a gap
-    and not a single event.
+    **Between them, two passes, and they are the point.** It used to be two
+    events back to back, with a note saying nothing here could respond because
+    neither agent held priority and the engine had none to hold. The engine has
+    priority now, so a spell resolves because every player passed in succession
+    (CR 117.4) -- and the harness has to actually pass, through the reducer,
+    recorded in the log, or the resolution is refused.
 
-    This used to be one ``MoveCard`` to the battlefield, and the board that
-    produced was wrong in a way anybody could see: an Opt sitting among the
-    lands, for the rest of the game.
+    The caster passes first because casting hands priority straight back to
+    them (CR 117.3c), and the opponent second, which is turn order from there
+    (CR 101.4) in a two-player game.
+
+    **The opponent's pass is the harness deciding, and that is a harness
+    policy rather than a rule.** None of the agents has a response to give --
+    a ``Move`` names a card to play or an attack to make, and there is no
+    "answer that spell" to name -- so a pass is the only thing the opponent
+    could truthfully be said to do. It goes through the real event rather than
+    being assumed away, so the log of a self-play game is a log a person could
+    have produced, and the day an agent learns to hold a trick this is the line
+    that has to change.
     """
     to = ZoneName.BATTLEFIELD if card.is_permanent else ZoneName.GRAVEYARD
     return [
@@ -92,6 +104,8 @@ def cast_and_resolve(player: PlayerId, card: Playable) -> list[Event]:
             instance_id=card.instance_id,
             payment=card.payment.tapped if card.payment else (),
         ),
+        PassPriority(player=player),
+        PassPriority(player=state.opponent_of(player)),
         ResolveSpell(player=player, instance_id=card.instance_id, to=to),
     ]
 

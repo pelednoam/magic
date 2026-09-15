@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING, assert_never
 
+from mtgcoach.core import priority
 from mtgcoach.core.casting import cast, resolve
 from mtgcoach.core.errors import IllegalEventError
 from mtgcoach.core.events import (
@@ -21,6 +22,7 @@ from mtgcoach.core.events import (
     ChangeLife,
     DrawCard,
     MoveCard,
+    PassPriority,
     PlayLand,
     ResolveSpell,
     SetTapped,
@@ -45,6 +47,17 @@ if TYPE_CHECKING:
 def apply(state: GameState, event: Event) -> GameState:
     """Return the state that results from applying ``event``.
 
+    Three of these are *actions*, taken by a player who holds priority:
+    ``CastSpell`` (CR 117.1a), ``PlayLand`` (CR 116.2a) and ``PassPriority``
+    itself. The rest are not, and deliberately need none. ``SetTapped``,
+    ``MoveCard`` and ``ChangeLife`` are the primitives that turn-based actions
+    and resolving effects are built from, and none of those uses priority
+    (CR 117.2c, CR 405.6a); ``DrawCard`` is the draw step's turn-based action
+    (CR 703.4d) that the tracker also offers as a button, which is an
+    approximation this engine makes on purpose and says so in
+    ``disclosure``. Gating them would have refused a combat damage
+    step half-way through applying itself.
+
     Raises:
         IllegalEventError: If the event cannot legally be applied, or if the
             game is already over. A finished game is not a position anybody may
@@ -59,6 +72,8 @@ def apply(state: GameState, event: Event) -> GameState:
     match event:
         case AdvanceStep():
             return advance(state)
+        case PassPriority(player=player_id):
+            return priority.passes(state, player_id)
         case DrawCard(player=player_id):
             return draw_card(state, player_id)
         case PlayLand() | CastSpell() | ResolveSpell() | MoveCard():
@@ -110,6 +125,19 @@ def replay(initial: GameState, events: Iterable[Event]) -> GameState:
 
 
 def _play_land(state: GameState, player_id: PlayerId, instance_id: InstanceId) -> GameState:
+    """Spend the land drop (CR 305.2) on a card from hand.
+
+    Playing a land is a special action, taken only by a player who has
+    priority (CR 116.2a), so that is checked here and not left to the card-aware
+    layer: it needs no card data, and a check a caller can skip by not asking
+    is not a check. The rest of CR 116.2a -- your main phase, your turn, an
+    empty stack -- is ``legality.why_not_play_land``, which needs to know the
+    card is a land before any of it means anything.
+
+    Priority comes straight back (CR 117.3c): a land does not use the stack, so
+    there is nothing to wait for and the turn carries on.
+    """
+    priority.demanded(state, player_id)
     player = state.player(player_id)
     if player.find(ZoneName.HAND, instance_id) is None:
         msg = f"card {instance_id!r} is not in {player_id!r}'s hand"
@@ -118,10 +146,11 @@ def _play_land(state: GameState, player_id: PlayerId, instance_id: InstanceId) -
         msg = f"{player_id!r} has already played a land this turn"
         raise IllegalEventError(msg)
     played = move_card(player, instance_id, ZoneName.BATTLEFIELD, state.turn)
-    return state.with_player(
+    dropped = state.with_player(
         player_id,
         replace(played, lands_played_this_turn=player.lands_played_this_turn + 1),
     )
+    return priority.acted(dropped, player_id)
 
 
 def _set_tapped(

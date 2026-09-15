@@ -11,9 +11,20 @@ Two answers to one question, and the live path had the wrong one.
 checks for these conditions whenever a player would receive priority. Not after
 every change -- a combat damage step kills creatures and changes life totals in
 one go (CR 510.2), and a check wedged between those would end the game before
-the deaths it caused had been applied. So ``turn.advance`` runs it, which is
-this engine's priority boundary, and a single event is never interrupted
-part-way through.
+the deaths it caused had been applied. So ``turn.advance`` runs it, and a
+single event is never interrupted part-way through.
+
+That used to read "which is this engine's priority boundary", and it is worth
+correcting rather than leaving: the engine now has three. A player receives
+priority at the start of a step (CR 117.3a), after a spell resolves (CR 117.3b)
+and after casting one (CR 117.3c), and only the first of those runs this check.
+The gap is the same one it always was -- resolution has always handed priority
+over in the rules, and this has always been checked a step late -- but
+``priority`` makes the boundaries explicit, so a docstring that named one of
+them as the boundary is now visibly wrong. Closing it is the state-based-action
+work, not the priority work: the review's R05 is where it belongs, and running
+this at three sites without the rest of CR 704.3 would be a second partial
+answer to a question that already has one.
 """
 
 from __future__ import annotations

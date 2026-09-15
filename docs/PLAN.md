@@ -667,6 +667,9 @@ class GameState:
     active_player: PlayerId
     step: Step
     players: Mapping[PlayerId, PlayerState]
+    stack: tuple[StackObject, ...] = ()
+    priority: PlayerId | None = None
+    passed: tuple[PlayerId, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -690,18 +693,59 @@ otherwise:
   legality question. The opponent-knowledge reasoning the coach needs (§3's "two burn spells
   left in their deck") is computed from their registered decklist, not from a deliberately
   impoverished state.
-- **The stack is a zone on each player, not a field on the game.** It is shared in the rules
-  (CR 405.1) and kept per-player here for two reasons that pull the same way: a spell's card
-  returns to *its owner's* graveyard when it resolves (CR 608.2m), so filing it under its owner
-  is where it has to come back from; and it keeps card conservation checkable per player, which
-  is the invariant a self-play season checks on every one of a hundred thousand events. The
-  first 200-game season after casting landed applied 68,534 events, cast 3,911 spells, and
-  broke nothing — the cast/resolve pair was checked for free, on every one of them.
+- **The stack is one ordered field on the game, and used to be a zone on each player.** It was
+  kept per-player for two reasons that pulled the same way: a spell's card returns to *its
+  owner's* graveyard when it resolves (CR 608.2m), so filing it under its owner is where it has
+  to come back from; and it kept card conservation checkable per player, which is the invariant
+  a self-play season checks on every one of a hundred thousand events. This plan said so, and
+  said what the arrangement did not model — the *order* of two spells on the stack at once,
+  which nothing could produce until the engine had priority.
 
-  What that does not model is the *order* of two spells on the stack at once. Nothing can
-  produce that yet: a second spell on the stack means responding to the first, which needs
-  priority (CR 117), which the engine does not have. When it does, the shared order belongs on
-  `GameState` beside it. `counters` and attachments on `Permanent` are still to come.
+  It has priority now, and the old arrangement was then wrong rather than merely incomplete:
+  two tuples filed under two players are two orders with no way to compare them, so the engine
+  let the spell cast *first* resolve first. That is the exact opposite of CR 405.5, and the
+  whole of what answering a spell means. So the order is one field, and each object on it
+  carries its `controller` (CR 405.4) rather than being filed in a collection.
+
+  Both original reasons survive that. `GameState.cards_of` composes a player's own zones with
+  the stack objects they control, so "how many cards does this seat have" is still answerable
+  and still checked on every event — and it is now a stronger invariant, because it spans a
+  zone the two players share. A spell mis-attributed on the stack, or dropped while resolving
+  out of order, changes that count. The 200-game season after the change applied 61,100 events
+  and cast 3,485 spells with nothing broken.
+
+  `counters` and attachments on `Permanent` are still to come.
+- **Priority is two fields, and it used to be nothing at all.** `priority` is the player who
+  may act (CR 117.1), null when nobody may — the untap and cleanup steps (CR 502.4, CR 514.3),
+  and the moment after everybody has passed, when the top of the stack resolves or the step
+  ends (CR 117.4). `passed` is who has passed *since the last action*, in order, because
+  CR 117.4 says "in succession" and anything anybody does breaks the run. A count would have
+  read the same for two players and stopped being true for three.
+
+  `active_player` is a different question and was the only one the engine could answer. A
+  player may cast an instant on their opponent's turn, and all of answering a spell happens
+  while it is somebody else's — so "you may cast this" could only ever mean "the step allows
+  somebody to", and the app cast a spell and resolved it in the same breath with no moment
+  in between for the other player to do anything.
+
+  Casting, playing a land and passing all take priority (CR 117.1a, CR 116.2a) and are refused
+  without it, in the reducer, where no caller can skip the check by not asking. A resolution
+  waits for every player to pass (CR 117.4, CR 608.1); a step ends the same way (CR 500.2), so
+  `AdvanceStep` is a consequence of validated flow rather than something a client asks for.
+  The primitives — `SetTapped`, `MoveCard`, `ChangeLife`, `DrawCard` — deliberately take none:
+  they are what turn-based actions and resolving effects are built from, and none of those uses
+  priority (CR 117.2c, CR 405.6a). Gating them would have refused a combat damage step
+  half-way through applying itself.
+
+  **What the model does not do is disclosed rather than implied.** Only spells go on this
+  stack: an activated or triggered ability goes on it in the rules (CR 602.2a, CR 603.3) and
+  this engine has no ability objects to put there, so nobody receives priority to answer one.
+  Nor does cleanup hand priority out when a trigger or a discard intervenes (CR 514.3a). A
+  priority system that handled only spells while *looking* complete would be the thing this
+  project must never produce — a child learning that a trigger cannot be answered, which is not
+  a rule of Magic. So `core/disclosure.py` says both, in the engine's own words, and they ride
+  the wire in `TurnReport.not_modelled` and print beside the stack on the screen. It is the
+  sibling of `carrying.py`: that one is the same admission about a card.
 
 **Event-sourced.** Store the event log, derive state via `reduce.apply`. Free undo, free replay,
 free end-of-game review, and the strongest property test in the suite. Costs nothing now,
@@ -764,15 +808,23 @@ sources, no source of a colour, or — the awkward one — enough sources of the
 that still cannot be assigned. "No source of a colour" counts only single-colour pips: a
 hybrid `{W/U}` demands neither in particular, and naming one as missing is the wrong lesson.
 
-Untap and cleanup are refused outright (CR 502.4, 514.3): no player gets priority there, so an
-instant that reads as castable during untap is not a harmless approximation, it is the one
-moment when "hold your Giant Growth" is wrong.
+All of CR 117.1a is now checked, and it took three goes to get there. The empty-stack half
+arrived with the stack: a spell waiting to resolve means it is not your turn to act at sorcery
+speed, however much it looks like your main phase, and `_sorcery_timing` reads the whole stack
+because there is only one of it.
 
-All three halves of CR 117.1a are now checked, including the empty stack — which was the one
-deliberate omission here for as long as there was no stack to look at. A spell waiting to
-resolve means it is not your turn to act at sorcery speed, however much it looks like your main
-phase, and `_sorcery_timing` looks at the whole stack rather than your half of it: a spell your
-opponent cast is on it exactly as much as one of yours.
+The *priority* half arrived with priority, and it is the one that had been quietly answered
+with something else. This asked whether the **step** hands out priority — untap and cleanup do
+not (CR 502.4, CR 514.3), and an instant that reads as castable during untap is not a harmless
+approximation but the one moment when "hold your Giant Growth" is wrong. What it could not ask
+was whether *you* have it, because nothing recorded a holder. So a Giant Growth read as
+castable during the opponent's upkeep before the opponent had done anything — and the moment a
+beginner has to learn is exactly the one that was missing: you get to hold the trick when they
+pass (CR 117.3d).
+
+`priority.lacking` answers both, in one wording, and the reducer refuses the event with the
+same sentence — so the server cannot contradict the advice in the very same response, which is
+the rule `guard.py` exists to keep.
 
 **3. Combat simulator** — `combat/`. Brute-force every attack subset against the defender's
 best blocks, and within each of those the attacker's best assignment of damage. This is the
@@ -1353,9 +1405,29 @@ battlefield for the rest of a game. The app now offers every playable card rathe
 lands, and `Playable.is_permanent` rides the wire beside `is_land` because the client has to say
 where a spell resolves to and the engine cannot read a type line.
 
-What is still missing is *responding*: neither player holds priority, so cast and resolve arrive
-back to back. That is honest rather than wrong — no board the engine produces misstates the
-rules — and it is the next thing the gap between those two events is for.
+**And responding, which was the gap between those two events, is now what fills it.** They used
+to arrive back to back, because neither player held priority and the engine had none to hold.
+That was honest while nothing could produce two spells at once; it stopped being honest the
+moment the stack had an order to get wrong.
+
+So a spell resolves because every player has passed in succession (CR 117.4, CR 608.1) rather
+than because its controller asked, a step ends the same way (CR 500.2), and `PassPriority` is
+the event that was missing — with nothing recording who may act, there was no way to *not* act,
+so there was no moment to answer a spell in. `apps/mobile/src/playing.ts` now sends the cast
+and stops; passing and resolving are deliberate acts in a `Priority` panel that shows one
+ordered stack, whose moment it is, and who is still to pass. The app decides none of it: every
+one of those is a field the server sends, including where the top spell resolves to, which the
+client used to remember from the hand advice after the card had left the zone it read it from.
+
+What is still missing is on the stack rather than beside it: activated and triggered abilities
+are not objects this engine can put there, so nobody receives priority to answer one
+(CR 117.1b, CR 603.3), and cleanup does not hand priority out when a trigger or a discard
+intervenes (CR 514.3a). Both are **disclosed** — `core/disclosure.py`, on the wire in
+`not_modelled`, printed beside the stack — because a priority system that handled only spells
+while looking complete would teach a child that a trigger cannot be answered, and that is not a
+rule of Magic. Pending choices beyond the stack (mulligans, discarding to hand size, choosing
+targets and modes) are Phase C, and `DrawCard` remains a button as well as the draw step's
+turn-based action.
 
 The remaining gap is identity, and it is now half closed. The API is **not** unauthenticated: the
 server makes a token on first run, prints it at startup, and `api/gatekeeper.py` refuses every

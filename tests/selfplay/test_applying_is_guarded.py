@@ -24,13 +24,13 @@ from helpers_selfplay import BOOK, THEM, YOU, game, main_phase
 from mtgcoach.api.eventfields import BadEventError
 from mtgcoach.coach.report import Playable, advise
 from mtgcoach.core.cards import CardInstance
-from mtgcoach.core.events import AdvanceStep
 from mtgcoach.core.ids import InstanceId, OracleId
 from mtgcoach.core.permanents import Permanent
 from mtgcoach.core.reduce import apply
 from mtgcoach.core.steps import Step
 from mtgcoach.selfplay.applying import attacked, played
 from mtgcoach.selfplay.moves import Seat
+from mtgcoach.selfplay.passing import ending
 from mtgcoach.selfplay.playing import play
 from mtgcoach.selfplay.policy import Greedy
 
@@ -110,7 +110,8 @@ def test_an_attack_taps_the_attackers() -> None:
         YOU, replace(mine, battlefield=(*mine.battlefield, Permanent(bear).settle()))
     )
     while state.step is not Step.DECLARE_ATTACKERS:
-        state = apply(state, AdvanceStep())
+        for event in ending(state):
+            state = apply(state, event)
     report = advise(state, YOU, BOOK)
     plan = next((one for one in report.attacks.plans if one.attackers), None)
     assert plan is not None, "a settled Bear and no attack to make"

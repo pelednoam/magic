@@ -20,7 +20,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from helpers_api import talking
-from helpers_replay import NAME, journalled, serving
+from helpers_journal import journalled, serving
+from helpers_replay import NAME
 from mtgcoach.core.steps import Step
 from wire import decoded, rows, text
 

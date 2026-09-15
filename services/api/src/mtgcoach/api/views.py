@@ -50,6 +50,10 @@ def report(turn: TurnReport) -> dict[str, Json]:
         "attacks": attacks(turn.attacks),
         "reminders": [reminder(r) for r in turn.reminders],
         "unknown": list(turn.unknown),
+        # What the rules engine does not model here, beside what it cannot say
+        # about a card. Both ride the wire because both have to be *read*: a
+        # gap nobody is told about is indistinguishable from a rule.
+        "not_modelled": list(turn.not_modelled),
     }
 
 

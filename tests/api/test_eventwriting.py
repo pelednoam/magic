@@ -24,6 +24,7 @@ from mtgcoach.core.events import (
     DrawCard,
     Event,
     MoveCard,
+    PassPriority,
     PlayLand,
     ResolveSpell,
     SetTapped,
@@ -35,6 +36,7 @@ from mtgcoach.core.zones import ZoneName
 #: defaults so a field dropped on the way out is visible on the way back.
 EVERY_EVENT: tuple[Event, ...] = (
     AdvanceStep(),
+    PassPriority(PlayerId("you")),
     DrawCard(PlayerId("you")),
     PlayLand(PlayerId("you"), InstanceId("card-1")),
     CastSpell(PlayerId("you"), InstanceId("card-4")),

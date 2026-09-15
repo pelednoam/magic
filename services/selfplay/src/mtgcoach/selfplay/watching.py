@@ -21,7 +21,8 @@ from __future__ import annotations
 from collections import Counter
 from typing import TYPE_CHECKING
 
-from mtgcoach.core.steps import TURN_ORDER
+from mtgcoach.core.priority import all_passed
+from mtgcoach.core.steps import TURN_ORDER, has_priority, named
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -53,15 +54,21 @@ def broken(before: GameState, after: GameState) -> Iterator[str]:
 
 
 def _conserved(before: GameState, after: GameState) -> Iterator[str]:
-    """Cards do not appear or vanish."""
-    for player_id, was in before.players.items():
-        now = after.player(player_id)
-        had, has = sum(1 for _ in was.cards()), sum(1 for _ in now.cards())
-        if had != has:
-            yield f"{player_id} had {had} cards and now has {has}"
-        lost = Counter(card.instance_id for card in was.cards()) - Counter(
-            card.instance_id for card in now.cards()
-        )
+    """Cards do not appear or vanish.
+
+    Asked of ``GameState.cards_of`` rather than ``PlayerState.cards``, which is
+    what it used to be. The stack is one shared, ordered field now, so a
+    player's cards live in two objects and only the game state can compose
+    them -- and the invariant is stronger for it: a spell mis-attributed on the
+    stack, or dropped while resolving out of order, changes this count, and a
+    season checks it on every one of a hundred thousand events.
+    """
+    for player_id in before.players:
+        had = Counter(card.instance_id for card in before.cards_of(player_id))
+        has = Counter(card.instance_id for card in after.cards_of(player_id))
+        if had.total() != has.total():
+            yield f"{player_id} had {had.total()} cards and now has {has.total()}"
+        lost = had - has
         if lost:
             yield f"{player_id} lost track of {sorted(lost)[:4]}"
 
@@ -85,3 +92,35 @@ def _sane(state: GameState) -> Iterator[str]:
             yield f"{player_id} is on {player.life} life"
         if player.lands_played_this_turn > LAND_DROPS:
             yield f"{player_id} has played {player.lands_played_this_turn} lands this turn"
+    yield from _priority(state)
+
+
+def _priority(state: GameState) -> Iterator[str]:
+    """Priority is somebody's, or nobody's, and only for a real reason.
+
+    Things no play may break. Priority belongs to a player who is in the game
+    -- a holder who is not is a seat nobody can ever act from. Nobody holds it
+    in the untap or cleanup steps (CR 502.4, CR 514.3), and *somebody* holds it
+    in every other step, unless everybody has passed: a step that handed it to
+    nobody is a game that has stopped, where no event is legal and no step can
+    end. And a player cannot pass twice without acting in between, because a
+    pass counts only in succession (CR 117.4) -- a duplicate would resolve a
+    spell one player had never had the chance to answer.
+    """
+    holder = state.priority
+    if holder is not None and holder not in state.players:
+        yield f"{holder} holds priority and is not in the game"
+    if holder is not None and not has_priority(state.step):
+        yield f"{holder} holds priority during the {named(state.step)}"
+    if holder is None and has_priority(state.step) and not all_passed(state):
+        # Somebody has to be able to act. A step that hands out priority and
+        # gave it to nobody, with nobody having passed, is a game that has
+        # simply stopped -- no event is legal and no step can end.
+        yield f"nobody holds priority during the {named(state.step)}"
+    if len(set(state.passed)) != len(state.passed):
+        yield f"{sorted(state.passed)} has a player passing twice in succession"
+    if len(state.passed) > len(state.players):
+        yield f"{len(state.passed)} passes from {len(state.players)} players"
+    for one in state.stack:
+        if one.controller not in state.players:
+            yield f"{one.instance_id} on the stack is controlled by nobody in the game"

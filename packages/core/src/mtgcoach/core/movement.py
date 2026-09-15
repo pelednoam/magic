@@ -3,6 +3,13 @@
 Every movement is remove-then-add, so the number of cards a player owns cannot
 change no matter which event moved them. That is what makes the conservation
 property in the test suite a real invariant rather than a hopeful assertion.
+
+Only a player's *own* zones. The stack is shared and ordered and lives on
+``GameState``; putting a card there is casting it, which needs a controller and
+a payment, so it is ``casting.cast`` rather than a move. This module used to
+have an arm for it, back when the stack was a field on ``PlayerState``, and
+that arm was how a caller could have moved a card onto the stack without
+casting it.
 """
 
 from __future__ import annotations
@@ -49,9 +56,6 @@ def _remove_from(
         case ZoneName.HAND:
             card, rest = _split(player.hand, instance_id)
             return replace(player, hand=rest), card
-        case ZoneName.STACK:
-            card, rest = _split(player.stack, instance_id)
-            return replace(player, stack=rest), card
         case ZoneName.GRAVEYARD:
             card, rest = _split(player.graveyard, instance_id)
             return replace(player, graveyard=rest), card
@@ -94,8 +98,6 @@ def add_card(player: PlayerState, card: CardInstance, zone: ZoneName, turn: int 
             return replace(player, library=(*player.library, card))
         case ZoneName.HAND:
             return replace(player, hand=(*player.hand, card))
-        case ZoneName.STACK:
-            return replace(player, stack=(*player.stack, card))
         case ZoneName.GRAVEYARD:
             return replace(player, graveyard=(*player.graveyard, card))
         case ZoneName.EXILE:

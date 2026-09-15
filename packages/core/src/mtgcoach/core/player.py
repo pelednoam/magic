@@ -41,10 +41,6 @@ class PlayerState:
     battlefield: tuple[Permanent, ...]
     graveyard: tuple[CardInstance, ...]
     exile: tuple[CardInstance, ...]
-    #: Spells this player has cast that have not resolved (CR 405.1). Kept with
-    #: their owner; see ``ZoneName`` for why, and for what that does not model.
-    #: Defaulted because a board built by hand in a test has nothing on it.
-    stack: tuple[CardInstance, ...] = ()
     life: int = STARTING_LIFE
     #: Whether this player has tried to draw from an empty library (CR 121.3).
     #: The attempt does not fail -- it loses the game the next time a player
@@ -54,14 +50,17 @@ class PlayerState:
     lands_played_this_turn: int = 0
 
     def cards(self) -> Iterator[CardInstance]:
-        """Every card this player owns, in every zone.
+        """Every card this player owns, in one of *their own* zones.
 
-        The basis of the conservation invariant: no event may change how many
-        cards this yields.
+        Not the whole of what they own: a spell they have cast is on the shared
+        stack and is not here. ``GameState.cards_of`` is the one that answers
+        the conservation question -- no event may change how many cards *it*
+        yields for a player -- and it composes this with the stack. Splitting
+        them is what the single ordered stack cost, and the invariant it buys
+        back is stronger, because it now spans a zone two players share.
         """
         yield from self.library
         yield from self.hand
-        yield from self.stack
         yield from (permanent.card for permanent in self.battlefield)
         yield from self.graveyard
         yield from self.exile
@@ -73,8 +72,6 @@ class PlayerState:
                 return self.library
             case ZoneName.HAND:
                 return self.hand
-            case ZoneName.STACK:
-                return self.stack
             case ZoneName.BATTLEFIELD:
                 return tuple(permanent.card for permanent in self.battlefield)
             case ZoneName.GRAVEYARD:

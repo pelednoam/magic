@@ -10,9 +10,10 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
+from mtgcoach.core import priority
 from mtgcoach.core.errors import IllegalEventError
 from mtgcoach.core.results import losses
-from mtgcoach.core.steps import Step, next_step
+from mtgcoach.core.steps import Step, has_priority, named, next_step
 
 if TYPE_CHECKING:
     from mtgcoach.core.ids import PlayerId
@@ -38,22 +39,23 @@ def advance(state: GameState) -> GameState:
     the deaths it caused were applied. When a loss fires, the step does not
     advance -- there is nothing to advance to.
 
+    Whether the step may end at all is ``_may_end`` below: both halves of
+    CR 500.2, an empty stack *and* every player having passed in succession.
+    The second half was missing for as long as there was no pass to record, so
+    a client could advance straight past the other player's only window to
+    answer a spell.
+
+    Priority is handed out last, after the new step's turn-based actions, which
+    is the order CR 117.3a and CR 117.2c give: those are dealt with before a
+    player would receive priority, not after.
+
     Raises:
-        IllegalEventError: If anything is waiting to resolve. CR 500.2: a step
-            ends when the stack is empty and all players pass in succession, so
-            a game cannot walk away from a spell it has not resolved. Without
-            this the harness would happily carry a cast Opt into the next turn
-            and the board would be wrong in a way nothing complained about --
-            which is how it stayed wrong for so long the first time.
+        IllegalEventError: If the step cannot end yet.
     """
     finished = losses(state.players)
     if finished is not None:
         return replace(state, over=finished)
-    waiting = [card for player in state.players.values() for card in player.stack]
-    if waiting:
-        names = ", ".join(str(card.instance_id) for card in waiting)
-        msg = f"the step cannot end while {names} is waiting to resolve"
-        raise IllegalEventError(msg)
+    _may_end(state)
     upcoming = next_step(state.step)
     if upcoming is Step.UNTAP:
         state = replace(
@@ -62,7 +64,7 @@ def advance(state: GameState) -> GameState:
             active_player=state.opponent_of(state.active_player),
         )
     state = replace(state, step=upcoming)
-    return _on_enter(state, upcoming)
+    return priority.begins(_on_enter(state, upcoming))
 
 
 def _on_enter(state: GameState, step: Step) -> GameState:
@@ -95,3 +97,37 @@ def draw_card(state: GameState, player_id: PlayerId) -> GameState:
     top, rest = player.library[0], player.library[1:]
     drawn = replace(player, library=rest, hand=(*player.hand, top))
     return state.with_player(player_id, drawn)
+
+
+def _may_end(state: GameState) -> None:
+    """Refuse a step that is not over yet.
+
+    Here rather than in ``priority``, though it is priority it reads: when a
+    step ends is turn structure, and this is the module that owns the turn.
+    ``priority`` answers what a *player* may do; this answers what the *clock*
+    may do, and only ``advance`` ever needs it.
+
+    CR 500.3 first: the untap step and the cleanup step end when their actions
+    are done, and no player receives priority to hold them open.
+
+    Then CR 500.2, both halves of it. The stack has to be empty -- a game
+    cannot walk away from a spell it has not resolved, and without that check
+    the harness carried a cast Opt into the next turn and nothing complained.
+    And every player has to have passed in succession: simply having the stack
+    become empty does not end a step, because each player gets a chance to add
+    something to it first. That second half was missing, which is why a client
+    could advance past the other player's only window to answer.
+
+    Raises:
+        IllegalEventError: If the step cannot end.
+    """
+    if not has_priority(state.step):
+        return
+    if state.stack:
+        names = ", ".join(str(one.instance_id) for one in state.stack)
+        msg = f"the step cannot end while {names} is waiting to resolve"
+        raise IllegalEventError(msg)
+    if not priority.all_passed(state):
+        waiting = ", ".join(str(player) for player in priority.yet_to_pass(state))
+        msg = f"the {named(state.step)} does not end until {waiting} passes"
+        raise IllegalEventError(msg)

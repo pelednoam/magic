@@ -16,7 +16,8 @@ from typing import TYPE_CHECKING
 from mtgcoach.core.manashortfall import mana_shortfall
 from mtgcoach.core.manasolver import can_pay
 from mtgcoach.core.player import MAX_LAND_DROPS_PER_TURN
-from mtgcoach.core.steps import Step, has_priority, is_main_phase
+from mtgcoach.core.priority import lacking
+from mtgcoach.core.steps import Step, is_main_phase
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -29,7 +30,14 @@ if TYPE_CHECKING:
 
 
 def why_not_play_land(state: GameState, player_id: PlayerId, card: CardFacts) -> tuple[str, ...]:
-    """Reasons this land cannot be played now, empty when it can."""
+    """Reasons this land cannot be played now, empty when it can.
+
+    All of CR 116.2a, which is the rule for the special action rather than
+    CR 305.1's summary of it: a land drop is your turn, your main phase, an
+    empty stack -- and priority. The priority half is last because the other
+    three explain themselves better when they apply; the case it is the only
+    answer to is the one where you have already passed.
+    """
     reasons: list[str] = []
     if not card.is_land:
         reasons.append(f"{card.name} is not a land")
@@ -37,6 +45,7 @@ def why_not_play_land(state: GameState, player_id: PlayerId, card: CardFacts) ->
     player = state.player(player_id)
     if player.lands_played_this_turn >= MAX_LAND_DROPS_PER_TURN:
         reasons.append("you have already played a land this turn")
+    reasons.extend(lacking(state, player_id))
     return tuple(reasons)
 
 
@@ -70,21 +79,18 @@ def why_not_cast(
         # CR 202.1a: no printed mana cost means no way to cast it. Not the same
         # as costing {0}, which both parsed identically until they were split.
         reasons.append(f"{card.name} has no mana cost, so it cannot be cast")
-    if not has_priority(state.step):
-        # CR 502.4, 514.3. Without this an instant reads as castable during
-        # untap, where nobody may do anything at all -- the one step where even
-        # "hold your Giant Growth" is wrong advice.
-        reasons.append(f"nobody gets priority during the {_step_name(state.step)}")
-    elif not card.is_instant_speed:
+    # CR 117.1a's first clause, and the one this used to answer only half of.
+    # It asked whether the *step* hands out priority (CR 502.4, 514.3) -- so an
+    # instant read as castable during untap, where nobody may do anything at
+    # all. It could not ask whether *you* have it, because nothing recorded a
+    # holder. ``lacking`` answers both, in one wording the reducer refuses with
+    # too, so the server cannot contradict this advice in the same response.
+    reasons.extend(lacking(state, player_id))
+    if not card.is_instant_speed:
         reasons.extend(_sorcery_timing(state, player_id, "this"))
     if not can_pay(card.cost, sources):
         reasons.append(mana_shortfall(card, sources))
     return tuple(reasons)
-
-
-def _step_name(step: Step) -> str:
-    """The step, as a player would say it."""
-    return f"{step.value.replace('_', ' ')} step"
 
 
 def _sorcery_timing(state: GameState, player_id: PlayerId, subject: str) -> tuple[str, ...]:
@@ -96,16 +102,17 @@ def _sorcery_timing(state: GameState, player_id: PlayerId, subject: str) -> tupl
     not your turn to act at sorcery speed, however much it looks like your main
     phase.
 
-    The whole stack, not just yours. Sorcery timing asks whether the stack is
-    empty, and a spell your opponent has cast is on it exactly as much as one of
-    yours is.
+    The whole stack, and there is only one of it now. This used to add up a
+    tuple per player, with a note that a spell your opponent cast is on the
+    stack exactly as much as one of yours -- true, and the arithmetic was the
+    shape of a zone that had no single order. One field says the same thing and
+    can also say which spell resolves first.
     """
     if state.active_player != player_id:
         return (f"you can only play {subject} on your own turn",)
     if not is_main_phase(state.step):
         return (f"you can only play {subject} in a main phase",)
-    waiting = sum(len(player.stack) for player in state.players.values())
-    if waiting:
+    if state.stack:
         return (f"you can only play {subject} when nothing is waiting to resolve",)
     return ()
 

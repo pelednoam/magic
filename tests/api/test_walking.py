@@ -21,7 +21,8 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from helpers_api import server, talking
-from helpers_replay import BEAR, FOREST, NAME, SEED, journalled, recording, serving
+from helpers_journal import journalled, serving
+from helpers_replay import BEAR, FOREST, NAME, SEED, recording
 from mtgcoach.core.events import PlayLand
 from mtgcoach.core.ids import InstanceId, PlayerId
 from mtgcoach.core.steps import Step

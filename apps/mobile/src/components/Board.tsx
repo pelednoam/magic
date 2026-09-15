@@ -1,10 +1,11 @@
 /**
  * One player's battlefield, and the two states that stop a permanent acting.
  *
- * Plus anything waiting on the stack. The stack is a public zone (CR 400.2) and
- * it is where a spell *is* between being cast and resolving -- the moment when
- * the other player may answer it. A tracker that did not show it would be
- * hiding the one thing that moment is about.
+ * The stack used to be here too, one line per player, because it was a field
+ * on each player. It is one shared, ordered zone (CR 405.1) and has its own
+ * panel now -- `Priority`, which shows the order, whose moment it is, and the
+ * buttons that move it on. Two half-stacks in two panels could not say which
+ * spell resolves first, which is the only thing that moment is about.
  */
 
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -29,11 +30,6 @@ export function Board({
 }) {
   return (
     <Panel title={title} note={`${player.life} life · ${player.library} in library`}>
-      {player.stack.length === 0 ? null : (
-        <Text style={styles.waiting}>
-          {`Waiting to resolve: ${player.stack.map((card) => card.name).join(", ")}`}
-        </Text>
-      )}
       {player.battlefield.length === 0 ? (
         <Text style={styles.empty}>Nothing on the battlefield.</Text>
       ) : (
@@ -71,5 +67,4 @@ const styles = StyleSheet.create({
   name: { color: colour.text, fontSize: text.small, fontWeight: "600" },
   note: { color: colour.quiet, fontSize: text.small },
   empty: { color: colour.quiet, fontSize: text.body },
-  waiting: { color: colour.warn, fontSize: text.small, paddingBottom: space.small },
 });
