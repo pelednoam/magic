@@ -38,15 +38,19 @@ class Moment:
 
 
 def decisions(
-    lines: tuple[dict[str, object], ...], seed: int
+    lines: tuple[dict[str, object], ...], game: str, seed: int
 ) -> dict[tuple[int, Step, str], dict[str, object]]:
     """One game's decisions, by the moment each was made.
 
-    ``lines`` is already the stretch of journal this game was written during,
-    and the seed is checked on top of that. Both, because each catches what the
-    other misses: position separates two games that share a seed, and the seed
-    keeps the orphaned decisions of a run killed mid-game from attaching
-    themselves to a recording a *later* run appended after them.
+    Joined by ``game``, an id the harness makes once per game and writes on
+    every line of it. That is exact: it survives two runs of a season repeating
+    a seed, and it survives a run killed mid-game with another appended after
+    it -- neither of which position or seed survives on its own.
+
+    A journal written before that id existed has none, and falls back to what
+    was there before: ``lines`` is already the stretch of file this game was
+    written during, and the seed is checked on top of it. Good enough for the
+    journals that exist, and not good enough to keep as the only answer.
 
     Keyed by the player as well as the step. Today the harness asks only the
     active player and one step has one decision -- but the line carries a
@@ -56,12 +60,19 @@ def decisions(
     """
     found: dict[tuple[int, Step, str], dict[str, object]] = {}
     for entry in lines:
-        turn, step, player = entry.get("turn"), entry.get("step"), entry.get("player")
-        if entry.get("seed") != seed:
+        if not _belongs(entry, game, seed):
             continue
+        turn, step, player = entry.get("turn"), entry.get("step"), entry.get("player")
         if isinstance(turn, int) and isinstance(step, str) and step in set(Step):
             found[turn, Step(step), str(player)] = entry
     return found
+
+
+def _belongs(entry: dict[str, object], game: str, seed: int) -> bool:
+    """Whether this decision was made during this game."""
+    if game:
+        return entry.get("game") == game
+    return not entry.get("game") and entry.get("seed") == seed
 
 
 def moment(turn: int, step: Step, state: GameState, entry: dict[str, object]) -> Moment:

@@ -84,6 +84,10 @@ class Coached:
     tally: Tally = field(default_factory=Tally)
     #: Which game this is, so a journal line can be looked up again.
     seed: int = 0
+    #: Which game this is, exactly. A seed says which *deal*; two runs of one
+    #: season repeat it, and a reader joining decisions to games by seed alone
+    #: would put the second run's advice beside the first run's board.
+    game: str = ""
     #: Where to write what happened. None keeps nothing, which is what a test
     #: wants and what a run nobody intends to repeat can have.
     journal: Journal | None = None
@@ -125,6 +129,7 @@ class Coached:
         self.journal.write(
             journal.Decision(
                 seed=self.seed,
+                game=self.game,
                 turn=at.state.turn,
                 step=str(at.state.step),
                 player=str(at.player),

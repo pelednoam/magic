@@ -15,7 +15,8 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 from helpers_replay import DECK, SEED, opening, played, recording
-from mtgcoach.api.recording import Recording, dealt_as, recorded
+from mtgcoach.api.reading import recorded
+from mtgcoach.api.recording import Recording, dealt_as
 from mtgcoach.core.cards import CardInstance
 from mtgcoach.core.events import MoveCard, PlayLand
 from mtgcoach.core.ids import InstanceId, OracleId, PlayerId

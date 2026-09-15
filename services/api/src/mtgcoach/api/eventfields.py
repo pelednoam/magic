@@ -8,7 +8,7 @@ with no coercion. ``0`` is not ``false``; ``true`` is not ``1``.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from mtgcoach.core.ids import InstanceId, PlayerId
 from mtgcoach.core.zones import ZoneName
@@ -81,3 +81,27 @@ def zone(payload: Mapping[str, object]) -> ZoneName:
 def player(payload: Mapping[str, object]) -> PlayerId:
     """The seat this event is about."""
     return PlayerId(text(payload, "player"))
+
+
+def instances(payload: Mapping[str, object], field: str) -> tuple[InstanceId, ...]:
+    """An optional list of card identifiers.
+
+    Absent is empty, which is a spell that costs nothing and a recording made
+    before casting took a payment. Present and not a list of non-empty strings
+    is a client that got it wrong, and is refused rather than trimmed: a
+    payment with one element quietly dropped is a different payment, and it
+    would be a *cheaper* one.
+    """
+    value = payload.get(field)
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        msg = f"{field!r} must be a list of card identifiers"
+        raise BadEventError(msg)
+    found: list[InstanceId] = []
+    for one in cast("list[object]", value):
+        if not isinstance(one, str) or not one:
+            msg = f"{field!r} must be a list of non-empty strings, got {one!r}"
+            raise BadEventError(msg)
+        found.append(InstanceId(one))
+    return tuple(found)

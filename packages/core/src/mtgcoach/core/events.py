@@ -55,15 +55,26 @@ class CastSpell:
     was wrong in a way anybody could see: an Opt sat on the battlefield, because
     the only way to play a non-land was to move it there.
 
-    The reducer checks that the card is in hand. It cannot check *timing* --
-    whether this is an instant, and whether it is your main phase -- because
-    ``core`` holds no card data by design. ``legality.cast_reasons`` does, and
-    that is what the coach and the server put in front of a player, exactly as
-    with ``PlayLand``.
+    One event, including the payment, because casting is one action. CR 601.2
+    runs from announcing the spell to paying its costs without stopping: no
+    player receives priority part-way through, and a spell half-cast is not a
+    state the game can be in. Tapping the lands as a separate event first was
+    both wrong about that and broken -- the mana was gone by the time anything
+    checked whether it covered the cost, so every paid cast over HTTP was
+    refused, and a cast sent with no taps at all was free.
+
+    The reducer checks that the card is in hand and that every source named is
+    an untapped permanent of that player, then taps them. It cannot check that
+    they *cover the cost* -- ``core`` holds no card data by design, so it does
+    not know what the spell costs or what a Forest makes. ``api.guard`` does,
+    and refuses the cast before a single land is tapped.
     """
 
     player: PlayerId
     instance_id: InstanceId
+    #: The permanents tapped to pay for it (CR 601.2h). Empty for a spell that
+    #: costs nothing, and for a recording made before casting took a payment.
+    payment: tuple[InstanceId, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

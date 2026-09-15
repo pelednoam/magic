@@ -11,16 +11,14 @@ from typing import get_args
 import pytest
 
 from mtgcoach.api.eventfields import BadEventError
-from mtgcoach.api.eventspec import BUILDERS, parse, written
+from mtgcoach.api.eventspec import BUILDERS, parse
 from mtgcoach.core.events import (
     AdvanceStep,
-    CastSpell,
     ChangeLife,
     DrawCard,
     Event,
     MoveCard,
     PlayLand,
-    ResolveSpell,
     SetTapped,
 )
 from mtgcoach.core.ids import InstanceId, PlayerId
@@ -143,53 +141,3 @@ def test_every_event_type_the_engine_has_can_be_sent() -> None:
 def _wire_name(class_name: str) -> str:
     """``PlayLand`` as a client would spell it."""
     return "".join("_" + c.lower() if c.isupper() else c for c in class_name).lstrip("_")
-
-
-#: One of every event, for the round trip. Built with real values rather than
-#: defaults so a field dropped on the way out is visible on the way back.
-EVERY_EVENT: tuple[Event, ...] = (
-    AdvanceStep(),
-    DrawCard(PlayerId("you")),
-    PlayLand(PlayerId("you"), InstanceId("card-1")),
-    CastSpell(PlayerId("you"), InstanceId("card-4")),
-    ResolveSpell(PlayerId("you"), InstanceId("card-5"), ZoneName.GRAVEYARD),
-    SetTapped(PlayerId("them"), InstanceId("card-2"), tapped=True),
-    MoveCard(PlayerId("you"), InstanceId("card-3"), ZoneName.GRAVEYARD),
-    ChangeLife(PlayerId("them"), -3),
-)
-
-
-@pytest.mark.parametrize("event", EVERY_EVENT)
-def test_an_event_survives_being_written_down_and_read_back(event: Event) -> None:
-    """The property a recorded game depends on.
-
-    A journal keeps the event log; a replay parses it back and folds it over
-    the opening board. If those two disagree about a single field, the board a
-    child is shown is not the board that was played -- silently, because both
-    halves would still be valid JSON.
-    """
-    assert parse(written(event)) == event
-
-
-def test_every_event_can_be_written_down() -> None:
-    """Guard on the guard: a new event with no round trip above."""
-    assert {type(event) for event in EVERY_EVENT} == set(get_args(Event.__value__))
-
-
-def test_casting_and_resolving_are_two_events() -> None:
-    """Because they are two things, with a gap between them.
-
-    The gap is where a player may answer a spell. Nothing can yet -- that needs
-    priority (CR 117) -- but modelling the gap away is what put an Opt on the
-    battlefield for the rest of a game.
-    """
-    cast = parse({"type": "cast_spell", "player": "you", "instance_id": "you-3"})
-    assert cast == CastSpell(PlayerId("you"), InstanceId("you-3"))
-    body = {"type": "resolve_spell", "player": "you", "instance_id": "you-3", "to": "graveyard"}
-    assert parse(body) == ResolveSpell(PlayerId("you"), InstanceId("you-3"), ZoneName.GRAVEYARD)
-
-
-def test_resolving_needs_somewhere_to_go() -> None:
-    """The destination is the client's to supply: `core` cannot read a type line."""
-    with pytest.raises(BadEventError, match="'to'"):
-        parse({"type": "resolve_spell", "player": "you", "instance_id": "you-3"})

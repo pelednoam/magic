@@ -18,6 +18,7 @@ from mtgcoach.api.eventfields import BadEventError
 from mtgcoach.coach import mana
 from mtgcoach.core.events import CastSpell, PlayLand, ResolveSpell
 from mtgcoach.core.legality import why_not_cast, why_not_play_land
+from mtgcoach.core.manasolver import can_pay
 from mtgcoach.core.zones import ZoneName
 
 if TYPE_CHECKING:
@@ -28,6 +29,7 @@ if TYPE_CHECKING:
     from mtgcoach.core.events import Event
     from mtgcoach.core.facts import CardFacts
     from mtgcoach.core.ids import InstanceId
+    from mtgcoach.core.manacost import ManaSource
     from mtgcoach.core.state import GameState
 
 
@@ -85,6 +87,29 @@ def _check_cast(event: CastSpell, state: GameState, lookup: CardLookup) -> None:
         return
     sources = mana.available(state.player(event.player).battlefield, lookup)
     _refuse(facts, why_not_cast(state, event.player, facts, sources))
+    _paid(facts, event.payment, sources)
+
+
+def _paid(facts: CardFacts, payment: Sequence[InstanceId], sources: Sequence[ManaSource]) -> None:
+    """Refuse a cast whose named sources do not actually pay for it.
+
+    ``why_not_cast`` asks whether the cost is payable *at all* from the board.
+    This asks whether it is paid by the permanents the caller actually named,
+    which is a different question and the one that keeps a client from casting
+    a Grizzly Bears by tapping a single Forest -- or by tapping nothing.
+
+    Raises:
+        BadEventError: If the named sources cannot pay the cost.
+    """
+    named = [source for source in sources if source.instance_id in set(payment)]
+    if len(named) != len(set(payment)):
+        unknown = sorted(set(payment) - {str(source.instance_id) for source in sources})
+        msg = f"{facts.name}: {unknown[0]} makes no mana, so it cannot pay for anything"
+        raise BadEventError(msg)
+    if not can_pay(facts.cost, named):
+        tapping = ", ".join(str(one) for one in payment) or "nothing"
+        msg = f"{facts.name} costs {facts.cost.total} mana, which tapping {tapping} does not pay"
+        raise BadEventError(msg)
 
 
 def _check_resolve(event: ResolveSpell, state: GameState, lookup: CardLookup) -> None:

@@ -12,7 +12,8 @@ from __future__ import annotations
 import pytest
 
 from helpers_replay import SEED
-from mtgcoach.api.recording import KIND, recorded
+from mtgcoach.api.reading import recorded
+from mtgcoach.api.recording import KIND
 from mtgcoach.core.events import AdvanceStep, PlayLand
 from mtgcoach.core.ids import InstanceId, PlayerId
 
@@ -133,3 +134,49 @@ def test_events_that_are_not_a_list_are_no_events() -> None:
     )
     assert found is not None
     assert found.events == ()
+
+
+@pytest.mark.parametrize(
+    "cards",
+    [
+        [[None, "Forest"]],
+        [["a", 3]],
+        [["", "Forest"]],
+        [["a", ""]],
+    ],
+)
+def test_a_card_whose_ids_are_not_strings_is_refused(cards: list[object]) -> None:
+    """Not coerced. ``[null, 3]`` used to become the card ``("None", "3")``.
+
+    Which looks perfectly usable, gets dealt into a game, and is a card that
+    was never in the deck -- so every board after it is a board that never
+    existed.
+    """
+    with pytest.raises(ValueError, match="non-empty strings"):
+        recorded(
+            {
+                "kind": KIND,
+                "seed": SEED,
+                "first": "you",
+                "decks": [],
+                "libraries": {"you": cards},
+            }
+        )
+
+
+def test_two_cards_may_not_share_an_instance_id() -> None:
+    """`InstanceId` exists so the Mountain you tapped is not the other one.
+
+    Every zone movement is looked up by it, so a duplicate makes one of the two
+    unreachable and the other ambiguous.
+    """
+    with pytest.raises(ValueError, match="share an instance id"):
+        recorded(
+            {
+                "kind": KIND,
+                "seed": SEED,
+                "first": "you",
+                "decks": [],
+                "libraries": {"you": [["a", "Forest"], ["a", "Island"]]},
+            }
+        )

@@ -38,13 +38,16 @@ describe("what tapping a card in hand sends", () => {
     ]);
   });
 
-  it("taps what pays, then casts, then resolves", () => {
+  it("casts and resolves, and casting carries what pays for it", () => {
+    // Two events, not four. CR 601.2 is one action: announcing the spell and
+    // paying for it happen without stopping. Sending the taps first also meant
+    // the server rechecked affordability with the mana already spent, so every
+    // paid cast came back "you need 2 more untapped sources".
     expect(playing(bear, "you").map((event) => event["type"])).toEqual([
-      "set_tapped",
-      "set_tapped",
       "cast_spell",
       "resolve_spell",
     ]);
+    expect(playing(bear, "you")[0]).toMatchObject({ payment: ["l1", "l2"] });
   });
 
   it("sends a permanent spell to the battlefield (CR 608.3)", () => {
@@ -64,6 +67,6 @@ describe("what tapping a card in hand sends", () => {
   });
 
   it("casts a free spell with nothing tapped", () => {
-    expect(playing({ ...opt, payment: null }, "you")).toHaveLength(2);
+    expect(playing({ ...opt, payment: null }, "you")[0]).toMatchObject({ payment: [] });
   });
 });

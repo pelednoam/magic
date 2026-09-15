@@ -27,7 +27,20 @@ def advance(state: GameState) -> GameState:
     Wrapping past cleanup begins the next player's turn. Turn-based actions
     happen automatically and receive no priority, which is exactly why they
     belong here and not in a player-issued event.
+
+    Raises:
+        IllegalEventError: If anything is waiting to resolve. CR 500.2: a step
+            ends when the stack is empty and all players pass in succession, so
+            a game cannot walk away from a spell it has not resolved. Without
+            this the harness would happily carry a cast Opt into the next turn
+            and the board would be wrong in a way nothing complained about --
+            which is how it stayed wrong for so long the first time.
     """
+    waiting = [card for player in state.players.values() for card in player.stack]
+    if waiting:
+        names = ", ".join(str(card.instance_id) for card in waiting)
+        msg = f"the step cannot end while {names} is waiting to resolve"
+        raise IllegalEventError(msg)
     upcoming = next_step(state.step)
     if upcoming is Step.UNTAP:
         state = replace(

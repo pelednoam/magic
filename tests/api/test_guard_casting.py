@@ -56,8 +56,38 @@ def _board(*, hand: tuple[str, ...] = (), stack: tuple[str, ...] = (), lands: in
     )
 
 
+#: The two Forests `_board(lands=2)` puts down.
+PAYS = (InstanceId("l0"), InstanceId("l1"))
+
+
 def test_a_castable_spell_is_allowed() -> None:
-    check(CastSpell(ME, InstanceId("h0")), _board(hand=("Bear",), lands=LANDS), BOOK)
+    check(CastSpell(ME, InstanceId("h0"), PAYS), _board(hand=("Bear",), lands=LANDS), BOOK)
+
+
+def test_a_cast_that_names_too_little_is_refused() -> None:
+    """The check `why_not_cast` cannot make.
+
+    It asks whether the cost is payable at all from this board. This asks
+    whether it is paid by the permanents the caller actually named, which is
+    what keeps a Grizzly Bears from being cast off a single Forest.
+    """
+    board = _board(hand=("Bear",), lands=LANDS)
+    with pytest.raises(BadEventError, match="costs 2 mana, which tapping l0 does not pay"):
+        check(CastSpell(ME, InstanceId("h0"), (InstanceId("l0"),)), board, BOOK)
+
+
+def test_a_cast_that_names_nothing_is_refused() -> None:
+    """Which is the same hole, at its widest: casting for free."""
+    board = _board(hand=("Bear",), lands=LANDS)
+    with pytest.raises(BadEventError, match="tapping nothing does not pay"):
+        check(CastSpell(ME, InstanceId("h0")), board, BOOK)
+
+
+def test_a_cast_that_names_something_that_makes_no_mana_is_refused() -> None:
+    """A creature is a permanent and is not a Forest."""
+    board = _board(hand=("Bear",), lands=LANDS)
+    with pytest.raises(BadEventError, match="makes no mana"):
+        check(CastSpell(ME, InstanceId("h0"), (InstanceId("h0"),)), board, BOOK)
 
 
 def test_a_spell_you_cannot_pay_for_is_refused() -> None:
@@ -70,24 +100,24 @@ def test_a_sorcery_speed_spell_on_the_wrong_turn_is_refused() -> None:
     """The server must not accept what the advice in the same response refuses."""
     theirs = replace(_board(hand=("Bear",), lands=LANDS), active_player=YOU)
     with pytest.raises(BadEventError, match="on your own turn"):
-        check(CastSpell(ME, InstanceId("h0")), theirs, BOOK)
+        check(CastSpell(ME, InstanceId("h0"), PAYS), theirs, BOOK)
 
 
 def test_a_land_cannot_be_cast() -> None:
     """CR 305.1: lands are played, not cast, and it is not a matter of timing."""
     with pytest.raises(BadEventError, match="lands are played, not cast"):
-        check(CastSpell(ME, InstanceId("h0")), _board(hand=("Forest",), lands=LANDS), BOOK)
+        check(CastSpell(ME, InstanceId("h0"), PAYS), _board(hand=("Forest",), lands=LANDS), BOOK)
 
 
 def test_a_card_the_coach_cannot_name_is_not_castable() -> None:
     """Unknown is not permitted. Treating it as permitted reopened this once."""
     with pytest.raises(BadEventError, match="does not know this card"):
-        check(CastSpell(ME, InstanceId("h0")), _board(hand=("Mystery",), lands=LANDS), BOOK)
+        check(CastSpell(ME, InstanceId("h0"), PAYS), _board(hand=("Mystery",), lands=LANDS), BOOK)
 
 
 def test_a_card_not_in_hand_is_left_to_the_reducer() -> None:
     """Which says it better, and says it about the state rather than the card."""
-    check(CastSpell(ME, InstanceId("nobody")), _board(hand=("Bear",)), BOOK)
+    check(CastSpell(ME, InstanceId("nobody"), PAYS), _board(hand=("Bear",)), BOOK)
 
 
 def test_a_permanent_spell_may_resolve_to_the_battlefield() -> None:

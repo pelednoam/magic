@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
+from uuid import uuid4
 
 from mtgcoach.api.cards import build
 from mtgcoach.api.claude import Cli
@@ -35,6 +36,21 @@ DEFAULT_SET: Final = SetCode("FDN")
 
 #: An agent that keeps a tally: the coach, or a replay of one.
 type Scored = Coached | Replayed
+
+
+@dataclass(frozen=True, slots=True)
+class Which:
+    """Which game of the season this is.
+
+    Three things that always travel together, and now travel as one rather than
+    as three more positional arguments. ``id`` is what joins a game's decisions
+    to its recording exactly; ``seed`` reproduces the deal and is a label
+    beside it, because two runs of a season repeat it.
+    """
+
+    seed: int
+    id: str
+    decks: tuple[str, str]
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,9 +105,13 @@ def season(run: Run) -> Season:
     tallies: list[Scored] = []
     for number in range(games):
         this = seed + number
+        # One id per game, so the decisions written during it and the recording
+        # written at the end of it can be joined exactly. A seed says which
+        # *deal*; run the same season twice into one journal and it repeats.
         chosen = pairs[number % len(pairs)]
+        which = Which(seed=this, id=uuid4().hex, decks=chosen)
         seats = tuple(
-            Seat(seat, deck, _agent(run, this, offset, tallies))
+            Seat(seat, deck, _agent(run, which, offset, tallies))
             for offset, (seat, deck) in enumerate(
                 ((dealing.YOU, chosen[0]), (dealing.THEM, chosen[1]))
             )
@@ -99,11 +119,11 @@ def season(run: Run) -> Season:
         state = dealing.dealt(decks, chosen, this)
         finished = playing.play((seats[0], seats[1]), state, catalogue, this)
         played.append(finished)
-        _recorded(run, this, chosen, state, finished)
+        _recorded(run, which, state, finished)
     return Season(games=tuple(played), coaching=tuple(agent.tally for agent in tallies))
 
 
-def _recorded(run: Run, seed: int, chosen: tuple[str, str], dealt: GameState, game: Game) -> None:
+def _recorded(run: Run, which: Which, dealt: GameState, game: Game) -> None:
     """Write the game itself beside its decisions, if there is a journal.
 
     The decisions alone replay a game inside the harness. This is what lets
@@ -114,8 +134,9 @@ def _recorded(run: Run, seed: int, chosen: tuple[str, str], dealt: GameState, ga
         return
     Journal(run.journal).write_game(
         Recording(
-            seed=seed,
-            decks=chosen,
+            seed=which.seed,
+            game=which.id,
+            decks=which.decks,
             first=str(dealt.active_player),
             libraries=dealt_as(dealt),
             events=game.log,
@@ -123,7 +144,7 @@ def _recorded(run: Run, seed: int, chosen: tuple[str, str], dealt: GameState, ga
     )
 
 
-def _agent(run: Run, seed: int, offset: int, kept: list[Scored]) -> Greedy | Scored:
+def _agent(run: Run, which: Which, offset: int, kept: list[Scored]) -> Greedy | Scored:
     """One seat's agent, and a handle on its tally if it keeps one.
 
     The two coached kinds share a seed with the game rather than with the
@@ -133,16 +154,18 @@ def _agent(run: Run, seed: int, offset: int, kept: list[Scored]) -> Greedy | Sco
     if run.replay is not None:
         playing_back = Replayed(
             answers=read(run.replay),
-            seed=seed,
+            seed=which.seed,
+            game=which.id,
             journal=Journal(run.journal) if run.journal is not None else None,
         )
         kept.append(playing_back)
         return playing_back
     if not run.coach:
-        return Greedy(seed=seed + offset)
+        return Greedy(seed=which.seed + offset)
     asking = Coached(
         explainer=ClaudeCliExplainer(Cli()),
-        seed=seed,
+        seed=which.seed,
+        game=which.id,
         journal=Journal(run.journal) if run.journal is not None else None,
     )
     kept.append(asking)

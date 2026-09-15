@@ -79,6 +79,7 @@ def _from(loaded: dict[str, object]) -> Decision | None:
     problems = loaded.get("problems")
     return Decision(
         seed=seed,
+        game=str(loaded.get("game", "")),
         turn=turn,
         step=step,
         player=player,

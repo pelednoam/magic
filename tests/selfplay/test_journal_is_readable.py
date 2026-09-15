@@ -98,3 +98,46 @@ def test_a_journal_the_harness_wrote_is_one_the_api_can_walk(tmp_path: Path) -> 
     assert moment.said == SAID
     # And the board is the one the harness dealt, not one shaped like it.
     assert moment.state.players[PlayerId("you")].hand == state.players[PlayerId("you")].hand
+
+
+def test_the_game_id_is_what_joins_the_two_halves(tmp_path: Path) -> None:
+    """Written by the harness on every line of a game, read by the API.
+
+    The one field that makes the join exact. A seed says which *deal* and two
+    runs of a season repeat it; position in the file is defeated by a run
+    killed mid-game with another appended after it. Both halves are written by
+    hand, so this is the test that keeps them agreeing on the name of it.
+    """
+    state = dealt()
+    path = tmp_path / "selfplay" / "ids.jsonl"
+    written = Journal(path)
+    # The same moment of the same deal, twice: only the game id separates them.
+    for game_id, seat in (("first-game", "them"), ("second-game", "you")):
+        written.write(
+            Decision(
+                seed=SEED,
+                game=game_id,
+                turn=1,
+                step=str(Step.UPKEEP),
+                player=seat,
+                briefing="",
+                answer=journal.fields(SAID),
+                trusted=True,
+            )
+        )
+    # Both games carry the same seed, which is what a season re-run produces.
+    written.write_game(
+        Recording(
+            seed=SEED,
+            game="second-game",
+            decks=("elves", "goblins"),
+            first="you",
+            libraries=dealt_as(state),
+            events=(AdvanceStep(),),
+        )
+    )
+
+    (game,) = games_in(tmp_path, "ids")
+    # Only the second game's decision, though both sit in its stretch of file
+    # and both carry its seed.
+    assert [one.player for one in game.moments] == ["you"]

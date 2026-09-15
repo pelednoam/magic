@@ -27,6 +27,7 @@ from mtgcoach.api.eventfields import (
     BadEventError,
     flag,
     instance,
+    instances,
     player,
     text,
     whole,
@@ -59,7 +60,9 @@ BUILDERS: Mapping[str, Callable[[Mapping[str, object]], Event]] = {
     "advance_step": lambda _: AdvanceStep(),
     "draw_card": lambda payload: DrawCard(player(payload)),
     "play_land": lambda payload: PlayLand(player(payload), instance(payload)),
-    "cast_spell": lambda payload: CastSpell(player(payload), instance(payload)),
+    "cast_spell": lambda payload: CastSpell(
+        player(payload), instance(payload), instances(payload, "payment")
+    ),
     "resolve_spell": lambda payload: ResolveSpell(
         player(payload), instance(payload), zone(payload)
     ),
@@ -122,8 +125,11 @@ def _moved(event: Moving) -> dict[str, Json]:
     match event:
         case PlayLand(seat, instance_id):
             return _card("play_land", seat, instance_id)
-        case CastSpell(seat, instance_id):
-            return _card("cast_spell", seat, instance_id)
+        case CastSpell(seat, instance_id, payment):
+            return {
+                **_card("cast_spell", seat, instance_id),
+                "payment": [str(one) for one in payment],
+            }
         case ResolveSpell(seat, instance_id, to):
             return {**_card("resolve_spell", seat, instance_id), "to": str(to)}
         case MoveCard(seat, instance_id, to):

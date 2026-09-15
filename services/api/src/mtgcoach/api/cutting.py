@@ -14,7 +14,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import cast
 
-from mtgcoach.api.recording import KIND, Recording, recorded
+from mtgcoach.api.reading import recorded
+from mtgcoach.api.recording import KIND, Recording
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,12 +34,11 @@ def games(lines: list[object]) -> list[Written]:
     written when a game ends, so decisions with none after them are a run that
     was killed mid-game, and there is no board to show them against.
 
-    A killed run leaves those decisions in the *middle* of the file, though,
-    not at the end: append another run to the same journal and they sit just
-    before somebody else's recording, and position alone would hand them to
-    that game. So the seed has to agree as well, which ``decisions`` checks.
-    The two together are what nothing slips past -- position separates two
-    games that share a seed, the seed separates two games that share a stretch.
+    Position is not the whole answer, though. A killed run leaves its decisions
+    in the *middle* of the file, not at the end: append another run to the same
+    journal and they sit just before somebody else's recording. So ``decisions``
+    checks the game id the harness writes on every line as well -- exact, where
+    position and seed between them only approximate.
     """
     made: list[Written] = []
     pending: list[dict[str, object]] = []

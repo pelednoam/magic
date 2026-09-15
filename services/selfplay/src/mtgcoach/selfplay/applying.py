@@ -24,7 +24,6 @@ from mtgcoach.core.events import (
     MoveCard,
     PlayLand,
     ResolveSpell,
-    SetTapped,
 )
 from mtgcoach.core.reduce import apply
 from mtgcoach.core.zones import ZoneName
@@ -59,31 +58,35 @@ def played(state: GameState, player: PlayerId, card: Playable) -> Applied:
     """
     if card.is_land:
         return _done(state, [PlayLand(player=player, instance_id=card.instance_id)])
-    paying = [
-        SetTapped(player=player, instance_id=source, tapped=True)
-        for source in (card.payment.tapped if card.payment else ())
-    ]
-    return _done(state, [*paying, *cast_and_resolve(player, card)])
+    return _done(state, cast_and_resolve(player, card))
 
 
 def cast_and_resolve(player: PlayerId, card: Playable) -> list[Event]:
     """The two events a spell nobody answers produces.
 
-    Cast puts it on the stack (CR 601.2a); resolution takes it off, onto the
-    battlefield if it is a permanent spell (CR 608.3) and into its owner's
-    graveyard if it is an instant or a sorcery (CR 608.2m). Both, back to back,
-    because nothing here can respond: neither agent holds priority, and the
-    engine has no priority to hold. When a player can answer a spell, the gap
-    between these two events is where that happens -- which is why they are two
-    events and not one.
+    Casting is one event including its payment, because CR 601.2 is one action:
+    announcing the spell and paying for it happen without stopping, and a spell
+    half-cast is not a state the game can be in. Resolution is the second, and
+    takes it off the stack -- onto the battlefield if it is a permanent spell
+    (CR 608.3), into its owner's graveyard if it is an instant or a sorcery
+    (CR 608.2m).
 
-    They used to be one ``MoveCard`` to the battlefield, and the board that
+    Two, back to back, because nothing here can respond: neither agent holds
+    priority and the engine has none to hold. When a player can answer a spell,
+    the gap between these two is where that happens -- which is why it is a gap
+    and not a single event.
+
+    This used to be one ``MoveCard`` to the battlefield, and the board that
     produced was wrong in a way anybody could see: an Opt sitting among the
     lands, for the rest of the game.
     """
     to = ZoneName.BATTLEFIELD if card.is_permanent else ZoneName.GRAVEYARD
     return [
-        CastSpell(player=player, instance_id=card.instance_id),
+        CastSpell(
+            player=player,
+            instance_id=card.instance_id,
+            payment=card.payment.tapped if card.payment else (),
+        ),
         ResolveSpell(player=player, instance_id=card.instance_id, to=to),
     ]
 

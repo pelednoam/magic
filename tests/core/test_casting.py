@@ -14,10 +14,9 @@ import pytest
 
 from helpers import ME, YOU
 from mtgcoach.core.errors import IllegalEventError
-from mtgcoach.core.events import AdvanceStep, CastSpell, ResolveSpell
+from mtgcoach.core.events import CastSpell, ResolveSpell
 from mtgcoach.core.ids import InstanceId
 from mtgcoach.core.reduce import apply
-from mtgcoach.core.steps import Step
 from mtgcoach.core.zones import ZoneName
 
 if TYPE_CHECKING:
@@ -106,17 +105,3 @@ def test_cards_are_conserved_across_a_cast(game: GameState) -> None:
     assert sorted(str(one.instance_id) for one in on_stack.player(ME).cards()) == before
     after = apply(on_stack, ResolveSpell(ME, card.instance_id, ZoneName.GRAVEYARD))
     assert sorted(str(one.instance_id) for one in after.player(ME).cards()) == before
-
-
-def test_a_spell_waiting_to_resolve_is_still_there_next_step(game: GameState) -> None:
-    """Nothing about advancing the turn clears the stack.
-
-    True of the rules -- a spell resolves because somebody let it, not because
-    time passed -- and worth pinning, because ``begin_turn`` rebuilds the
-    battlefield and could as easily have rebuilt this.
-    """
-    on_stack, card = cast(game)
-    later = on_stack
-    while later.step is not Step.END_STEP:
-        later = apply(later, AdvanceStep())
-    assert later.player(ME).stack == (card,)

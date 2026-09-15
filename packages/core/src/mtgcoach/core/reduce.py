@@ -34,7 +34,7 @@ from mtgcoach.core.zones import ZoneName
 type Moving = PlayLand | CastSpell | ResolveSpell | MoveCard
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Sequence
 
     from mtgcoach.core.events import Event
     from mtgcoach.core.ids import InstanceId, PlayerId
@@ -77,8 +77,8 @@ def _moved(state: GameState, event: Moving) -> GameState:
     match event:
         case PlayLand(player=player_id, instance_id=instance_id):
             return _play_land(state, player_id, instance_id)
-        case CastSpell(player=player_id, instance_id=instance_id):
-            return _cast(state, player_id, instance_id)
+        case CastSpell(player=player_id, instance_id=instance_id, payment=payment):
+            return _cast(state, player_id, instance_id, payment)
         case ResolveSpell(player=player_id, instance_id=instance_id, to=zone):
             return _resolve(state, player_id, instance_id, zone)
         case MoveCard(player=player_id, instance_id=instance_id, to=zone):
@@ -123,12 +123,39 @@ def _play_land(state: GameState, player_id: PlayerId, instance_id: InstanceId) -
 RESOLVES_TO = (ZoneName.BATTLEFIELD, ZoneName.GRAVEYARD)
 
 
-def _cast(state: GameState, player_id: PlayerId, instance_id: InstanceId) -> GameState:
+def _cast(
+    state: GameState,
+    player_id: PlayerId,
+    instance_id: InstanceId,
+    payment: Sequence[InstanceId],
+) -> GameState:
+    """Pay for a spell and put it on the stack, as one action (CR 601.2).
+
+    All of it or none of it: every check happens before anything moves, so a
+    refusal leaves the board exactly where it was. A player whose lands were
+    tapped by a cast the server then refused would be worse off than one whose
+    cast was simply refused.
+    """
     player = state.player(player_id)
     if player.find(ZoneName.HAND, instance_id) is None:
         msg = f"card {instance_id!r} is not in {player_id!r}'s hand"
         raise IllegalEventError(msg)
-    return state.with_player(player_id, move_card(player, instance_id, ZoneName.STACK, state.turn))
+    paid = player
+    for source in payment:
+        found = next((p for p in paid.battlefield if p.instance_id == source), None)
+        if found is None:
+            msg = f"no permanent {source!r} on {player_id!r}'s battlefield to pay with"
+            raise IllegalEventError(msg)
+        if found.tapped:
+            # Also what catches the same land named twice: the second time
+            # round it is tapped, because the first time tapped it.
+            msg = f"{source!r} is already tapped, so it cannot pay for anything"
+            raise IllegalEventError(msg)
+        paid = replace(
+            paid,
+            battlefield=tuple(p.tap() if p.instance_id == source else p for p in paid.battlefield),
+        )
+    return state.with_player(player_id, move_card(paid, instance_id, ZoneName.STACK, state.turn))
 
 
 def _resolve(
@@ -137,6 +164,13 @@ def _resolve(
     player = state.player(player_id)
     if player.find(ZoneName.STACK, instance_id) is None:
         msg = f"spell {instance_id!r} is not on {player_id!r}'s stack"
+        raise IllegalEventError(msg)
+    if player.stack[-1].instance_id != instance_id:
+        # CR 608.1: the top object on the stack resolves, and the top is the
+        # last one put there. Only within one player's stack, because that is
+        # as much of the order as this engine keeps -- see ``ZoneName``. It is
+        # never *wrong*, and it is strictly more than nothing.
+        msg = f"spell {instance_id!r} is not the top of {player_id!r}'s stack"
         raise IllegalEventError(msg)
     if to not in RESOLVES_TO:
         named = " or ".join(zone.value for zone in RESOLVES_TO)

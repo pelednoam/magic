@@ -61,6 +61,10 @@ class Replayed:
 
     answers: Answers
     seed: int = 0
+    #: Which game this is, exactly. A seed says which *deal*; two runs of one
+    #: season repeat it, and a reader joining decisions to games by seed alone
+    #: would put the second run's advice beside the first run's board.
+    game: str = ""
     name: str = "replay"
     tally: Tally = field(default_factory=Tally)
     #: Where to write this run's decisions. None keeps nothing, which is what
@@ -124,6 +128,7 @@ class Replayed:
         self.journal.write(
             Decision(
                 seed=self.seed,
+                game=self.game,
                 turn=state.turn,
                 step=str(state.step),
                 player=str(player),

@@ -192,10 +192,19 @@ applied, in order. Rebuilding a moment is then `start_game` plus `reduce.replay`
 and nothing else. Nothing is re-asked, so the board shown is the board that was played.
 
 ```
-{"seed": 100, "turn": 7, "step": "declare_attackers", ...}   ← a decision
-{"seed": 100, "turn": 7, "step": "postcombat_main",  ...}    ← a decision
-{"kind": "game", "seed": 100, "libraries": {...}, "events": [...]}  ← the game
+{"seed": 100, "game": "19f9751d…", "turn": 7, "step": "declare_attackers", ...}
+{"seed": 100, "game": "19f9751d…", "turn": 7, "step": "postcombat_main",  ...}
+{"kind": "game", "seed": 100, "game": "19f9751d…", "libraries": {…}, "events": […]}
 ```
+
+`game` is what joins a game's decisions to its recording, and it is the only
+thing that does so exactly. A **seed** says which *deal* — run the same season
+twice into one journal and it repeats. **Position in the file** is defeated by a
+run killed mid-game with another appended after it: the orphans then sit just
+before somebody else's recording. Only an id made once per game separates them,
+and what it prevents is one game's coaching printed beside another game's board,
+with nothing on screen saying so. Journals written before the id exists fall
+back to position and seed.
 
 **The recording is written last**, because the event log is not known until then. A run killed
 mid-game therefore keeps its decisions and loses its recording, which is the right way round: the

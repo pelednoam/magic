@@ -45,6 +45,13 @@ class Decision:
     #: The exact prompt. Large, and worth every byte: a disagreement is only
     #: diagnosable next to the board the model was actually shown.
     briefing: str
+    #: Which game this was, as an id made once per game. The *only* exact way
+    #: to join a decision to the game it was made in: a seed is repeated by two
+    #: runs of the same season, and position in the file is defeated by a run
+    #: that was killed mid-game with another appended after it. Empty for a
+    #: journal written before this field existed, which the reader falls back
+    #: to position and seed for.
+    game: str = ""
     #: The answer's fields, or None when there was no answer at all.
     answer: dict[str, object] | None = None
     #: Why there was none, when there was none.
@@ -63,6 +70,7 @@ class Decision:
         return json.dumps(
             {
                 "seed": self.seed,
+                "game": self.game,
                 "turn": self.turn,
                 "step": self.step,
                 "player": self.player,

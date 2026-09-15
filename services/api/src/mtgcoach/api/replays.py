@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from mtgcoach.api.cutting import games
 from mtgcoach.api.decisions import Moment, decisions, moment, order
@@ -63,6 +63,31 @@ class Replay:
     moments: tuple[Moment, ...] = ()
 
 
+def _decoded(text: str) -> list[object]:
+    """Every line of a journal, up to the first one that is not JSON.
+
+    Stopping rather than refusing the file: a journal is appended to by a
+    process that can be killed mid-write, so a half-written last line is the
+    normal shape of an interrupted run -- and losing a whole season's games to
+    it was the loudest possible response to the quietest possible problem.
+
+    Stopping rather than skipping, for the same reason as a truncated event
+    log: a *recording* that failed to decode would otherwise hand its game's
+    decisions to the next recording along, which is one game's advice beside
+    another game's board. Everything before the damage is good; nothing after
+    it can be trusted to mean what it says.
+    """
+    found: list[object] = []
+    for line in text.splitlines():
+        if not line:
+            continue
+        try:
+            found.append(json.loads(line))
+        except json.JSONDecodeError:
+            break
+    return found
+
+
 def journals(data_root: Path) -> tuple[str, ...]:
     """Every journal on disk, newest first.
 
@@ -87,13 +112,14 @@ def games_in(data_root: Path, name: str) -> tuple[Replay, ...]:
     """
     path = data_root / FOLDER / f"{name}{SUFFIX}"
     try:
-        lines = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
-    except (OSError, json.JSONDecodeError) as unreadable:
+        text = path.read_text(encoding="utf-8")
+    except OSError as unreadable:
         msg = f"{name}: {type(unreadable).__name__}"
         raise UnknownReplayError(msg) from unreadable
+    lines = _decoded(text)
     played = tuple(
         game
-        for at, written in enumerate(games(cast("list[object]", lines)))
+        for at, written in enumerate(games(lines))
         if (game := _replay(at, written)) is not None
     )
     if not played:
@@ -118,7 +144,7 @@ def _replay(index: int, written: Written) -> Replay | None:
         boards = _boards(written.recording)
     except (ValueError, IllegalEventError):
         return None
-    said = decisions(written.decisions, written.recording.seed)
+    said = decisions(written.decisions, written.recording.game, written.recording.seed)
     moments = tuple(
         moment(turn, step, boards[turn, step], entry)
         for (turn, step, _), entry in sorted(said.items(), key=lambda one: order(one[0]))
