@@ -13,7 +13,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from mtgcoach.core.triggerscan import arrivals, triggers_at
+from mtgcoach.core.arrivalscan import arrivals
+from mtgcoach.core.triggerscan import triggers_at
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -46,5 +47,23 @@ def reminders(
     """
     return (
         *triggers_at(state.step, player.battlefield, lookup.abilities, named, your_turn=your_turn),
-        *arrivals(player.battlefield, lookup.abilities, named, state.turn),
+        *arrivals(
+            player.battlefield,
+            lookup.abilities,
+            named,
+            state.turn,
+            lambda oracle_id: _is_creature(lookup, oracle_id),
+        ),
     )
+
+
+def _is_creature(lookup: CardLookup, oracle_id: OracleId) -> bool:
+    """Whether this card is a creature, for the "another creature" trigger.
+
+    A card the coach cannot identify is not a creature here. That is the safe
+    side: an unknown permanent entering will not fire somebody's Dazzling
+    Angel, and the cards it cannot speak for are already listed separately as
+    cards it cannot speak for.
+    """
+    facts = lookup.facts(oracle_id)
+    return facts is not None and facts.is_creature
