@@ -21,6 +21,7 @@ describe("what tapping a card in hand sends", () => {
     is_permanent: true,
     playable: true,
     reasons: [],
+    not_carried_out: [],
     payment: null,
   };
   const bear = {

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from helpers import ME, YOU, facts
 from mtgcoach.core.abilities import Ability, ActivatedAbility, unmodelled_reasons
 from mtgcoach.core.cards import CardInstance
+from mtgcoach.core.carrying import not_carried_out as _not_carried_out
 from mtgcoach.core.effects import ProduceMana
 from mtgcoach.core.facts import CardFacts
 from mtgcoach.core.ids import InstanceId, OracleId
@@ -52,6 +53,18 @@ class Book:
         if abilities is None:
             return False
         return not any(unmodelled_reasons(ability) for ability in abilities)
+
+    def not_carried_out(self, oracle_id: OracleId) -> tuple[str, ...]:
+        """What the engine will not do if this card is played.
+
+        The same two answers the real catalogue gives, and for the same reason
+        -- a book that reported every unreviewed card as fully handled would
+        make the disclosure tests pass while disclosing nothing.
+        """
+        abilities = self.rules.get(str(oracle_id))
+        if abilities is None:
+            return ("anything it does -- this card has not been reviewed",)
+        return _not_carried_out(abilities)
 
 
 def land(name: str, mana: str) -> tuple[CardFacts, tuple[Ability, ...]]:

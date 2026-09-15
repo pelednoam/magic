@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 from mtgcoach.carddata.enginefacts import UnmodellableCardError, facts_for
 from mtgcoach.carddata.sealed import load
 from mtgcoach.core.abilities import unmodelled_reasons
+from mtgcoach.core.carrying import not_carried_out
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
@@ -63,6 +64,25 @@ class Catalogue:
         if abilities is None:
             return False
         return not any(unmodelled_reasons(ability) for ability in abilities)
+
+    def not_carried_out(self, oracle_id: OracleId) -> tuple[str, ...]:
+        """What the engine will not do if this card is played, in words.
+
+        A different question from ``modelled``, which asks whether the card's
+        behaviour is *described*. Giant Growth's +3/+3 is described, counts
+        towards the 52% figure, and nothing carries it out -- so the tracker
+        accepts the cast and no toughness changes, and every number it shows
+        afterwards is computed from a board that is wrong by three points.
+
+        Asked here rather than of the abilities alone because only this knows
+        the difference between a card reviewed and found to have no abilities
+        (a vanilla creature, which carries out fine) and a card never reviewed
+        at all (about which nothing is known). They are both an empty list.
+        """
+        abilities = self.rules.get(str(oracle_id))
+        if abilities is None:
+            return ("anything it does -- this card has not been reviewed",)
+        return not_carried_out(abilities)
 
     def name(self, oracle_id: OracleId) -> str:
         """The printed name, falling back to the identifier when unknown.

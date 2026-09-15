@@ -35,6 +35,14 @@ class CardLookup(Protocol):
         """The card's modelled abilities, empty when there are none or it is unknown."""
         ...
 
+    def not_carried_out(self, oracle_id: OracleId) -> tuple[str, ...]:
+        """What the engine will not do if this card is played, in words.
+
+        Empty when it will do all of it. See ``api.cards.Catalogue`` for why
+        this cannot be answered from the abilities alone.
+        """
+        ...
+
     def name(self, oracle_id: OracleId) -> str:
         """The printed name, falling back to the identifier when unknown.
 

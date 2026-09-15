@@ -37,6 +37,18 @@ export interface Playable {
   readonly playable: boolean;
   /** Empty when playable. Otherwise the engine's own words, printed verbatim. */
   readonly reasons: readonly string[];
+  /**
+   * What the tracker will not do if you play this. Empty when it will do all
+   * of it.
+   *
+   * A different thing from `reasons`, which is why you *cannot* play the card.
+   * You can cast Giant Growth; the tracker simply will not change anybody's
+   * toughness when you do, and every number it shows afterwards is computed
+   * from a board that is wrong by three points. It used to come back playable
+   * with nothing said, because the card's effect is *described* in the
+   * fixture and being described is not being carried out.
+   */
+  readonly not_carried_out: readonly string[];
   readonly payment: Payment | null;
 }
 

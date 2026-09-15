@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING
 
 from mtgcoach.coach import mana
 from mtgcoach.coach.attacks import Attacks, attacks_for
+from mtgcoach.coach.speaking import named_by, unknown_to
 from mtgcoach.coach.warnings import reminders as warnings_for
 from mtgcoach.core.legality import why_not_cast, why_not_play_land
 from mtgcoach.core.manasolver import payments
@@ -35,7 +36,7 @@ if TYPE_CHECKING:
 
     from mtgcoach.coach.lookup import CardLookup
     from mtgcoach.core.cards import CardInstance
-    from mtgcoach.core.ids import InstanceId, OracleId, PlayerId
+    from mtgcoach.core.ids import InstanceId, PlayerId
     from mtgcoach.core.manacost import ManaSource
     from mtgcoach.core.manasolver import Payment
     from mtgcoach.core.state import GameState
@@ -53,6 +54,16 @@ class Playable:
     #: a land (CR 305.1) and casting a spell (CR 601) are different actions
     #: with different events, and only one of them is a land drop.
     is_land: bool = False
+    #: What the engine will *not* do if you play this, in words, and empty when
+    #: it will do all of it.
+    #:
+    #: A different question from ``reasons``, which is why you cannot play the
+    #: card. You can play Giant Growth; the tracker simply will not change
+    #: anybody's toughness when you do, and every number it shows afterwards is
+    #: computed from a board that is wrong by three points. The card used to
+    #: come back playable with nothing said, because its effect is *described*
+    #: in the fixture and being described is what ``modelled`` measures.
+    not_carried_out: tuple[str, ...] = ()
     #: Whether casting this puts a permanent on the battlefield (CR 608.3) or
     #: sends the card to its owner's graveyard as it resolves (CR 608.2m). The
     #: client needs it because ``ResolveSpell`` has to be told which, and it is
@@ -110,8 +121,10 @@ def advise(state: GameState, player_id: PlayerId, lookup: CardLookup) -> TurnRep
         life=player.life,
         hand=tuple(_verdict(state, player_id, card, sources, lookup) for card in player.hand),
         attacks=attacks_for(state, player_id, lookup),
-        reminders=warnings_for(state, player, lookup, partial(_name, lookup), your_turn=your_turn),
-        unknown=_unknown(state, player_id, lookup),
+        reminders=warnings_for(
+            state, player, lookup, partial(named_by, lookup), your_turn=your_turn
+        ),
+        unknown=unknown_to(state, player_id, lookup),
     )
 
 
@@ -130,10 +143,23 @@ def _verdict(
             str(card.oracle_id),
             reasons=("this card is not modelled, so the coach cannot say",),
         )
+    undone = lookup.not_carried_out(card.oracle_id)
     if facts.is_land:
         reasons = why_not_play_land(state, player_id, facts)
-        return Playable(card.instance_id, facts.name, is_land=True, reasons=reasons)
-    spell = partial(Playable, card.instance_id, facts.name, is_permanent=facts.is_permanent)
+        return Playable(
+            card.instance_id,
+            facts.name,
+            not_carried_out=undone,
+            is_land=True,
+            reasons=reasons,
+        )
+    spell = partial(
+        Playable,
+        card.instance_id,
+        facts.name,
+        not_carried_out=undone,
+        is_permanent=facts.is_permanent,
+    )
     try:
         reasons = why_not_cast(state, player_id, facts, sources)
         best = payments(facts.cost, sources) if not reasons else ()
@@ -145,34 +171,3 @@ def _verdict(
         # accepted event left the game permanently unreadable.
         return spell(reasons=(str(refusal),))
     return spell(reasons=reasons, payment=best[0] if best else None)
-
-
-def _unknown(state: GameState, player_id: PlayerId, lookup: CardLookup) -> tuple[str, ...]:
-    """Every card in this player's view the engine cannot speak for.
-
-    Two different failures, and the second one used to be invisible. A card with
-    no *facts* cannot be identified at all. A card with facts but no complete
-    *model* can be identified and priced, and the engine still does not know
-    what it does -- which is 59 of the Beginner Box's 124 cards. Reporting only
-    the first meant the coach gave confident advice about half the box while
-    ``unknown`` stayed empty, which is the one thing this field exists to stop.
-    """
-    player = state.player(player_id)
-    seen = [c.oracle_id for c in player.hand]
-    # Every battlefield, not just this player's. An opposing creature the coach
-    # cannot identify is left out of combat silently, so the attack advisor
-    # reported exact damage and "no blockers" against a board it could not see.
-    # Their battlefield is public; their *hand* is not, and is not looked at.
-    seen += [p.card.oracle_id for other in state.players.values() for p in other.battlefield]
-    return tuple(sorted({_name(lookup, o) for o in seen if not _spoken_for(lookup, o)}))
-
-
-def _spoken_for(lookup: CardLookup, oracle_id: OracleId) -> bool:
-    """Whether the engine can answer for this card at all."""
-    return lookup.facts(oracle_id) is not None and lookup.modelled(oracle_id)
-
-
-def _name(lookup: CardLookup, oracle_id: OracleId) -> str:
-    """A card's name, falling back to its identifier when it is unknown."""
-    facts = lookup.facts(oracle_id)
-    return facts.name if facts is not None else str(oracle_id)

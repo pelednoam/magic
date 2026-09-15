@@ -71,6 +71,10 @@ def playable(card: Playable) -> dict[str, Json]:
         "instance_id": str(card.instance_id),
         "name": card.name,
         "is_land": card.is_land,
+        # What the tracker will not do if you play this. Empty when it will do
+        # all of it. Not a reason you cannot play the card -- you can, on the
+        # table -- which is why it is a separate field from `reasons`.
+        "not_carried_out": list(card.not_carried_out),
         # Where this ends up when it resolves, which the client has to send in
         # `resolve_spell` and only this side knows: the engine cannot read a
         # type line. See `Playable.is_permanent`.

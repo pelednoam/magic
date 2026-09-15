@@ -71,6 +71,14 @@ function HandCard({
           {reason}
         </Text>
       ))}
+      {/* Not a reason you cannot play it. A warning that the tracker will not
+          show what happens when you do, so the board on screen will be behind
+          the board on the table until you fix it by hand. */}
+      {card.not_carried_out.map((undone) => (
+        <Text key={undone} style={styles.undone}>
+          {`The tracker will not apply ${undone} — do it on the table.`}
+        </Text>
+      ))}
       {card.payment === null ? null : (
         <Text style={styles.payment}>
           {paymentLine(board, card.payment.tap, card.payment.keep)}
@@ -95,6 +103,7 @@ const styles = StyleSheet.create({
   yes: { color: colour.yes, fontSize: text.small },
   no: { color: colour.no, fontSize: text.small },
   reason: { color: colour.quiet, fontSize: text.small, marginTop: space.tight },
+  undone: { color: colour.warn, fontSize: text.small, marginTop: space.tight },
   payment: { color: colour.accent, fontSize: text.small, marginTop: space.tight },
   empty: { color: colour.quiet, fontSize: text.body },
 });
