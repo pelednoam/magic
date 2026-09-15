@@ -40,6 +40,23 @@ class TargetKind(StrEnum):
     #: The permanent the ability is printed on. "Put a +1/+1 counter on this
     #: creature" has no other way to name its subject.
     SELF = "self"
+    #: The permanent an Aura or Equipment is attached to -- Pacifism's
+    #: "enchanted creature", a Cutlass's "equipped creature".
+    #:
+    #: A separate kind from SELF, and the separation is the point. The card
+    #: fixture used to say `self` for both, on a stated "Aura convention", and
+    #: the engine read it as SELF means it. So Pacifism's "can't attack or
+    #: block" was applied to *Pacifism*, an enchantment that could not do
+    #: either anyway -- and because the combat layer treats a SELF restriction
+    #: as one it can apply, the card was exempted from the "this is not in the
+    #: numbers" caveat. Combat advice ignored the Pacifism on the table and
+    #: said nothing about doing so.
+    #:
+    #: Nothing can act on this yet: ``Permanent`` has no attachments, so the
+    #: engine cannot know which creature an Aura is on. That is exactly why it
+    #: needs its own name -- a restriction on ENCHANTED is a restriction the
+    #: engine must *disclose*, and one on SELF is one it can apply.
+    ENCHANTED = "enchanted"
 
 
 class Condition(StrEnum):
@@ -77,6 +94,9 @@ class TargetSpec:
 
 #: The ability's own source.
 SELF = TargetSpec(kinds=frozenset({TargetKind.SELF}))
+
+#: Whatever the Aura or Equipment carrying the ability is attached to.
+ENCHANTED = TargetSpec(kinds=frozenset({TargetKind.ENCHANTED}))
 
 #: The commonest spec in the box, by a wide margin.
 ANY_CREATURE = TargetSpec(kinds=frozenset({TargetKind.CREATURE}))
