@@ -82,8 +82,16 @@ def facts(
     creature: bool = False,
     land: bool = False,
     instant: bool = False,
+    permanent: bool | None = None,
 ) -> CardFacts:
-    """Card facts for a rules test, named so failures read like the board."""
+    """Card facts for a rules test, named so failures read like the board.
+
+    ``permanent`` defaults to what the other flags imply: a land or a creature
+    stays on the battlefield (CR 110.1) and anything else here does not. Spelled
+    out rather than left to the caller because a fixture that forgot it made a
+    Grizzly Bears resolve into the graveyard -- which is the fixture lying about
+    the rules, and the one thing no fixture in this project may do.
+    """
     return CardFacts(
         oracle_id=OracleId(name),
         name=name,
@@ -91,6 +99,7 @@ def facts(
         is_land=land,
         is_creature=creature,
         is_instant_speed=instant,
+        is_permanent=(land or creature) if permanent is None else permanent,
         power=power,
         toughness=toughness,
         keywords=frozenset(keywords),

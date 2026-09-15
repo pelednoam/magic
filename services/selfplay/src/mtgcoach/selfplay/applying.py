@@ -1,10 +1,9 @@
 """Turning a decision into the events the engine actually has.
 
-The engine has no event for *casting* a spell -- ``Playable`` says so in as
-many words, and the stack arrives with it -- so a player casting a creature
-does what the app's user does: taps the lands the payment names, and moves the
-card onto the battlefield. This module does exactly that and nothing cleverer,
-because a harness that invented its own rules would be testing itself.
+A player casting a spell does what the app's user does: taps the lands the
+payment names, casts the card onto the stack, and lets it resolve. This module
+does exactly that and nothing cleverer, because a harness that invented its own
+rules would be testing itself.
 
 The same principle decides combat. The engine does not apply damage, it
 *computes* it: ``Outcome`` says how much the defender takes, which creatures
@@ -19,7 +18,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from mtgcoach.core.events import ChangeLife, MoveCard, PlayLand, SetTapped
+from mtgcoach.core.events import (
+    CastSpell,
+    ChangeLife,
+    MoveCard,
+    PlayLand,
+    ResolveSpell,
+    SetTapped,
+)
 from mtgcoach.core.reduce import apply
 from mtgcoach.core.zones import ZoneName
 
@@ -57,8 +63,29 @@ def played(state: GameState, player: PlayerId, card: Playable) -> Applied:
         SetTapped(player=player, instance_id=source, tapped=True)
         for source in (card.payment.tapped if card.payment else ())
     ]
-    casting = MoveCard(player=player, instance_id=card.instance_id, to=ZoneName.BATTLEFIELD)
-    return _done(state, [*paying, casting])
+    return _done(state, [*paying, *cast_and_resolve(player, card)])
+
+
+def cast_and_resolve(player: PlayerId, card: Playable) -> list[Event]:
+    """The two events a spell nobody answers produces.
+
+    Cast puts it on the stack (CR 601.2a); resolution takes it off, onto the
+    battlefield if it is a permanent spell (CR 608.3) and into its owner's
+    graveyard if it is an instant or a sorcery (CR 608.2m). Both, back to back,
+    because nothing here can respond: neither agent holds priority, and the
+    engine has no priority to hold. When a player can answer a spell, the gap
+    between these two events is where that happens -- which is why they are two
+    events and not one.
+
+    They used to be one ``MoveCard`` to the battlefield, and the board that
+    produced was wrong in a way anybody could see: an Opt sitting among the
+    lands, for the rest of the game.
+    """
+    to = ZoneName.BATTLEFIELD if card.is_permanent else ZoneName.GRAVEYARD
+    return [
+        CastSpell(player=player, instance_id=card.instance_id),
+        ResolveSpell(player=player, instance_id=card.instance_id, to=to),
+    ]
 
 
 def attacked(state: GameState, attacker: PlayerId, plan: Plan) -> Applied:

@@ -99,15 +99,23 @@ def _found(server: Server, name: str) -> tuple[Replay, ...]:
 
 
 def _game(games: tuple[Replay, ...], index: int) -> Replay:
-    """One game of a journal, by its position in it.
+    """One game of a journal, by its position in the file.
+
+    Found by its own ``index``, not by where it sits in this tuple. A game that
+    will not rebuild is left out of the tuple and keeps its place in the file,
+    so the two stop agreeing the moment a journal holds one damaged game -- and
+    since the list route hands out file positions, ``at/2`` would then open a
+    different game than the one the list said was there.
 
     Raises:
         HTTPException: 404 when there is no game there.
     """
-    if not 0 <= index < len(games):
-        msg = f"no game {index} in this journal; it has {len(games)}"
+    found = next((game for game in games if game.index == index), None)
+    if found is None:
+        listed = ", ".join(str(game.index) for game in games) or "none"
+        msg = f"no game {index} in this journal; it has {listed}"
         raise HTTPException(HTTP_404_NOT_FOUND, msg)
-    return games[index]
+    return found
 
 
 def _moment(game: Replay, index: int) -> Moment:

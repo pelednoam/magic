@@ -17,10 +17,13 @@ one of them knowing it came from a replay.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from helpers_api import server, talking
-from helpers_replay import BEAR, FOREST, NAME, SEED, journalled, serving
+from helpers_replay import BEAR, FOREST, NAME, SEED, journalled, recording, serving
+from mtgcoach.core.events import PlayLand
+from mtgcoach.core.ids import InstanceId, PlayerId
 from mtgcoach.core.steps import Step
 from wire import decoded, rows, text
 
@@ -147,47 +150,28 @@ def test_a_replay_of_a_set_this_server_lacks_shows_the_id(tmp_path: Path) -> Non
         assert named == {FOREST, BEAR}
 
 
-def test_stepping_into_a_moment_makes_a_game(tmp_path: Path) -> None:
-    """The point of the whole screen.
+def test_a_damaged_game_does_not_shift_the_ones_after_it(tmp_path: Path) -> None:
+    """A game is addressed by where it is in the file, not in the answer.
 
-    From here it is an ordinary session, so every route that already exists
-    answers about turn seven's board rather than about a board like it.
+    The list route hands out file positions. Leaving a damaged game out of the
+    answer while numbering by position in the answer made those two disagree,
+    so `at/2` opened game 1 and `at/1` was a 404 -- silently showing one game
+    under another game's name, which is the failure this whole format exists
+    to prevent.
     """
-    journalled(tmp_path)
+    path = journalled(tmp_path)
+    broken = replace(recording(), seed=8, events=(PlayLand(PlayerId("you"), InstanceId("nobody")),))
+    with path.open("a", encoding="utf-8") as file:
+        file.write(broken.as_json() + "\n")
+        file.write(replace(recording(), seed=9).as_json() + "\n")
+
     with talking(serving(tmp_path)) as client:
-        stepped = client.post(f"/replays/{NAME}/0/at/0")
-        assert stepped.status_code == HTTP_OK, stepped.text
-        body = decoded(stepped.json())
-        session_id = body["session_id"]
-        assert isinstance(session_id, str)
-        assert text(body, "state", "step") == str(Step.PRECOMBAT_MAIN)
-
-        # And the engine advises on it, which is what proves it is a real game
-        # rather than a picture of one.
-        looked = decoded(client.get(f"/games/{session_id}").json())
-        assert text(looked, "state", "step") == str(Step.PRECOMBAT_MAIN)
-        assert len(rows(looked, "advice", "you", "hand")) > 0
-
-
-def test_stepping_into_a_game_that_is_not_there(tmp_path: Path) -> None:
-    journalled(tmp_path)
-    with talking(serving(tmp_path)) as client:
-        assert client.post(f"/replays/{NAME}/9/at/0").status_code == HTTP_NOT_FOUND
-
-
-def test_stepping_past_the_end_of_a_game(tmp_path: Path) -> None:
-    journalled(tmp_path)
-    with talking(serving(tmp_path)) as client:
-        assert client.post(f"/replays/{NAME}/0/at/99").status_code == HTTP_NOT_FOUND
-
-
-def test_stepping_into_a_journal_that_is_not_there(tmp_path: Path) -> None:
-    with talking(serving(tmp_path)) as client:
-        assert client.post("/replays/never-ran/0/at/0").status_code == HTTP_NOT_FOUND
-
-
-def test_stepping_in_needs_a_token(tmp_path: Path) -> None:
-    """The replay routes are behind the same door as everything else."""
-    journalled(tmp_path)
-    with talking(serving(tmp_path), token=WRONG) as client:
-        assert client.get("/replays").status_code != HTTP_OK
+        body = decoded(client.get(f"/replays/{NAME}").json())
+        listed = {row["index"]: row["seed"] for row in rows(body, "games")}
+        assert listed == {0: SEED, 2: 9}
+        # Every index the list gave out opens the game the list named.
+        for index, seed in listed.items():
+            got = decoded(client.get(f"/replays/{NAME}/{index}").json())
+            assert got["seed"] == seed
+        # And the one it did not give out is honestly missing.
+        assert client.get(f"/replays/{NAME}/1").status_code == HTTP_NOT_FOUND

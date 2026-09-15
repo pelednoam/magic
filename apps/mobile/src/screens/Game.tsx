@@ -19,6 +19,7 @@ import { Question } from "../components/Question";
 import { Reminders, Unknown } from "../components/Reminders";
 import type { Coach } from "../client";
 import { messageOf } from "../errors";
+import { playing } from "../playing";
 import { turnLine } from "../format";
 import { useCoaching, useQuestions } from "../thinking";
 import { colour, space, text } from "../theme";
@@ -83,10 +84,15 @@ export function Game({
   const questions = useQuestions(coach, game.session_id, seat, snapshot.version);
 
   const act = useCallback(
-    async (event: Record<string, unknown>): Promise<void> => {
+    async (...events: readonly Record<string, unknown>[]): Promise<void> => {
       setProblem("");
       try {
-        accept(await coach.event(game.session_id, event));
+        // In order, and one at a time: casting a spell is three events and the
+        // second depends on the first having been accepted. A refusal stops
+        // the rest, leaving the game where the server last agreed it was.
+        for (const event of events) {
+          accept(await coach.event(game.session_id, event));
+        }
       } catch (error: unknown) {
         setProblem(messageOf(error));
       }
@@ -119,7 +125,7 @@ export function Game({
         cards={advice.hand}
         board={mine}
         onPlay={(card: Playable) => {
-          void act({ type: "play_land", player: seat, instance_id: card.instance_id });
+          void act(...playing(card, seat));
         }}
       />
       <Attacks attacks={advice.attacks} />

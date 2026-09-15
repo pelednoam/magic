@@ -41,6 +41,10 @@ class PlayerState:
     battlefield: tuple[Permanent, ...]
     graveyard: tuple[CardInstance, ...]
     exile: tuple[CardInstance, ...]
+    #: Spells this player has cast that have not resolved (CR 405.1). Kept with
+    #: their owner; see ``ZoneName`` for why, and for what that does not model.
+    #: Defaulted because a board built by hand in a test has nothing on it.
+    stack: tuple[CardInstance, ...] = ()
     life: int = STARTING_LIFE
     lands_played_this_turn: int = 0
 
@@ -52,6 +56,7 @@ class PlayerState:
         """
         yield from self.library
         yield from self.hand
+        yield from self.stack
         yield from (permanent.card for permanent in self.battlefield)
         yield from self.graveyard
         yield from self.exile
@@ -63,6 +68,8 @@ class PlayerState:
                 return self.library
             case ZoneName.HAND:
                 return self.hand
+            case ZoneName.STACK:
+                return self.stack
             case ZoneName.BATTLEFIELD:
                 return tuple(permanent.card for permanent in self.battlefield)
             case ZoneName.GRAVEYARD:

@@ -51,7 +51,7 @@ function HandCard({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${card.name}, ${card.playable ? "playable" : "not playable"}`}
-      disabled={!trackable(card)}
+      disabled={!card.playable}
       onPress={() => { onPlay(card); }}
       style={[styles.card, card.playable ? styles.can : styles.cannot]}
     >
@@ -61,11 +61,6 @@ function HandCard({
           {card.playable ? "can play" : "cannot"}
         </Text>
       </View>
-      {card.playable && !card.is_land ? (
-        <Text style={styles.caveat}>
-          The tracker cannot record casting a spell yet — play it on the table.
-        </Text>
-      ) : null}
       {card.reasons.map((reason) => (
         <Text key={reason} style={styles.reason}>
           {reason}
@@ -78,17 +73,6 @@ function HandCard({
       )}
     </Pressable>
   );
-}
-
-/**
- * Whether tapping this card can actually do anything.
- *
- * Only a land drop is an event the engine has. A spell the coach says you can
- * afford is still true and still worth showing -- it just cannot be *recorded*,
- * so the card says so rather than sending a request the server will refuse.
- */
-function trackable(card: Playable): boolean {
-  return card.playable && card.is_land;
 }
 
 const styles = StyleSheet.create({
@@ -107,6 +91,5 @@ const styles = StyleSheet.create({
   no: { color: colour.no, fontSize: text.small },
   reason: { color: colour.quiet, fontSize: text.small, marginTop: space.tight },
   payment: { color: colour.accent, fontSize: text.small, marginTop: space.tight },
-  caveat: { color: colour.warn, fontSize: text.small, marginTop: space.tight },
   empty: { color: colour.quiet, fontSize: text.body },
 });

@@ -27,13 +27,16 @@ import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
+from mtgcoach.api.cutting import games
 from mtgcoach.api.decisions import Moment, decisions, moment, order
-from mtgcoach.api.recording import KIND, Recording, recorded
+from mtgcoach.core.errors import IllegalEventError
 from mtgcoach.core.reduce import apply
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from mtgcoach.api.cutting import Written
+    from mtgcoach.api.recording import Recording
     from mtgcoach.core.state import GameState
     from mtgcoach.core.steps import Step
 
@@ -58,14 +61,6 @@ class Replay:
     seed: int
     decks: tuple[str, str]
     moments: tuple[Moment, ...] = ()
-
-
-@dataclass(frozen=True, slots=True)
-class Written:
-    """One game's lines: the recording, and the decisions made during it."""
-
-    recording: Recording
-    decisions: tuple[dict[str, object], ...] = ()
 
 
 def journals(data_root: Path) -> tuple[str, ...]:
@@ -98,7 +93,7 @@ def games_in(data_root: Path, name: str) -> tuple[Replay, ...]:
         raise UnknownReplayError(msg) from unreadable
     played = tuple(
         game
-        for at, written in enumerate(_games(cast("list[object]", lines)))
+        for at, written in enumerate(games(cast("list[object]", lines)))
         if (game := _replay(at, written)) is not None
     )
     if not played:
@@ -107,57 +102,23 @@ def games_in(data_root: Path, name: str) -> tuple[Replay, ...]:
     return played
 
 
-def _games(lines: list[object]) -> list[Written]:
-    """The journal, cut into games at each recording line.
-
-    Decisions that come after the last recording belong to a game that never
-    finished, and are dropped. That is the right way round: a recording is
-    written when a game ends, so decisions with none after them are a run that
-    was killed mid-game, and there is no board to show them against.
-    """
-    made: list[Written] = []
-    pending: list[dict[str, object]] = []
-    for line in lines:
-        if not isinstance(line, dict):
-            continue
-        entry = cast("dict[str, object]", line)
-        if entry.get("kind") != KIND:
-            pending.append(entry)
-            continue
-        found = _recording(entry)
-        if found is not None:
-            made.append(Written(recording=found, decisions=tuple(pending)))
-        pending = []
-    return made
-
-
-def _recording(entry: dict[str, object]) -> Recording | None:
-    """A game line, or None if it cannot be trusted to rebuild one.
-
-    A damaged deal is refused rather than repaired. Dropping one card from a
-    library shifts every card after it, and the boards that then rebuild are
-    boards that never existed -- which is worse than a game the screen cannot
-    show, and much worse on this screen than anywhere else.
-    """
-    try:
-        return recorded(entry)
-    except ValueError:
-        return None
-
-
 def _replay(index: int, written: Written) -> Replay | None:
     """One game, rebuilt, with its decisions attached.
 
-    None when the recording will not rebuild -- a library too short for an
-    opening hand, a seat missing. A journal is a file that a killed process may
-    have half-written, so one damaged game is not a reason to refuse the rest
-    of a season.
+    None when the recording will not rebuild. Two ways that happens and both
+    are real: a deal that is not a game (``ValueError`` out of ``start_game``
+    -- a library too short for an opening hand, a seat missing), and an event
+    the engine now refuses (``IllegalEventError`` out of ``apply``). The second
+    is not hypothetical: ``docs/SELFPLAY.md`` says in as many words that a
+    replay against a stricter engine diverges, and a game recorded before a
+    rule was tightened is exactly that. Neither is a reason to refuse the rest
+    of a season, and neither may be a 500.
     """
     try:
         boards = _boards(written.recording)
-    except ValueError:
+    except (ValueError, IllegalEventError):
         return None
-    said = decisions(written.decisions)
+    said = decisions(written.decisions, written.recording.seed)
     moments = tuple(
         moment(turn, step, boards[turn, step], entry)
         for (turn, step, _), entry in sorted(said.items(), key=lambda one: order(one[0]))
@@ -179,6 +140,9 @@ def _boards(recording: Recording) -> dict[tuple[int, Step], GameState]:
 
     Raises:
         ValueError: If the recording's libraries are not a game.
+        IllegalEventError: If an event in it cannot be applied to the board it
+            reached -- which a game recorded before the engine grew stricter
+            really can contain.
     """
     state = recording.opening()
     seen: dict[tuple[int, Step], GameState] = {(state.turn, state.step): state}

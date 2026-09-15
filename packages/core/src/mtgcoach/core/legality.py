@@ -88,17 +88,25 @@ def _step_name(step: Step) -> str:
 
 
 def _sorcery_timing(state: GameState, player_id: PlayerId, subject: str) -> tuple[str, ...]:
-    """Sorcery speed: your turn, your main phase.
+    """Sorcery speed: your turn, your main phase, nothing on the stack.
 
-    CR 117.1a also requires an empty stack. That check is absent because the
-    state has no stack yet -- nothing can put an object on one until spells can
-    be cast, and a field no event can change is a field no test can cover. It
-    arrives with casting, and this is the site that will need it.
+    All three of CR 117.1a. The empty-stack half used to be missing with a note
+    saying it "arrives with casting, and this is the site that will need it" --
+    casting has arrived, so here it is: a spell waiting to resolve means it is
+    not your turn to act at sorcery speed, however much it looks like your main
+    phase.
+
+    The whole stack, not just yours. Sorcery timing asks whether the stack is
+    empty, and a spell your opponent has cast is on it exactly as much as one of
+    yours is.
     """
     if state.active_player != player_id:
         return (f"you can only play {subject} on your own turn",)
     if not is_main_phase(state.step):
         return (f"you can only play {subject} in a main phase",)
+    waiting = sum(len(player.stack) for player in state.players.values())
+    if waiting:
+        return (f"you can only play {subject} when nothing is waiting to resolve",)
     return ()
 
 

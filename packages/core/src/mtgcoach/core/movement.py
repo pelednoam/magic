@@ -49,6 +49,9 @@ def _remove_from(
         case ZoneName.HAND:
             card, rest = _split(player.hand, instance_id)
             return replace(player, hand=rest), card
+        case ZoneName.STACK:
+            card, rest = _split(player.stack, instance_id)
+            return replace(player, stack=rest), card
         case ZoneName.GRAVEYARD:
             card, rest = _split(player.graveyard, instance_id)
             return replace(player, graveyard=rest), card
@@ -91,6 +94,8 @@ def add_card(player: PlayerState, card: CardInstance, zone: ZoneName, turn: int 
             return replace(player, library=(*player.library, card))
         case ZoneName.HAND:
             return replace(player, hand=(*player.hand, card))
+        case ZoneName.STACK:
+            return replace(player, stack=(*player.stack, card))
         case ZoneName.GRAVEYARD:
             return replace(player, graveyard=(*player.graveyard, card))
         case ZoneName.EXILE:

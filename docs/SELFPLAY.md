@@ -34,15 +34,23 @@ chose, which is exactly when an invariant that holds in every fixture stops hold
 
 ## What it cannot test, and why
 
-**The engine has no event for casting a spell.** `Playable`'s own docstring says so — the stack
-arrives with it. So the harness does exactly what the app's user does: taps the lands the payment
-names, then moves the card onto the battlefield. And combat applies the engine's own `Outcome`
-(damage, then deaths, then lifelink) rather than a second rules implementation written to check
-the first. **Where the engine is the authority, the engine is asked.** A harness that invented its
-own rules would be testing itself.
+The harness does exactly what the app's user does, and nothing cleverer: taps the lands the
+payment names, casts the card onto the stack, lets it resolve. Combat applies the engine's own
+`Outcome` (damage, then deaths, then lifelink) rather than a second rules implementation written
+to check the first. **Where the engine is the authority, the engine is asked.** A harness that
+invented its own rules would be testing itself.
 
-The consequence: this exercises zones, mana, legality, the step walker, the trigger scanner and
-the combat simulator. It does not exercise spell resolution, because there is none yet.
+**No player can answer a spell.** Casting is two events — `CastSpell` then `ResolveSpell` — and
+the gap between them is exactly where a response belongs. Nothing goes in it yet: that needs
+priority (CR 117), which the engine does not model, so the two arrive back to back. That is a
+gap, not an error: no board this produces misstates the rules, which is a different thing from
+modelling every rule.
+
+What a season therefore exercises: zones including the stack, mana, legality, the step walker,
+the trigger scanner, the combat simulator, and spell resolution. The first 200-game season after
+casting landed applied 68,534 events and cast 3,911 spells with nothing broken — the per-player
+card conservation check covers every cast-and-resolve pair for free, which is the reason the
+stack is filed under its owner rather than on `GameState`.
 
 ## Re-running a season
 

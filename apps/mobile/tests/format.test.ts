@@ -25,6 +25,7 @@ const board: Player = {
     { instance_id: "f2", oracle_id: "forest", name: "Forest", tapped: true, summoning_sick: false },
     { instance_id: "i1", oracle_id: "island", name: "Island", tapped: false, summoning_sick: true },
   ],
+  stack: [],
   graveyard: [],
   exile: [],
 };

@@ -18,12 +18,20 @@ export interface Playable {
   readonly instance_id: string;
   readonly name: string;
   /**
-   * Whether playing this is a land drop. The two actions are different events,
-   * and only one of them exists yet -- the engine cannot record *casting* a
-   * spell, so a client that treats every playable card as a land drop sends an
-   * illegal event for every spell the coach just said you can afford.
+   * Whether playing this is a land drop. Playing a land (CR 305.1) and casting
+   * a spell (CR 601) are different actions with different events, so a client
+   * has to know which it is looking at.
    */
   readonly is_land: boolean;
+  /**
+   * Whether casting this leaves a permanent on the battlefield (CR 608.3) or
+   * puts the card in its owner's graveyard as it resolves (CR 608.2m).
+   *
+   * The client sends it back in `resolve_spell`, because the engine holds no
+   * card data and cannot work it out. This app still decides nothing: the
+   * server read the type line and this carries the answer.
+   */
+  readonly is_permanent: boolean;
   readonly playable: boolean;
   /** Empty when playable. Otherwise the engine's own words, printed verbatim. */
   readonly reasons: readonly string[];
@@ -103,6 +111,8 @@ export interface Player {
   readonly library: number;
   readonly lands_played_this_turn: number;
   readonly hand: readonly Card[];
+  /** Spells cast and not yet resolved. Public, so both players see it. */
+  readonly stack: readonly Card[];
   readonly battlefield: readonly Permanent[];
   readonly graveyard: readonly Card[];
   readonly exile: readonly Card[];

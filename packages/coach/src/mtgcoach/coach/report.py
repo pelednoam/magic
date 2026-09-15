@@ -49,12 +49,15 @@ class Playable:
 
     instance_id: InstanceId
     name: str
-    #: Whether playing this is a land drop. The client needs it because the two
-    #: actions are different events, and because only one of them exists yet:
-    #: the engine has no way to record *casting* a spell, so a client that
-    #: treats every playable card as a land drop sends an illegal event for
-    #: every spell the coach has just told the player they can afford.
+    #: Whether playing this is a land drop. The client needs it because playing
+    #: a land (CR 305.1) and casting a spell (CR 601) are different actions
+    #: with different events, and only one of them is a land drop.
     is_land: bool = False
+    #: Whether casting this puts a permanent on the battlefield (CR 608.3) or
+    #: sends the card to its owner's graveyard as it resolves (CR 608.2m). The
+    #: client needs it because ``ResolveSpell`` has to be told which, and it is
+    #: the only party that knows: ``core`` cannot read a type line.
+    is_permanent: bool = False
     #: Empty when you can play it. Otherwise every reason you cannot, in the
     #: engine's own words -- "you need 1 more untapped source", not False.
     reasons: tuple[str, ...] = ()
@@ -130,6 +133,7 @@ def _verdict(
     if facts.is_land:
         reasons = why_not_play_land(state, player_id, facts)
         return Playable(card.instance_id, facts.name, is_land=True, reasons=reasons)
+    spell = partial(Playable, card.instance_id, facts.name, is_permanent=facts.is_permanent)
     try:
         reasons = why_not_cast(state, player_id, facts, sources)
         best = payments(facts.cost, sources) if not reasons else ()
@@ -139,13 +143,8 @@ def _verdict(
         # here, not an error: letting it escape made the whole snapshot a 500,
         # and because the event is recorded before the advice is built, one
         # accepted event left the game permanently unreadable.
-        return Playable(card.instance_id, facts.name, reasons=(str(refusal),))
-    return Playable(
-        card.instance_id,
-        facts.name,
-        reasons=reasons,
-        payment=best[0] if best else None,
-    )
+        return spell(reasons=(str(refusal),))
+    return spell(reasons=reasons, payment=best[0] if best else None)
 
 
 def _unknown(state: GameState, player_id: PlayerId, lookup: CardLookup) -> tuple[str, ...]:

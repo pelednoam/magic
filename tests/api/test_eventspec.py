@@ -10,22 +10,36 @@ from typing import get_args
 
 import pytest
 
-from mtgcoach.api.eventspec import BadEventError, parse, written
+from mtgcoach.api.eventfields import BadEventError
+from mtgcoach.api.eventspec import BUILDERS, parse, written
 from mtgcoach.core.events import (
     AdvanceStep,
+    CastSpell,
     ChangeLife,
     DrawCard,
     Event,
     MoveCard,
     PlayLand,
+    ResolveSpell,
     SetTapped,
 )
 from mtgcoach.core.ids import InstanceId, PlayerId
 from mtgcoach.core.zones import ZoneName
 
-#: Every event a client can send, as it spells it on the wire.
+#: Every event a client can send, as it spells it on the wire. Written out
+#: rather than read from ``BUILDERS``: a test that derived the list from the
+#: thing it is checking would agree with anything.
 WIRE_FORMS = frozenset(
-    {"advance_step", "draw_card", "play_land", "set_tapped", "move_card", "change_life"}
+    {
+        "advance_step",
+        "draw_card",
+        "play_land",
+        "cast_spell",
+        "resolve_spell",
+        "set_tapped",
+        "move_card",
+        "change_life",
+    }
 )
 
 
@@ -103,7 +117,10 @@ def test_true_is_not_a_life_total() -> None:
 
 
 def test_an_unknown_zone_lists_the_real_ones() -> None:
-    body = {"type": "move_card", "player": "you", "instance_id": "x", "to": "stack"}
+    # The command zone, which is real in the rules and does not exist here:
+    # it arrives with commanders, which this project does not play. "stack"
+    # used to be the example, and is a zone now.
+    body = {"type": "move_card", "player": "you", "instance_id": "x", "to": "command"}
     with pytest.raises(BadEventError, match="expected one of battlefield, exile"):
         parse(body)
 
@@ -117,6 +134,10 @@ def test_every_event_type_the_engine_has_can_be_sent() -> None:
     """
     members = {member.__name__ for member in get_args(Event.__value__)}
     assert {_wire_name(name) for name in members} == WIRE_FORMS
+    # And the table the parser actually dispatches on says the same, so a name
+    # spelled one way in the union and another in `BUILDERS` is caught here
+    # rather than by a client getting "unknown event type".
+    assert set(BUILDERS) == WIRE_FORMS
 
 
 def _wire_name(class_name: str) -> str:
@@ -130,6 +151,8 @@ EVERY_EVENT: tuple[Event, ...] = (
     AdvanceStep(),
     DrawCard(PlayerId("you")),
     PlayLand(PlayerId("you"), InstanceId("card-1")),
+    CastSpell(PlayerId("you"), InstanceId("card-4")),
+    ResolveSpell(PlayerId("you"), InstanceId("card-5"), ZoneName.GRAVEYARD),
     SetTapped(PlayerId("them"), InstanceId("card-2"), tapped=True),
     MoveCard(PlayerId("you"), InstanceId("card-3"), ZoneName.GRAVEYARD),
     ChangeLife(PlayerId("them"), -3),
@@ -151,3 +174,22 @@ def test_an_event_survives_being_written_down_and_read_back(event: Event) -> Non
 def test_every_event_can_be_written_down() -> None:
     """Guard on the guard: a new event with no round trip above."""
     assert {type(event) for event in EVERY_EVENT} == set(get_args(Event.__value__))
+
+
+def test_casting_and_resolving_are_two_events() -> None:
+    """Because they are two things, with a gap between them.
+
+    The gap is where a player may answer a spell. Nothing can yet -- that needs
+    priority (CR 117) -- but modelling the gap away is what put an Opt on the
+    battlefield for the rest of a game.
+    """
+    cast = parse({"type": "cast_spell", "player": "you", "instance_id": "you-3"})
+    assert cast == CastSpell(PlayerId("you"), InstanceId("you-3"))
+    body = {"type": "resolve_spell", "player": "you", "instance_id": "you-3", "to": "graveyard"}
+    assert parse(body) == ResolveSpell(PlayerId("you"), InstanceId("you-3"), ZoneName.GRAVEYARD)
+
+
+def test_resolving_needs_somewhere_to_go() -> None:
+    """The destination is the client's to supply: `core` cannot read a type line."""
+    with pytest.raises(BadEventError, match="'to'"):
+        parse({"type": "resolve_spell", "player": "you", "instance_id": "you-3"})

@@ -75,6 +75,10 @@ def playable(card: Playable) -> dict[str, Json]:
         "instance_id": str(card.instance_id),
         "name": card.name,
         "is_land": card.is_land,
+        # Where this ends up when it resolves, which the client has to send in
+        # `resolve_spell` and only this side knows: the engine cannot read a
+        # type line. See `Playable.is_permanent`.
+        "is_permanent": card.is_permanent,
         "playable": card.playable,
         "reasons": list(card.reasons),
         "payment": payment(card.payment) if card.payment is not None else None,
@@ -152,6 +156,10 @@ def _player(player: PlayerState, names: Naming) -> dict[str, Json]:
         "library": len(player.library),
         "lands_played_this_turn": player.lands_played_this_turn,
         "hand": [_card(card, names) for card in player.hand],
+        # The stack is a public zone (CR 400.2): both players can see what is
+        # waiting to resolve, and a tracker that hid it would be hiding the one
+        # thing a player needs in order to decide whether to answer it.
+        "stack": [_card(card, names) for card in player.stack],
         "battlefield": [_permanent(p, names) for p in player.battlefield],
         "graveyard": [_card(card, names) for card in player.graveyard],
         "exile": [_card(card, names) for card in player.exile],

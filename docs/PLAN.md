@@ -690,10 +690,18 @@ otherwise:
   legality question. The opponent-knowledge reasoning the coach needs (§3's "two burn spells
   left in their deck") is computed from their registered decklist, not from a deliberately
   impoverished state.
-- **There is no `stack` field yet.** Nothing can put an object on one until spells can be cast,
-  and a field no event can change is a field no test can cover. M4's legality layer already
-  marks the one check this costs (the empty-stack half of CR 117.1a) at the site that will need
-  it. It arrives with spell casting, alongside `counters` and attachments on `Permanent`.
+- **The stack is a zone on each player, not a field on the game.** It is shared in the rules
+  (CR 405.1) and kept per-player here for two reasons that pull the same way: a spell's card
+  returns to *its owner's* graveyard when it resolves (CR 608.2m), so filing it under its owner
+  is where it has to come back from; and it keeps card conservation checkable per player, which
+  is the invariant a self-play season checks on every one of a hundred thousand events. The
+  first 200-game season after casting landed applied 68,534 events, cast 3,911 spells, and
+  broke nothing — the cast/resolve pair was checked for free, on every one of them.
+
+  What that does not model is the *order* of two spells on the stack at once. Nothing can
+  produce that yet: a second spell on the stack means responding to the first, which needs
+  priority (CR 117), which the engine does not have. When it does, the shared order belongs on
+  `GameState` beside it. `counters` and attachments on `Permanent` are still to come.
 
 **Event-sourced.** Store the event log, derive state via `reduce.apply`. Free undo, free replay,
 free end-of-game review, and the strongest property test in the suite. Costs nothing now,
@@ -760,10 +768,11 @@ Untap and cleanup are refused outright (CR 502.4, 514.3): no player gets priorit
 instant that reads as castable during untap is not a harmless approximation, it is the one
 moment when "hold your Giant Growth" is wrong.
 
-One check is deliberately missing. CR 117.1a also requires an empty stack for sorcery speed,
-and `GameState` has no stack, because nothing before casting can put an object on one and a
-field no event can change is a field no test can cover. `_sorcery_timing` is the site that will
-need it, and says so.
+All three halves of CR 117.1a are now checked, including the empty stack — which was the one
+deliberate omission here for as long as there was no stack to look at. A spell waiting to
+resolve means it is not your turn to act at sorcery speed, however much it looks like your main
+phase, and `_sorcery_timing` looks at the whole stack rather than your half of it: a spell your
+opponent cast is on it exactly as much as one of yours.
 
 **3. Combat simulator** — `combat/`. Brute-force every attack subset against the defender's
 best blocks, and within each of those the attacker's best assignment of damage. This is the
@@ -1335,14 +1344,20 @@ combat model has no "affects other creatures" — so they are **disclosed**, by 
 numbers. "Four damage, lethal" has to be readable as "unless the Pacifism says otherwise", and
 a confident wrong number is the worst thing this project can produce.
 
-**Two things this cannot do yet, which the app has to say out loud.** `core` has no event for
-*casting a spell* — the `Event` union is untap/draw/land/tap/move/life — so the coach can tell
-you a spell is affordable and the tracker cannot record you casting it. `Playable.is_land` is on
-the wire for exactly this reason: the app only offers to play what the engine can record, and
-says so on the cards it cannot. Casting arrives with the stack, alongside `counters` and
-attachments.
+**Casting, which used to be the biggest hole here, is closed.** `core` gained `CastSpell` and
+`ResolveSpell`: hand to stack (CR 601.2a), then stack to the battlefield if it is a permanent
+spell (CR 608.3) or to its owner's graveyard if it is an instant or a sorcery (CR 608.2m). Two
+events rather than one, because they are two things with a gap between them — the gap is where
+a player may answer a spell, and modelling it away is what used to leave an Opt sitting on the
+battlefield for the rest of a game. The app now offers every playable card rather than only
+lands, and `Playable.is_permanent` rides the wire beside `is_land` because the client has to say
+where a spell resolves to and the engine cannot read a type line.
 
-The other is identity, and it is now half closed. The API is **not** unauthenticated: the
+What is still missing is *responding*: neither player holds priority, so cast and resolve arrive
+back to back. That is honest rather than wrong — no board the engine produces misstates the
+rules — and it is the next thing the gap between those two events is for.
+
+The remaining gap is identity, and it is now half closed. The API is **not** unauthenticated: the
 server makes a token on first run, prints it at startup, and `api/gatekeeper.py` refuses every
 request and every socket without it — as ASGI middleware rather than a per-route dependency, so
 a route added later is behind it whether or not anybody remembered. The threat that closes is

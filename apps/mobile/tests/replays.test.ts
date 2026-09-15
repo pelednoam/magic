@@ -11,13 +11,25 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Coach, ServerError } from "../src/client";
-import { placeOf, seatName } from "../src/format";
+import { nameOf, placeOf, seatName } from "../src/format";
 import { isJournals, isPlayedGame, isWalkthrough } from "../src/wire";
 
 const TOKEN = "t";
 
 /** One line of a journal's game list. */
 const LINE = { index: 2, seed: 77, decks: ["inferno", "healing"], decisions: 81 };
+
+/** A board with one card on it, for naming a checked choice. */
+const BOARD = {
+  life: 20,
+  library: 30,
+  lands_played_this_turn: 0,
+  hand: [{ instance_id: "you-7", oracle_id: "uuid", name: "Skyship Buccaneer" }],
+  stack: [],
+  battlefield: [],
+  graveyard: [],
+  exile: [],
+};
 
 /** One moment, down to what the stepper actually dereferences. */
 const MOMENT = {
@@ -156,5 +168,19 @@ describe("saying where in a game a moment is", () => {
   it("marks the seat that was being asked", () => {
     expect(seatName("you", "You", "you")).toBe("You — choosing here");
     expect(seatName("them", "Them", "you")).toBe("Them");
+  });
+});
+
+describe("what the replay panel may claim was checked", () => {
+  // `advice.verify` checks the card named in `play` and the attack named in
+  // `attack`. It checks nothing about `in_short` or `because`, which are prose
+  // a model wrote. A badge over the prose is a claim about the wrong text.
+  it("names the checked choice from the board it was made on", () => {
+    expect(nameOf(BOARD, "you-7")).toBe("Skyship Buccaneer");
+  });
+
+  it("falls back to the identifier for a card the board no longer holds", () => {
+    // Better an unfamiliar word than a blank space, which reads as a bug.
+    expect(nameOf(BOARD, "you-99")).toBe("you-99");
   });
 });

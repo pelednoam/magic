@@ -1,4 +1,11 @@
-/** One player's battlefield, and the two states that stop a permanent acting. */
+/**
+ * One player's battlefield, and the two states that stop a permanent acting.
+ *
+ * Plus anything waiting on the stack. The stack is a public zone (CR 400.2) and
+ * it is where a spell *is* between being cast and resolving -- the moment when
+ * the other player may answer it. A tracker that did not show it would be
+ * hiding the one thing that moment is about.
+ */
 
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -19,6 +26,11 @@ export function Board({
 }) {
   return (
     <Panel title={title} note={`${player.life} life · ${player.library} in library`}>
+      {player.stack.length === 0 ? null : (
+        <Text style={styles.waiting}>
+          {`Waiting to resolve: ${player.stack.map((card) => card.name).join(", ")}`}
+        </Text>
+      )}
       {player.battlefield.length === 0 ? (
         <Text style={styles.empty}>Nothing on the battlefield.</Text>
       ) : (
@@ -56,4 +68,5 @@ const styles = StyleSheet.create({
   name: { color: colour.text, fontSize: text.small, fontWeight: "600" },
   note: { color: colour.quiet, fontSize: text.small },
   empty: { color: colour.quiet, fontSize: text.body },
+  waiting: { color: colour.warn, fontSize: text.small, paddingBottom: space.small },
 });

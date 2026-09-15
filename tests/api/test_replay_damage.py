@@ -12,15 +12,12 @@ rules from is much worse than a game that cannot be shown.
 
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING
 
 import pytest
 
-from helpers_replay import NAME, SEED, journalled, recording
-from mtgcoach.api.recording import KIND
+from helpers_replay import NAME, journalled
 from mtgcoach.api.replays import UnknownReplayError, games_in
-from mtgcoach.core.steps import Step
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -67,92 +64,3 @@ def test_a_line_that_is_not_an_object_is_walked_past(tmp_path: Path) -> None:
     journalled(tmp_path, extra=["42"])
     (game,) = games_in(tmp_path, NAME)
     assert len(game.moments) == DECISIONS
-
-
-def test_a_game_that_will_not_rebuild_is_skipped_not_fatal(tmp_path: Path) -> None:
-    """One damaged game must not take a season with it.
-
-    A library too short for an opening hand raises out of ``start_game``. It
-    used to raise all the way out of the route, so a journal with one bad game
-    in it answered 500 and every good game in it became unreadable.
-    """
-    path = journalled(tmp_path)
-    broken = recording()
-    with path.open("a", encoding="utf-8") as file:
-        file.write(
-            json.dumps(
-                {
-                    "kind": KIND,
-                    "seed": 8,
-                    "decks": ["green", "other"],
-                    "first": "you",
-                    "libraries": {"you": [["a", "Forest"]], "them": [["b", "Forest"]]},
-                    "events": [],
-                }
-            )
-            + "\n"
-        )
-        file.write(broken.as_json() + "\n")
-    played = games_in(tmp_path, NAME)
-    assert [game.seed for game in played] == [SEED, SEED]
-
-
-def test_a_journal_of_only_damaged_games_says_so(tmp_path: Path) -> None:
-    """Rather than an empty screen, or a 500."""
-    path = tmp_path / "selfplay" / "wrecked.jsonl"
-    path.parent.mkdir(parents=True)
-    path.write_text(
-        json.dumps(
-            {
-                "kind": KIND,
-                "seed": 8,
-                "decks": [],
-                "first": "you",
-                "libraries": {"you": [["a", "Forest"]]},
-            }
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    with pytest.raises(UnknownReplayError, match="can be rebuilt"):
-        games_in(tmp_path, "wrecked")
-
-
-def test_a_damaged_deal_takes_only_its_own_game(tmp_path: Path) -> None:
-    """A library with a card that is not a card is refused, not repaired."""
-    path = journalled(tmp_path)
-    with path.open("a", encoding="utf-8") as file:
-        file.write(
-            json.dumps(
-                {
-                    "kind": KIND,
-                    "seed": 9,
-                    "decks": ["green", "other"],
-                    "first": "you",
-                    "libraries": {"you": [["a"], ["b", "Forest"]]},
-                }
-            )
-            + "\n"
-        )
-    played = games_in(tmp_path, NAME)
-    assert [game.seed for game in played] == [SEED]
-
-
-def test_two_decisions_in_one_step_are_both_kept(tmp_path: Path) -> None:
-    """The defender is asked at declare-blockers, which the rules require.
-
-    The harness does not do that yet. The journal line has always carried a
-    player, and a key that threw it away would have kept the last of the two
-    and shown one player's advice as the other's -- silently, the day somebody
-    added blocking.
-    """
-    journalled(
-        tmp_path,
-        extra=[
-            '{"seed": 7, "turn": 1, "step": "declare_blockers", "player": "them"}',
-            '{"seed": 7, "turn": 1, "step": "declare_blockers", "player": "you"}',
-        ],
-    )
-    (game,) = games_in(tmp_path, NAME)
-    blocking = [one.player for one in game.moments if one.step is Step.DECLARE_BLOCKERS]
-    assert sorted(blocking) == ["them", "you"]

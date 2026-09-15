@@ -22,7 +22,8 @@ from mtgcoach.api.access import MissingTokenError
 from mtgcoach.api.asker import ClaudeCliAsker
 from mtgcoach.api.context import Claude, Server, session, snapshot
 from mtgcoach.api.dealing import library
-from mtgcoach.api.eventspec import BadEventError, parse
+from mtgcoach.api.eventfields import BadEventError
+from mtgcoach.api.eventspec import parse
 from mtgcoach.api.explainer import ClaudeCliExplainer
 from mtgcoach.api.gatekeeper import guarded
 from mtgcoach.api.guard import check

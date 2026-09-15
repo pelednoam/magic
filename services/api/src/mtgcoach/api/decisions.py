@@ -38,9 +38,15 @@ class Moment:
 
 
 def decisions(
-    lines: tuple[dict[str, object], ...],
+    lines: tuple[dict[str, object], ...], seed: int
 ) -> dict[tuple[int, Step, str], dict[str, object]]:
     """One game's decisions, by the moment each was made.
+
+    ``lines`` is already the stretch of journal this game was written during,
+    and the seed is checked on top of that. Both, because each catches what the
+    other misses: position separates two games that share a seed, and the seed
+    keeps the orphaned decisions of a run killed mid-game from attaching
+    themselves to a recording a *later* run appended after them.
 
     Keyed by the player as well as the step. Today the harness asks only the
     active player and one step has one decision -- but the line carries a
@@ -51,6 +57,8 @@ def decisions(
     found: dict[tuple[int, Step, str], dict[str, object]] = {}
     for entry in lines:
         turn, step, player = entry.get("turn"), entry.get("step"), entry.get("player")
+        if entry.get("seed") != seed:
+            continue
         if isinstance(turn, int) and isinstance(step, str) and step in set(Step):
             found[turn, Step(step), str(player)] = entry
     return found

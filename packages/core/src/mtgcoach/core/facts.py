@@ -32,6 +32,12 @@ class CardFacts:
     is_land: bool = False
     is_creature: bool = False
     is_instant_speed: bool = False
+    #: Whether this stays on the battlefield once it resolves (CR 110.1). The
+    #: difference between a spell that becomes a permanent (CR 608.3) and one
+    #: that goes to its owner's graveyard as the last part of resolving
+    #: (CR 608.2m) -- which is the whole of what ``ResolveSpell`` needs told,
+    #: because ``core`` cannot read a type line.
+    is_permanent: bool = False
     power: int | None = None
     toughness: int | None = None
     keywords: frozenset[str] = field(default_factory=frozenset[str])

@@ -13,7 +13,7 @@ import pytest
 
 from helpers import ME, YOU, deck, facts
 from helpers_coach import Book
-from mtgcoach.api.eventspec import BadEventError
+from mtgcoach.api.eventfields import BadEventError
 from mtgcoach.api.guard import check
 from mtgcoach.core.cards import CardInstance
 from mtgcoach.core.events import AdvanceStep, PlayLand
