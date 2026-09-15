@@ -22,7 +22,12 @@ export function Hand({
 }: {
   readonly cards: readonly Playable[];
   readonly board: Player;
-  readonly onPlay: (card: Playable) => void;
+  /**
+   * What to do when a card is tapped. Absent means nothing can be played --
+   * a finished game, where the server refuses every event, so offering the
+   * tap would produce a refusal for no reason the player could see.
+   */
+  readonly onPlay?: ((card: Playable) => void) | undefined;
 }) {
   const ready = cards.filter((card) => card.playable).length;
   return (
@@ -45,14 +50,14 @@ function HandCard({
 }: {
   readonly card: Playable;
   readonly board: Player;
-  readonly onPlay: (card: Playable) => void;
+  readonly onPlay?: ((card: Playable) => void) | undefined;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${card.name}, ${card.playable ? "playable" : "not playable"}`}
-      disabled={!card.playable}
-      onPress={() => { onPlay(card); }}
+      disabled={!card.playable || onPlay === undefined}
+      onPress={() => { onPlay?.(card); }}
       style={[styles.card, card.playable ? styles.can : styles.cannot]}
     >
       <View style={styles.row}>

@@ -15,7 +15,7 @@
 
 import { asObject } from "./shapes";
 
-import type { GameState } from "./board";
+import type { GameState } from "./game";
 import type { Explanation } from "./claude";
 
 /** One decision: where in the game, the board, and what was said about it. */

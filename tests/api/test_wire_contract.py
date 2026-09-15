@@ -20,19 +20,14 @@ longer sends. Either is a bug; neither raises anything at runtime.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import pytest
 
 from helpers_api import RULES, Answering, Canned, server, talking
-from helpers_replay import NAME, journalled, serving
 from mtgcoach.coach.advice import Explanation
 from mtgcoach.rules.answer import Answer
 from wire import decoded, named, rows, text
+from wirecorners import finished, replayed
 from wirefields import DYNAMIC_KEYS, declared, keys, wire_files
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 #: The status the server returns when an event was accepted.
 HTTP_OK = 200
@@ -124,35 +119,9 @@ def sent(tmp_path_factory: pytest.TempPathFactory) -> frozenset[str]:
         assert asked.status_code == HTTP_OK, asked.text
         found.update(keys(decoded(asked.json())))
 
-    found.update(_replayed(tmp_path_factory.mktemp("data")))
+    found.update(replayed(tmp_path_factory.mktemp("data")))
+    found.update(finished())
     return frozenset(found)
-
-
-def _replayed(data_root: Path) -> set[str]:
-    """Every field the three replay routes send.
-
-    A separate server because these need a data root, and a separate journal
-    because what they send depends on what is in it -- a game with an untrusted
-    answer and a refused one in it, so `problems` and `error` are populated
-    rather than merely present.
-    """
-    journalled(data_root)
-    found: set[str] = set()
-    with talking(serving(data_root)) as client:
-        found.update(keys(decoded(client.get("/replays").json())))
-        for path in (f"/replays/{NAME}", f"/replays/{NAME}/0"):
-            got = client.get(path)
-            assert got.status_code == HTTP_OK, got.text
-            found.update(keys(decoded(got.json())))
-        stepped = client.post(f"/replays/{NAME}/0/at/0")
-        assert stepped.status_code == HTTP_OK, stepped.text
-        found.update(keys(decoded(stepped.json())))
-    return found
-
-
-def _is(card: dict[str, object], name: str) -> bool:
-    """Whether this card is the one named."""
-    return card.get("name") == name
 
 
 def test_the_app_knows_every_field_the_server_sends(sent: frozenset[str]) -> None:
@@ -167,7 +136,14 @@ def test_the_server_sends_every_field_the_app_declares(sent: frozenset[str]) -> 
 
 def test_the_wire_folder_is_where_it_is_thought_to_be() -> None:
     """A moved or renamed module would make both checks vacuously pass."""
-    assert wire_files() == ["board.ts", "claude.ts", "index.ts", "replay.ts", "shapes.ts"]
+    assert wire_files() == [
+        "board.ts",
+        "claude.ts",
+        "game.ts",
+        "index.ts",
+        "replay.ts",
+        "shapes.ts",
+    ]
 
 
 def test_the_turn_actually_covers_the_payload(sent: frozenset[str]) -> None:
@@ -192,5 +168,16 @@ def test_the_turn_actually_covers_the_payload(sent: frozenset[str]) -> None:
         "trusted",
         "decisions",
         "index",
+        # A game that ended, which only a game played to a conclusion reaches.
+        "over",
+        "lost",
+        "why",
+        "winner",
+        "drawn",
     }
     assert corners <= sent
+
+
+def _is(card: dict[str, object], name: str) -> bool:
+    """Whether this card is the one named."""
+    return card.get("name") == name

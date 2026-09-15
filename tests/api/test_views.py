@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from helpers import ME, YOU, deck, facts
 from helpers_coach import Book, game, land
-from mtgcoach.api import views
+from mtgcoach.api import boardview, views
 from mtgcoach.coach.report import advise
 from mtgcoach.core.abilities import Trigger, TriggeredAbility
 from mtgcoach.core.state import start_game
@@ -35,7 +35,7 @@ def test_everything_it_produces_is_json() -> None:
     """The one property that matters: it has to survive `json.dumps`."""
     state = game(hand=("Bear", "Forest"), battlefield=("Forest", "Forest"))
     payload = {
-        "state": views.state(state, _names),
+        "state": boardview.state(state, _names),
         "advice": views.report(advise(state, ME, BOOK)),
     }
     assert json.loads(json.dumps(payload)) == json.loads(json.dumps(payload))
@@ -44,14 +44,14 @@ def test_everything_it_produces_is_json() -> None:
 def test_a_library_is_a_count_and_never_a_list() -> None:
     """A tracker that shows you the top of a deck is a cheating tool."""
     state = start_game({ME: deck("m"), YOU: deck("y")}, ME)
-    rendered = views.state(state, _names)
+    rendered = boardview.state(state, _names)
     for name in ("me", "you"):
         assert isinstance(at(rendered, "players", name, "library"), int)
 
 
 def test_a_card_carries_both_of_its_identities_and_its_name() -> None:
     state = game(hand=("Bear",))
-    (card,) = rows(views.state(state, _names), "players", "me", "hand")
+    (card,) = rows(boardview.state(state, _names), "players", "me", "hand")
     assert text(card, "oracle_id") == "Bear"
     assert text(card, "name") == "Grizzly Bears"
     assert text(card, "instance_id").startswith("Bear")
@@ -59,7 +59,7 @@ def test_a_card_carries_both_of_its_identities_and_its_name() -> None:
 
 def test_a_permanent_carries_the_two_states_a_tracker_has_to_show() -> None:
     state = game(battlefield=("Forest",))
-    (permanent,) = rows(views.state(state, _names), "players", "me", "battlefield")
+    (permanent,) = rows(boardview.state(state, _names), "players", "me", "battlefield")
     assert flag(permanent, "tapped") is False
     assert flag(permanent, "summoning_sick") is False
 
@@ -67,7 +67,7 @@ def test_a_permanent_carries_the_two_states_a_tracker_has_to_show() -> None:
 def test_an_unnamed_card_falls_back_to_its_identifier() -> None:
     """Better than a blank, which a player would read as a bug."""
     state = game(hand=("Mystery",))
-    (card,) = rows(views.state(state, _names), "players", "me", "hand")
+    (card,) = rows(boardview.state(state, _names), "players", "me", "hand")
     assert text(card, "name") == "Mystery"
 
 

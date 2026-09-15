@@ -22,6 +22,7 @@ from mtgcoach.core.events import AdvanceStep
 from mtgcoach.core.reduce import apply
 from mtgcoach.core.steps import Step
 from mtgcoach.selfplay import applying, watching
+from mtgcoach.selfplay.ending import finished, over_with
 from mtgcoach.selfplay.offers import offered, planned
 from mtgcoach.selfplay.records import Game, Kind, Reached, Trouble
 
@@ -29,7 +30,6 @@ if TYPE_CHECKING:
     from mtgcoach.coach.lookup import CardLookup
     from mtgcoach.coach.report import TurnReport
     from mtgcoach.core.events import Event
-    from mtgcoach.core.ids import PlayerId
     from mtgcoach.core.state import GameState
     from mtgcoach.selfplay.moves import Seat
 
@@ -83,17 +83,21 @@ def play(seats: tuple[Seat, Seat], state: GameState, catalogue: CardLookup, seed
         )
         if state.step in DECISIONS:
             state = _decide(state, table[state.active_player], report, run)
-        dead = _dead(state)
-        if dead is not None:
-            return _over(run, state, dead)
         state, stepped = _stepped(state, run)
+        # The engine's own answer, not a second one. This loop used to check
+        # life totals itself, outside the game -- so the harness knew a game
+        # had ended while the live API path carried on advancing steps. One
+        # question must not have two answers, and the engine's is the one a
+        # player sees.
+        if state.over is not None:
+            return finished(run, state, state.over)
         if not stepped:
-            return _over(run, state, None, ending="decked")
+            return over_with(run, state, None, ending="stuck")
 
     run.trouble.append(
         Trouble(Kind.STUCK, f"still going after {TURN_CAP} turns", state.turn, state.step)
     )
-    return _over(run, state, None, ending="no end")
+    return over_with(run, state, None, ending="no end")
 
 
 def _decide(state: GameState, seat: Seat, report: TurnReport, run: Run) -> GameState:
@@ -146,8 +150,10 @@ def _decide(state: GameState, seat: Seat, report: TurnReport, run: Run) -> GameS
 def _stepped(state: GameState, run: Run) -> tuple[GameState, bool]:
     """Advance one step, watching what that did.
 
-    A refusal here is how a game ends by decking: the draw step raises when the
-    library is empty, which is the rules working rather than anything wrong.
+    A refusal here used to be how a game ended by decking: the draw step raised
+    when the library was empty. It does not any more -- CR 121.3 makes that a
+    *loss*, which `advance` records in the state -- so decking now arrives as a
+    result rather than as an exception, and the caller reads `state.over`.
     """
     before = state
     try:
@@ -172,24 +178,3 @@ def _logged(run: Run, done: applying.Applied) -> GameState:
     """Keep what was applied, and hand back where it got to."""
     run.log.extend(done.events)
     return done.state
-
-
-def _dead(state: GameState) -> PlayerId | None:
-    """The player who has lost on life, if there is one."""
-    return next((pid for pid, player in state.players.items() if player.life <= 0), None)
-
-
-def _over(run: Run, state: GameState, dead: PlayerId | None, ending: str = "life") -> Game:
-    """Everything that happened, as a record."""
-    return Game(
-        seed=run.seed,
-        decks=(run.seats[0].deck, run.seats[1].deck),
-        turns=state.turn,
-        winner=state.opponent_of(dead) if dead is not None else None,
-        ending=ending,
-        trouble=tuple(run.trouble),
-        unknown=tuple(sorted(run.unknown)),
-        events=run.events,
-        log=tuple(run.log),
-        reached=run.reached,
-    )

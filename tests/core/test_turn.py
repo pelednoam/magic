@@ -4,10 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-import pytest
-
 from helpers import ME, YOU, deck
-from mtgcoach.core.errors import IllegalEventError
 from mtgcoach.core.movement import add_card
 from mtgcoach.core.state import GameState, start_game
 from mtgcoach.core.steps import TURN_ORDER, Step
@@ -92,7 +89,48 @@ def test_draw_moves_the_top_card(game: GameState) -> None:
     assert state.player(ME).library[0] != top
 
 
-def test_drawing_from_an_empty_library_is_refused() -> None:
+def test_drawing_from_an_empty_library_loses_rather_than_failing() -> None:
+    """CR 121.3, and the old test had this backwards.
+
+    It asserted a refusal, on a docstring saying losing "arrives with the rules
+    engine in M4". The difference is not academic: refusing made decking
+    *unreachable* rather than lost, so a game that should have ended with a
+    winner ended with a 400 and a tracker still showing a live board.
+
+    The loss itself comes at the next priority, which is ``advance``. Here the
+    attempt is simply remembered.
+    """
     state = start_game({ME: deck("m", 7), YOU: deck("y")}, ME)
-    with pytest.raises(IllegalEventError, match="empty library"):
-        draw_card(state, ME)
+    tried = draw_card(state, ME)
+    assert tried.player(ME).drew_from_empty
+    assert tried.over is None, "the loss is a state-based action, not immediate"
+
+
+def test_the_attempted_draw_loses_the_game_at_the_next_priority() -> None:
+    """CR 704.5b. One step later, not one event later."""
+    state = start_game({ME: deck("m", 7), YOU: deck("y")}, ME)
+    finished = advance(draw_card(state, ME))
+    assert finished.over is not None
+    assert [one.player for one in finished.over.lost] == [ME]
+    assert finished.over.winner(finished.players) == YOU
+
+
+def test_a_player_at_zero_life_loses_at_the_next_priority() -> None:
+    """CR 704.5a. The tracker used to carry on advancing steps instead."""
+    state = start_game({ME: deck("m"), YOU: deck("y")}, ME)
+    state = state.with_player(ME, replace(state.player(ME), life=0))
+    finished = advance(state)
+    assert finished.over is not None
+    assert [one.player for one in finished.over.lost] == [ME]
+    assert finished.step is state.step, "a finished game does not advance"
+
+
+def test_both_players_out_at_once_is_a_draw() -> None:
+    """CR 104.4b, rather than a win for whoever is listed first."""
+    state = start_game({ME: deck("m"), YOU: deck("y")}, ME)
+    for seat in (ME, YOU):
+        state = state.with_player(seat, replace(state.player(seat), life=-1))
+    finished = advance(state)
+    assert finished.over is not None
+    assert finished.over.drawn
+    assert finished.over.winner(finished.players) is None

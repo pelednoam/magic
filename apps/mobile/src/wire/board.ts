@@ -13,6 +13,8 @@
 
 import { asObject } from "./shapes";
 
+import type { GameState } from "./game";
+
 /** One card in hand, and the engine's verdict on it. */
 export interface Playable {
   readonly instance_id: string;
@@ -90,40 +92,6 @@ export interface Advice {
   readonly reminders: readonly Reminder[];
   /** Cards the coach cannot speak for. Shown, never hidden. */
   readonly unknown: readonly string[];
-}
-
-/** One card, by both of its identities and the word printed on it. */
-export interface Card {
-  readonly instance_id: string;
-  readonly oracle_id: string;
-  readonly name: string;
-}
-
-/** One permanent, with the two states a tracker has to show. */
-export interface Permanent extends Card {
-  readonly tapped: boolean;
-  readonly summoning_sick: boolean;
-}
-
-/** One player's half of the board. The library is a count, never a list. */
-export interface Player {
-  readonly life: number;
-  readonly library: number;
-  readonly lands_played_this_turn: number;
-  readonly hand: readonly Card[];
-  /** Spells cast and not yet resolved. Public, so both players see it. */
-  readonly stack: readonly Card[];
-  readonly battlefield: readonly Permanent[];
-  readonly graveyard: readonly Card[];
-  readonly exile: readonly Card[];
-}
-
-/** The board, as much of it as a client may see. */
-export interface GameState {
-  readonly turn: number;
-  readonly step: string;
-  readonly active_player: string;
-  readonly players: Readonly<Record<string, Player>>;
 }
 
 /** What every route returns: the board, plus advice for both players. */

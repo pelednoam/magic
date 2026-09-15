@@ -46,6 +46,11 @@ class PlayerState:
     #: Defaulted because a board built by hand in a test has nothing on it.
     stack: tuple[CardInstance, ...] = ()
     life: int = STARTING_LIFE
+    #: Whether this player has tried to draw from an empty library (CR 121.3).
+    #: The attempt does not fail -- it loses the game the next time a player
+    #: would receive priority, which is a different thing and a reachable one.
+    #: Never cleared: having tried once is permanent.
+    drew_from_empty: bool = False
     lands_played_this_turn: int = 0
 
     def cards(self) -> Iterator[CardInstance]:

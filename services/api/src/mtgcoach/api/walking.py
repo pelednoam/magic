@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING
 from fastapi import HTTPException
 from starlette.status import HTTP_404_NOT_FOUND
 
-from mtgcoach.api import views
+from mtgcoach.api import boardview, views
 from mtgcoach.api.context import snapshot
 from mtgcoach.api.replays import UnknownReplayError, games_in, journals
 
@@ -148,7 +148,7 @@ def walked(server: Server, game: Replay) -> dict[str, Json]:
 def moment(server: Server, one: Moment) -> dict[str, Json]:
     """One moment: where in the game, the board, and what was said about it.
 
-    The board goes out as ``views.state`` -- the same shape a live game sends
+    The board goes out as ``boardview.state`` -- the same shape a live game sends
     -- so the app renders a replayed position with the components it already
     has, and a position looks the same whether it is happening now or happened
     last night.
@@ -165,7 +165,7 @@ def moment(server: Server, one: Moment) -> dict[str, Json]:
         "turn": one.turn,
         "step": str(one.step),
         "player": one.player,
-        "state": views.state(one.state, server.catalogue.name),
+        "state": boardview.state(one.state, server.catalogue.name),
         "said": views.explanation(one.said) if one.said is not None else None,
         "trusted": one.trusted,
         "problems": list(one.problems),

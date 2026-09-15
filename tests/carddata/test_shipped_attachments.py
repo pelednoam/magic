@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Final
+from typing import Final, cast
 
 from mtgcoach.core.targets import TargetKind
 
@@ -34,24 +34,32 @@ ABOUT_THE_ATTACHED: Final = ("static_restriction", "static_modifier")
 
 def shipped() -> list[dict[str, object]]:
     """The fixture's card entries."""
-    loaded = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    loaded = cast("dict[str, object]", json.loads(FIXTURE.read_text(encoding="utf-8")))
     cards = loaded["cards"]
     assert isinstance(cards, list)
-    return cards
+    return cast("list[dict[str, object]]", cards)
 
 
 def entry(name: str) -> dict[str, object]:
     """One card's shipped entry."""
-    found = next((card for card in shipped() if card["name"] == name), None)
+    found = next((card for card in shipped() if card.get("name") == name), None)
     assert found is not None, f"{name} is not in the shipped fixture"
     return found
 
 
 def statics(name: str) -> list[dict[str, object]]:
     """A card's static abilities, as shipped."""
-    abilities = entry(name).get("abilities") or []
-    assert isinstance(abilities, list)
+    abilities = _abilities(entry(name))
     return [one for one in abilities if one.get("kind") in ABOUT_THE_ATTACHED]
+
+
+def _abilities(card: dict[str, object]) -> list[dict[str, object]]:
+    """One entry's abilities, typed."""
+    found = card.get("abilities")
+    if found is None:
+        return []
+    assert isinstance(found, list)
+    return cast("list[dict[str, object]]", found)
 
 
 def test_the_fixture_is_where_it_is_thought_to_be() -> None:
@@ -71,15 +79,14 @@ def test_no_static_ability_claims_self_for_what_it_is_attached_to() -> None:
     """
     for name in ATTACHING:
         for ability in statics(name):
-            affects = ability.get("affects") or {}
-            assert isinstance(affects, dict)
+            affects = cast("dict[str, object]", ability.get("affects") or {})
             kinds = affects.get("kinds")
             assert kinds == [TargetKind.ENCHANTED.value], f"{name}: {ability['kind']} says {kinds}"
 
 
 def test_pacifism_restricts_what_it_enchants() -> None:
     """Both halves of its one printed sentence, on the right permanent."""
-    restrictions = {one["restriction"] for one in statics("Pacifism")}
+    restrictions = {str(one["restriction"]) for one in statics("Pacifism")}
     assert restrictions == {"cant_attack", "cant_block"}
 
 
@@ -90,13 +97,11 @@ def test_an_equipments_enters_trigger_is_still_about_itself() -> None:
     creature gets +2/+1" is about what it is attached to -- so a change that
     rewrote every ``self`` in the card would be wrong in the other direction.
     """
-    abilities = entry("Pirate's Cutlass").get("abilities") or []
-    assert isinstance(abilities, list)
+    abilities = _abilities(entry("Pirate's Cutlass"))
     triggers = [one for one in abilities if one.get("kind") == "triggered"]
     assert triggers
     for trigger in triggers:
-        subject = trigger.get("subject") or {}
-        assert isinstance(subject, dict)
+        subject = cast("dict[str, object]", trigger.get("subject") or {})
         assert subject.get("kinds") == [TargetKind.SELF.value]
 
 

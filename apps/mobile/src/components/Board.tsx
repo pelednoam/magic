@@ -22,7 +22,10 @@ export function Board({
 }: {
   readonly title: string;
   readonly player: Player;
-  readonly onTap?: (permanent: Permanent) => void;
+  // `| undefined` spelled out because `exactOptionalPropertyTypes` is on: a
+  // caller computing the handler (`playable ? tap : undefined`) is passing
+  // undefined, which is different from not passing the prop at all.
+  readonly onTap?: ((permanent: Permanent) => void) | undefined;
 }) {
   return (
     <Panel title={title} note={`${player.life} life · ${player.library} in library`}>

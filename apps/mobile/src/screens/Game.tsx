@@ -11,19 +11,20 @@ import { useCallback, useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text } from "react-native";
 
 import { Attacks } from "../components/Attacks";
-import { Board } from "../components/Board";
+import { Battlefields } from "../components/Battlefields";
 import { Coaching } from "../components/Coaching";
 import { Controls } from "../components/Controls";
+import { Finished } from "../components/Finished";
 import { Hand } from "../components/Hand";
 import { Question } from "../components/Question";
 import { Reminders, Unknown } from "../components/Reminders";
 import type { Coach } from "../client";
 import { messageOf } from "../errors";
-import { playing } from "../playing";
 import { turnLine } from "../format";
+import { playing } from "../playing";
 import { useCoaching, useQuestions } from "../thinking";
 import { colour, space, text } from "../theme";
-import type { NewGame, Permanent, Playable, Snapshot } from "../wire";
+import type { NewGame, Playable, Snapshot } from "../wire";
 import { isSnapshot } from "../wire";
 import { THEM, YOU } from "../wire";
 
@@ -100,6 +101,9 @@ export function Game({
     [accept, coach, game.session_id],
   );
 
+  // Whether anything can still be done. A finished game refuses every event,
+  // so offering a tap would show the engine's refusal for no visible reason.
+  const playable = snapshot.state.over === null;
   const other = seat === YOU ? THEM : YOU;
   const mine = snapshot.state.players[seat];
   const theirs = snapshot.state.players[other];
@@ -120,13 +124,18 @@ export function Game({
         </Text>
       )}
 
+      {snapshot.state.over === null ? null : (
+        <Finished over={snapshot.state.over} seat={seat} />
+      )}
+
       <Reminders reminders={advice.reminders} />
       <Hand
         cards={advice.hand}
         board={mine}
-        onPlay={(card: Playable) => {
-          void act(...playing(card, seat));
-        }}
+        // A finished game offers nothing. The server refuses every event in
+        // one, so without this the only feedback for tapping a card would be
+        // the engine's refusal text appearing for no reason a player can see.
+        onPlay={playable ? (card: Playable) => { void act(...playing(card, seat)); } : undefined}
       />
       <Attacks attacks={advice.attacks} />
       <Coaching
@@ -137,19 +146,12 @@ export function Game({
         plans={advice.attacks.plans}
         onAsk={coaching.ask}
       />
-      <Board
-        title="Your battlefield"
-        player={mine}
-        onTap={(permanent: Permanent) => {
-          void act({
-            type: "set_tapped",
-            player: seat,
-            instance_id: permanent.instance_id,
-            tapped: !permanent.tapped,
-          });
-        }}
+      <Battlefields
+        mine={mine}
+        theirs={theirs}
+        seat={seat}
+        onTap={playable ? act : undefined}
       />
-      <Board title="Their battlefield" player={theirs} />
       <Unknown cards={advice.unknown} />
       <Question
         reply={questions.reply}

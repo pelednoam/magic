@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
     from mtgcoach.core.cards import CardInstance
     from mtgcoach.core.ids import PlayerId
+    from mtgcoach.core.results import Over
 
 #: A game has exactly two players. Multiplayer changes turn order, priority and
 #: combat targeting; rejecting it here is cheaper than pretending to support it.
@@ -28,14 +29,17 @@ class GameState:
     and every transition returns a new state, so a state can be stored, compared
     and replayed safely.
 
-    The stack is absent until spell casting arrives in M4. An empty tuple now
-    would be a field no event can change.
     """
 
     turn: int
     active_player: PlayerId
     step: Step
     players: Mapping[PlayerId, PlayerState]
+    #: How the game ended, or None while it is still going. Set by the
+    #: state-based action check at the priority boundary; see ``results``.
+    #: Once set, the reducer refuses every event -- a finished game is not a
+    #: position anybody may act in, and the tracker used to let one carry on.
+    over: Over | None = None
 
     def player(self, player_id: PlayerId) -> PlayerState:
         """Return one player's state.

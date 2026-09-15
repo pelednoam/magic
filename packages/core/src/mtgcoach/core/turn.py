@@ -11,6 +11,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from mtgcoach.core.errors import IllegalEventError
+from mtgcoach.core.results import losses
 from mtgcoach.core.steps import Step, next_step
 
 if TYPE_CHECKING:
@@ -28,6 +29,15 @@ def advance(state: GameState) -> GameState:
     happen automatically and receive no priority, which is exactly why they
     belong here and not in a player-issued event.
 
+    **This is the priority boundary**, so it is where state-based actions are
+    checked (CR 704.3). A player at 0 life or who has tried to draw from an
+    empty library loses *here* rather than at the moment it happened, which is
+    the difference between ending a game correctly and ending it in the middle
+    of a combat damage step: damage, deaths and lifelink are one event in the
+    rules (CR 510.2), and a check wedged between them would end the game before
+    the deaths it caused were applied. When a loss fires, the step does not
+    advance -- there is nothing to advance to.
+
     Raises:
         IllegalEventError: If anything is waiting to resolve. CR 500.2: a step
             ends when the stack is empty and all players pass in succession, so
@@ -36,6 +46,9 @@ def advance(state: GameState) -> GameState:
             and the board would be wrong in a way nothing complained about --
             which is how it stayed wrong for so long the first time.
     """
+    finished = losses(state.players)
+    if finished is not None:
+        return replace(state, over=finished)
     waiting = [card for player in state.players.values() for card in player.stack]
     if waiting:
         names = ", ".join(str(card.instance_id) for card in waiting)
@@ -68,16 +81,17 @@ def _untap_step(state: GameState) -> GameState:
 def draw_card(state: GameState, player_id: PlayerId) -> GameState:
     """Move the top card of a library into its owner's hand.
 
-    Raises:
-        IllegalEventError: If the library is empty. Drawing from an empty
-            library loses the game rather than being illegal, but losing is a
-            state-based action and those arrive with the rules engine in M4;
-            refusing loudly now is better than silently continuing.
+    An empty library is not an error. CR 121.3: a player who attempts to draw
+    from one loses the game the next time a player would receive priority --
+    they do not fail to draw. This used to raise, with a docstring saying
+    losing "arrives with the rules engine in M4"; it has arrived, and the
+    difference is not academic. Refusing made decking *unreachable* rather than
+    lost, so a game that should have ended with a winner ended with a 400 and
+    a tracker still showing a live board.
     """
     player = state.player(player_id)
     if not player.library:
-        msg = f"{player_id!r} cannot draw from an empty library"
-        raise IllegalEventError(msg)
+        return state.with_player(player_id, replace(player, drew_from_empty=True))
     top, rest = player.library[0], player.library[1:]
     drawn = replace(player, library=rest, hand=(*player.hand, top))
     return state.with_player(player_id, drawn)

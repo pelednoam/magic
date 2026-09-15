@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 from fastapi import HTTPException
 from starlette.status import HTTP_404_NOT_FOUND
 
-from mtgcoach.api import views
+from mtgcoach.api import boardview, views
 from mtgcoach.api.rationing import Rationed
 from mtgcoach.api.sessions import SessionStore, UnknownSessionError
 from mtgcoach.coach.report import advise
@@ -134,7 +134,7 @@ def snapshot(server: Server, game: Session) -> dict[str, Json]:
         # box, let somebody type a question, and only then say the feature was
         # off. A flag costs one boolean and moves that sentence to the top.
         "rules_available": server.rules is not None,
-        "state": views.state(game.state, server.catalogue.name),
+        "state": boardview.state(game.state, server.catalogue.name),
         "advice": {
             str(player): views.report(advise(game.state, player, server.catalogue))
             for player in game.state.players

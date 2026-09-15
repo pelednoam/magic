@@ -21,13 +21,9 @@ if TYPE_CHECKING:
     from mtgcoach.coach.advice import Explanation
     from mtgcoach.coach.attacks import Attacks
     from mtgcoach.coach.report import Playable, TurnReport
-    from mtgcoach.core.cards import CardInstance
     from mtgcoach.core.combat.search import Plan
     from mtgcoach.core.ids import OracleId
     from mtgcoach.core.manasolver import Payment
-    from mtgcoach.core.permanents import Permanent
-    from mtgcoach.core.player import PlayerState
-    from mtgcoach.core.state import GameState
     from mtgcoach.core.triggerscan import Reminder
 
 #: What a JSON value can be, once it has been built. Deliberately concrete:
@@ -127,58 +123,4 @@ def reminder(trigger: Reminder) -> dict[str, Json]:
         "instance_id": str(trigger.instance_id),
         "name": trigger.name,
         "event": trigger.event.value,
-    }
-
-
-def state(game: GameState, names: Naming) -> dict[str, Json]:
-    """The board, as much of it as a client may see.
-
-    Every player's *library* is a count, never a list. A tracker that shows you
-    the top of your own deck is a cheating tool, and one that shows your
-    opponent's is a worse one -- §3's non-goals put both out of scope.
-
-    ``names`` is passed in because the state does not know them: ``core`` holds
-    no card data, and a client should not have to ask twice for the word printed
-    on the card in front of it.
-    """
-    return {
-        "turn": game.turn,
-        "step": game.step.value,
-        "active_player": str(game.active_player),
-        "players": {str(pid): _player(player, names) for pid, player in game.players.items()},
-    }
-
-
-def _player(player: PlayerState, names: Naming) -> dict[str, Json]:
-    """One player's half of the board."""
-    return {
-        "life": player.life,
-        "library": len(player.library),
-        "lands_played_this_turn": player.lands_played_this_turn,
-        "hand": [_card(card, names) for card in player.hand],
-        # The stack is a public zone (CR 400.2): both players can see what is
-        # waiting to resolve, and a tracker that hid it would be hiding the one
-        # thing a player needs in order to decide whether to answer it.
-        "stack": [_card(card, names) for card in player.stack],
-        "battlefield": [_permanent(p, names) for p in player.battlefield],
-        "graveyard": [_card(card, names) for card in player.graveyard],
-        "exile": [_card(card, names) for card in player.exile],
-    }
-
-
-def _card(card: CardInstance, names: Naming) -> dict[str, Json]:
-    """One card, by all three of the things a client needs to call it."""
-    return {
-        "instance_id": str(card.instance_id),
-        "oracle_id": str(card.oracle_id),
-        "name": names(card.oracle_id),
-    }
-
-
-def _permanent(permanent: Permanent, names: Naming) -> dict[str, Json]:
-    """One permanent, with the two states a tracker has to show."""
-    return {
-        **_card(permanent.card, names),
-        "tapped": permanent.tapped,
-        "summoning_sick": permanent.summoning_sick,
     }
