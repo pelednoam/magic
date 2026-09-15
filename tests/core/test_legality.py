@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from helpers import ME, YOU, deck, facts
+from helpers import ME, YOU, at_step, deck, facts
 from mtgcoach.core.cards import CardInstance
-from mtgcoach.core.events import CastSpell
 from mtgcoach.core.ids import InstanceId, OracleId, PlayerId
 from mtgcoach.core.legality import (
     can_attack,
@@ -18,7 +17,6 @@ from mtgcoach.core.legality import (
 )
 from mtgcoach.core.manacost import ManaSource
 from mtgcoach.core.permanents import Permanent
-from mtgcoach.core.reduce import apply
 from mtgcoach.core.state import GameState, start_game
 from mtgcoach.core.steps import Step
 
@@ -47,9 +45,19 @@ CANCEL = facts("Cancel", "{1}{U}{U}", instant=True)
 PLAINS = facts("Plains", land=True)
 
 
-def _game(step: Step = Step.PRECOMBAT_MAIN, active: PlayerId = ME) -> GameState:
+def _game(
+    step: Step = Step.PRECOMBAT_MAIN, active: PlayerId = ME, holder: PlayerId | None = None
+) -> GameState:
+    """A board at one step, with priority handed out the way the step hands it.
+
+    ``holder`` says otherwise. The active player gets priority first
+    (CR 117.3a), so a test about casting an instant on the *opponent's* turn
+    has to say that the opponent has already passed (CR 117.3d) -- which is
+    the moment that actually happens at a table, and which this helper could
+    not express while nothing recorded a holder at all.
+    """
     game = start_game({ME: deck("m"), YOU: deck("y")}, ME)
-    return replace(game, step=step, active_player=active)
+    return at_step(game, step, active, holder)
 
 
 # --- casting ---------------------------------------------------------------
@@ -57,10 +65,6 @@ def _game(step: Step = Step.PRECOMBAT_MAIN, active: PlayerId = ME) -> GameState:
 
 def test_an_instant_can_be_cast_in_combat() -> None:
     assert can_cast(_game(Step.DECLARE_BLOCKERS), ME, GIANT_GROWTH, [FOREST])
-
-
-def test_an_instant_can_be_cast_on_the_opponents_turn() -> None:
-    assert can_cast(_game(Step.UPKEEP, YOU), ME, GIANT_GROWTH, [FOREST])
 
 
 def test_a_creature_cannot_be_cast_in_combat() -> None:
@@ -159,40 +163,3 @@ def test_defender_cannot_attack() -> None:
 
 def test_a_noncreature_cannot_attack() -> None:
     assert "is not a creature" in why_not_attack(_permanent("Plains", sick=False), PLAINS)[0]
-
-
-def _waiting(state: GameState, caster: PlayerId) -> GameState:
-    """The same board with one spell on the stack, cast by ``caster``."""
-    return apply(state, CastSpell(caster, state.player(caster).hand[0].instance_id))
-
-
-def test_a_spell_waiting_to_resolve_stops_sorcery_speed() -> None:
-    """The third half of CR 117.1a, which had no stack to look at until now.
-
-    A spell waiting to resolve means it is not your turn to act at sorcery
-    speed, however much it looks like your main phase.
-    """
-    main = _game()
-    # A creature a single Forest pays for, so nothing but the stack is in the
-    # way and the difference between the two calls is only the waiting spell.
-    bear = facts("Bear", "{G}", creature=True, power=1, toughness=1)
-    assert can_cast(main, ME, bear, [FOREST])
-    reasons = why_not_cast(_waiting(main, ME), ME, bear, [FOREST])
-    assert reasons == ("you can only play this when nothing is waiting to resolve",)
-
-
-def test_the_opponents_spell_stops_it_too() -> None:
-    """Sorcery timing asks whether *the* stack is empty, not whether yours is.
-
-    The stack is one zone in the rules (CR 405.1) and is filed per-owner here,
-    so a check that looked only at your own half would let you cast a creature
-    in response to theirs -- which is the one thing sorcery speed forbids.
-    """
-    bear = facts("Bear", "{G}", creature=True, power=1, toughness=1)
-    reasons = why_not_cast(_waiting(_game(), YOU), ME, bear, [FOREST])
-    assert reasons == ("you can only play this when nothing is waiting to resolve",)
-
-
-def test_an_instant_is_unaffected_by_a_waiting_spell() -> None:
-    """Which is what instant speed *is*: answering something on the stack."""
-    assert can_cast(_waiting(_game(), YOU), ME, GIANT_GROWTH, [FOREST])

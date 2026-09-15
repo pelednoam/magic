@@ -165,7 +165,7 @@ def moment(server: Server, one: Moment) -> dict[str, Json]:
         "turn": one.turn,
         "step": str(one.step),
         "player": one.player,
-        "state": boardview.state(one.state, server.catalogue.name),
+        "state": boardview.state(one.state, server.catalogue),
         "said": views.explanation(one.said) if one.said is not None else None,
         "trusted": one.trusted,
         "problems": list(one.problems),

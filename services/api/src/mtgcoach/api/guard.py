@@ -19,6 +19,7 @@ from mtgcoach.coach import mana
 from mtgcoach.core.events import CastSpell, PlayLand, ResolveSpell
 from mtgcoach.core.legality import why_not_cast, why_not_play_land
 from mtgcoach.core.manasolver import can_pay
+from mtgcoach.core.stack import controlled_by
 from mtgcoach.core.zones import ZoneName
 
 if TYPE_CHECKING:
@@ -125,8 +126,11 @@ def _check_resolve(event: ResolveSpell, state: GameState, lookup: CardLookup) ->
     CR 608.3 for a permanent spell, CR 608.2m for an instant or a sorcery, and
     no third answer.
     """
-    stack = state.player(event.player).stack
-    facts = _known(stack, event.instance_id, lookup, doing="resolve")
+    # This player's spells out of the one shared stack. Whether it is the
+    # *top* of it is the reducer's question (CR 405.5) and it asks it better;
+    # this only needs to find the card to read its type line.
+    mine = tuple(controlled_by(state.stack, event.player))
+    facts = _known(mine, event.instance_id, lookup, doing="resolve")
     if facts is None:
         return
     belongs = ZoneName.BATTLEFIELD if facts.is_permanent else ZoneName.GRAVEYARD

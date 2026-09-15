@@ -15,7 +15,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from helpers_replay import NAME, SEED, journalled, recording
+from helpers_journal import journalled
+from helpers_replay import NAME, SEED, recording
 from mtgcoach.api.recording import KIND
 from mtgcoach.api.replays import UnknownReplayError, games_in
 from mtgcoach.core.events import PlayLand

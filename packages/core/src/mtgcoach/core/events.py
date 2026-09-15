@@ -21,7 +21,37 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class AdvanceStep:
-    """Move to the next step, wrapping into the next player's turn."""
+    """End the current step, wrapping into the next player's turn.
+
+    A consequence now, not a request. A step in which players receive priority
+    ends when the stack is empty *and* every player has passed in succession
+    (CR 500.2) -- so this is refused until that is true, and the untap and
+    cleanup steps, where nobody receives priority, end when their own actions
+    are done (CR 500.3). It used to be accepted whenever the stack happened to
+    be empty, which is the half of CR 500.2 the rule explicitly warns against:
+    each player gets a chance to add something to the stack first, and a client
+    could advance straight past the other player's only window.
+    """
+
+
+@dataclass(frozen=True, slots=True)
+class PassPriority:
+    """One player declines to act, handing priority on (CR 117.3d).
+
+    The event that was missing, and the reason the app could cast a spell and
+    resolve it in the same breath: with nothing recording who may act, there
+    was no way to *not* act, so there was no moment for the other player to
+    answer a spell in. A step ending and the top of the stack resolving are
+    both consequences of everybody passing (CR 117.4), and they are now
+    consequences of this event rather than things a client simply asks for.
+
+    Carries the player, so that a pass by the seat that does not hold priority
+    is refused rather than silently accepted. One device must not be able to
+    pass on the other seat's behalf -- that is the shortcut the app took by
+    resolving its own spell, dressed as a rule.
+    """
+
+    player: PlayerId
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,11 +79,16 @@ class PlayLand:
 class CastSpell:
     """Put a card from hand onto the stack (CR 601.2a).
 
-    Casting is two events, not one, because it is two things that happen at
-    different times with a gap between them in which the game can change. A
-    single "play this card" event modelled the gap away, and the board it left
-    was wrong in a way anybody could see: an Opt sat on the battlefield, because
-    the only way to play a non-land was to move it there.
+    Casting and resolving are separate events, because they are two things that
+    happen at different times with a gap between them in which the game can
+    change. A single "play this card" event modelled the gap away, and the
+    board it left was wrong in a way anybody could see: an Opt sat on the
+    battlefield, because the only way to play a non-land was to move it there.
+
+    The gap is no longer empty. This takes priority to do (CR 117.1a) and hands
+    it straight back (CR 117.3c), and the spell does not resolve until every
+    player has passed in succession (CR 117.4) -- which is the moment the other
+    player spends deciding whether to answer it.
 
     One event, including the payment, because casting is one action. CR 601.2
     runs from announcing the spell to paying its costs without stopping: no
@@ -132,5 +167,13 @@ class ChangeLife:
 
 
 type Event = (
-    AdvanceStep | DrawCard | PlayLand | CastSpell | ResolveSpell | SetTapped | MoveCard | ChangeLife
+    AdvanceStep
+    | PassPriority
+    | DrawCard
+    | PlayLand
+    | CastSpell
+    | ResolveSpell
+    | SetTapped
+    | MoveCard
+    | ChangeLife
 )

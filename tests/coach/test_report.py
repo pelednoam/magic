@@ -8,10 +8,12 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from helpers import ME, facts
+from helpers import ME, YOU, facts
 from helpers_coach import Book, game, land
 from mtgcoach.coach.report import advise
 from mtgcoach.core.abilities import Trigger, TriggeredAbility
+from mtgcoach.core.events import PassPriority
+from mtgcoach.core.reduce import apply
 from mtgcoach.core.steps import Step
 from mtgcoach.core.vocabulary import TriggerEvent
 
@@ -69,15 +71,29 @@ def test_the_payment_keeps_the_most_useful_lands_untapped() -> None:
     assert len(card.payment.spare) == 1
 
 
-def test_an_instant_is_castable_on_their_turn() -> None:
+def test_an_instant_is_castable_on_their_turn_once_you_have_priority() -> None:
+    """CR 117.1a: any time they have priority -- which is the whole rule.
+
+    This test used to stop at "on their turn", because that was as much of the
+    rule as the engine could check: it asked whether the *step* hands out
+    priority and had no holder to compare against. So it read as castable in
+    the opponent's upkeep before the opponent had done anything, which is not
+    when you get to hold a trick. The active player gets priority first
+    (CR 117.3a); you get it when they pass (CR 117.3d), and then the Growth is
+    castable -- which is exactly the moment a beginner has to learn to wait for.
+    """
     state = game(hand=("Growth",), battlefield=("Forest",), step=Step.UPKEEP, active="you")
-    (card,) = advise(state, ME, BOOK).hand
-    assert card.playable
+    (before,) = advise(state, ME, BOOK).hand
+    assert not before.playable
+    assert "you do not have priority right now" in before.reasons
+    (card,) = advise(apply(state, PassPriority(YOU)), ME, BOOK).hand
+    assert card.playable, card.reasons
 
 
 def test_a_creature_is_not_castable_on_their_turn() -> None:
     state = game(hand=("Bear",), battlefield=("Forest", "Forest"), step=Step.UPKEEP, active="you")
-    (card,) = advise(state, ME, BOOK).hand
+    passed = apply(state, PassPriority(YOU))
+    (card,) = advise(passed, ME, BOOK).hand
     assert "your own turn" in " ".join(card.reasons)
 
 

@@ -18,12 +18,12 @@ from typing import TYPE_CHECKING
 
 from mtgcoach.coach.report import advise
 from mtgcoach.core.errors import IllegalEventError
-from mtgcoach.core.events import AdvanceStep
 from mtgcoach.core.reduce import apply
 from mtgcoach.core.steps import Step
 from mtgcoach.selfplay import applying, watching
 from mtgcoach.selfplay.ending import finished, over_with
 from mtgcoach.selfplay.offers import offered, planned
+from mtgcoach.selfplay.passing import ending
 from mtgcoach.selfplay.records import Game, Kind, Reached, Trouble
 
 if TYPE_CHECKING:
@@ -156,7 +156,7 @@ def _decide(state: GameState, seat: Seat, report: TurnReport, run: Run) -> GameS
 
 
 def _stepped(state: GameState, run: Run) -> tuple[GameState, bool]:
-    """Advance one step, watching what that did.
+    """Pass with both seats and end the step, watching what that did.
 
     A refusal here used to be how a game ended by decking: the draw step raised
     when the library was empty. It does not any more -- CR 121.3 makes that a
@@ -165,8 +165,9 @@ def _stepped(state: GameState, run: Run) -> tuple[GameState, bool]:
     """
     before = state
     try:
-        state = apply(state, AdvanceStep())
-        run.log.append(AdvanceStep())
+        for event in ending(state):
+            state = apply(state, event)
+            run.log.append(event)
     except IllegalEventError:
         return before, False
     except Exception as crashed:  # noqa: BLE001 - see `_decide`

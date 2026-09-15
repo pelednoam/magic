@@ -16,7 +16,7 @@ from dataclasses import replace
 
 import pytest
 
-from helpers import ME, YOU, deck, facts
+from helpers import ME, YOU, at_step, deck, facts
 from helpers_coach import Book, taps_for
 from mtgcoach.api.eventfields import BadEventError
 from mtgcoach.api.guard import check
@@ -24,6 +24,7 @@ from mtgcoach.core.cards import CardInstance
 from mtgcoach.core.events import CastSpell, ResolveSpell
 from mtgcoach.core.ids import InstanceId, OracleId
 from mtgcoach.core.permanents import Permanent
+from mtgcoach.core.stack import StackObject
 from mtgcoach.core.state import GameState, start_game
 from mtgcoach.core.steps import Step
 from mtgcoach.core.zones import ZoneName
@@ -41,19 +42,25 @@ LANDS = 2
 
 
 def _board(*, hand: tuple[str, ...] = (), stack: tuple[str, ...] = (), lands: int = 0) -> GameState:
-    """A main phase with the given cards where the test wants them."""
+    """A main phase with the given cards where the test wants them.
+
+    ``stack`` goes on ``GameState`` rather than into the player, because the
+    stack is one shared ordered zone now (CR 405.1) -- and each object says who
+    controls it (CR 405.4), which is what the guard reads to find the card.
+    """
     state = start_game({ME: deck("m"), YOU: deck("y")}, ME)
     mine = replace(
         state.player(ME),
         hand=tuple(CardInstance(InstanceId(f"h{n}"), OracleId(o)) for n, o in enumerate(hand)),
-        stack=tuple(CardInstance(InstanceId(f"s{n}"), OracleId(o)) for n, o in enumerate(stack)),
         battlefield=tuple(
             Permanent(CardInstance(InstanceId(f"l{n}"), OracleId("Forest"))) for n in range(lands)
         ),
     )
-    return replace(
-        state, players={**state.players, ME: mine}, step=Step.PRECOMBAT_MAIN, active_player=ME
+    waiting = tuple(
+        StackObject(CardInstance(InstanceId(f"s{n}"), OracleId(o)), ME) for n, o in enumerate(stack)
     )
+    board = replace(state.with_player(ME, mine), stack=waiting)
+    return at_step(board, Step.PRECOMBAT_MAIN, ME)
 
 
 #: The two Forests `_board(lands=2)` puts down.

@@ -39,6 +39,7 @@ from mtgcoach.core.events import (
     ChangeLife,
     DrawCard,
     MoveCard,
+    PassPriority,
     PlayLand,
     ResolveSpell,
     SetTapped,
@@ -58,6 +59,10 @@ if TYPE_CHECKING:
 #: what stops a new event reaching the engine without the app ever hearing of it.
 BUILDERS: Mapping[str, Callable[[Mapping[str, object]], Event]] = {
     "advance_step": lambda _: AdvanceStep(),
+    # Carries the seat, because a pass is an action one player takes. Without
+    # it one device could pass for the other and the window this event exists
+    # to open would be the window it closed.
+    "pass_priority": lambda payload: PassPriority(player(payload)),
     "draw_card": lambda payload: DrawCard(player(payload)),
     "play_land": lambda payload: PlayLand(player(payload), instance(payload)),
     "cast_spell": lambda payload: CastSpell(
@@ -99,6 +104,8 @@ def written(event: Event) -> dict[str, Json]:
     match event:
         case AdvanceStep():
             return {"type": "advance_step"}
+        case PassPriority(seat):
+            return {"type": "pass_priority", "player": str(seat)}
         case DrawCard(seat):
             return {"type": "draw_card", "player": str(seat)}
         case PlayLand() | CastSpell() | ResolveSpell() | MoveCard():

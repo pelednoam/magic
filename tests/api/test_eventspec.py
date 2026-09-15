@@ -30,6 +30,7 @@ from mtgcoach.core.zones import ZoneName
 WIRE_FORMS = frozenset(
     {
         "advance_step",
+        "pass_priority",
         "draw_card",
         "play_land",
         "cast_spell",

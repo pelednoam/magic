@@ -25,7 +25,6 @@ const BOARD = {
   library: 30,
   lands_played_this_turn: 0,
   hand: [{ instance_id: "you-7", oracle_id: "uuid", name: "Skyship Buccaneer" }],
-  stack: [],
   battlefield: [],
   graveyard: [],
   exile: [],

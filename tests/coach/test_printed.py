@@ -18,6 +18,7 @@ from mtgcoach.coach.printed import PrintedCard, printed
 from mtgcoach.core.errors import IllegalEventError
 from mtgcoach.core.ids import PlayerId
 from mtgcoach.core.player import PlayerState
+from mtgcoach.core.stack import StackObject
 from mtgcoach.core.state import GameState
 from mtgcoach.core.steps import Step
 
@@ -92,13 +93,15 @@ def test_a_spell_waiting_on_the_stack_is_read() -> None:
         battlefield=(on_battlefield("Angel"),),
         graveyard=(),
         exile=(),
-        stack=(instance("Growth"),),
     )
+    # The stack is one shared, ordered zone on the game (CR 405.1), not a
+    # tuple on each player -- each object carries the player who cast it.
     state = GameState(
         turn=1,
         active_player=ME,
         step=Step.PRECOMBAT_MAIN,
         players={ME: mine, YOU: PlayerState((), (), (), (), ())},
+        stack=(StackObject(instance("Growth"), ME),),
     )
     assert [card.name for card in printed(state, ME, BOOK)] == [
         "Dazzling Angel",

@@ -12,7 +12,8 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
-from helpers_replay import ANSWER, NAME, SEED, board_at, journalled, recording
+from helpers_journal import ANSWER, journalled
+from helpers_replay import NAME, SEED, board_at, recording
 from mtgcoach.api.replays import games_in, journals
 from mtgcoach.core.steps import Step
 

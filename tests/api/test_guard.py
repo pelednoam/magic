@@ -11,7 +11,7 @@ from dataclasses import replace
 
 import pytest
 
-from helpers import ME, YOU, deck, facts
+from helpers import ME, YOU, at_step, deck, facts
 from helpers_coach import Book
 from mtgcoach.api.eventfields import BadEventError
 from mtgcoach.api.guard import check
@@ -34,10 +34,16 @@ def _holding(oracle: str) -> tuple[CardInstance, ...]:
 
 
 def _game(oracle: str, step: Step = Step.PRECOMBAT_MAIN) -> GameState:
-    """A game with one card in hand, in a step where a land could be played."""
+    """A game with one card in hand, in a step where a land could be played.
+
+    Through ``at_step``, so priority is handed out the way entering the step
+    hands it out (CR 117.3a). A board assembled without it has nobody able to
+    act, and every card in hand then comes back with one reason that is not the
+    one under test.
+    """
     state = start_game({ME: deck("m"), YOU: deck("y")}, ME)
     mine = replace(state.player(ME), hand=_holding(oracle))
-    return replace(state, players={**state.players, ME: mine}, step=step)
+    return at_step(state.with_player(ME, mine), step)
 
 
 def test_a_land_may_be_played_as_a_land() -> None:

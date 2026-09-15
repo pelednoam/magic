@@ -6,9 +6,7 @@ beginner needs, and each was once the wrong one.
 
 from __future__ import annotations
 
-from dataclasses import replace
-
-from helpers import ME, YOU, deck, facts
+from helpers import ME, YOU, at_step, deck, facts
 from mtgcoach.core.ids import InstanceId, PlayerId
 from mtgcoach.core.legality import can_cast, why_not_cast
 from mtgcoach.core.manacost import ManaSource
@@ -33,9 +31,19 @@ def islands(count: int) -> list[ManaSource]:
     return [ManaSource(InstanceId(f"island-{i}"), frozenset("U")) for i in range(count)]
 
 
-def _game(step: Step = Step.PRECOMBAT_MAIN, active: PlayerId = ME) -> GameState:
+def _game(
+    step: Step = Step.PRECOMBAT_MAIN, active: PlayerId = ME, holder: PlayerId | None = None
+) -> GameState:
+    """A board at one step, with priority handed out the way the step hands it.
+
+    ``holder`` says otherwise. The active player gets priority first
+    (CR 117.3a), so a test about casting an instant on the *opponent's* turn
+    has to say that the opponent has already passed (CR 117.3d) -- which is
+    the moment that actually happens at a table, and which this helper could
+    not express while nothing recorded a holder at all.
+    """
     game = start_game({ME: deck("m"), YOU: deck("y")}, ME)
-    return replace(game, step=step, active_player=active)
+    return at_step(game, step, active, holder)
 
 
 def test_the_right_number_of_sources_in_the_wrong_colours() -> None:

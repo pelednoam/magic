@@ -34,23 +34,32 @@ chose, which is exactly when an invariant that holds in every fixture stops hold
 
 ## What it cannot test, and why
 
-The harness does exactly what the app's user does, and nothing cleverer: taps the lands the
-payment names, casts the card onto the stack, lets it resolve. Combat applies the engine's own
+The harness does exactly what the app's user does, and nothing cleverer: casts the card onto
+the stack paying for it in one action, passes with both seats, lets it resolve. Combat applies the engine's own
 `Outcome` (damage, then deaths, then lifelink) rather than a second rules implementation written
 to check the first. **Where the engine is the authority, the engine is asked.** A harness that
 invented its own rules would be testing itself.
 
-**No player can answer a spell.** Casting is two events — `CastSpell` then `ResolveSpell` — and
-the gap between them is exactly where a response belongs. Nothing goes in it yet: that needs
-priority (CR 117), which the engine does not model, so the two arrive back to back. That is a
-gap, not an error: no board this produces misstates the rules, which is a different thing from
-modelling every rule.
+**No agent can answer a spell, and the harness passes for both seats.** The engine has priority
+now, so a spell resolves because every player passed in succession (CR 117.4): the harness sends
+`CastSpell`, then `PassPriority` from each seat, then `ResolveSpell`, and ending a step is the
+same two passes followed by `AdvanceStep` (CR 500.2). The passes go through the real reducer and
+into the log, so a self-play game's log is a log a person could have produced at the table.
 
-What a season therefore exercises: zones including the stack, mana, legality, the step walker,
-the trigger scanner, the combat simulator, and spell resolution. The first 200-game season after
-casting landed applied 68,534 events and cast 3,911 spells with nothing broken — the per-player
-card conservation check covers every cast-and-resolve pair for free, which is the reason the
-stack is filed under its owner rather than on `GameState`.
+But *deciding* to pass is the harness's own policy, not a rule it discovered. A `Move` names a
+card to play or an attack to make; there is no "answer that spell" to name, so passing is the
+only thing either seat could truthfully be said to do. `applying.cast_and_resolve` and
+`passing.ending` are the two places that say so, and they are the two lines that change the day
+an agent learns to hold a trick.
+
+What a season therefore exercises: zones including the shared stack, priority and passing, mana,
+legality, the step walker, the trigger scanner, the combat simulator, and spell resolution. The
+200-game season after the shared stack landed applied 61,100 events and cast 3,485 spells with
+nothing broken — and the card conservation check is *per player* over a zone the two players
+share, so a spell mis-attributed on the stack, or dropped while resolving out of order, changes
+a count that is checked on every one of those events. `watching` also checks that priority
+belongs to somebody in the game, to nobody in the untap and cleanup steps, and to somebody in
+every other one, and that no player passes twice in succession.
 
 ## Re-running a season
 

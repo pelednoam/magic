@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from helpers import ME, YOU, facts
+from mtgcoach.core import priority
 from mtgcoach.core.abilities import Ability, ActivatedAbility, unmodelled_reasons
 from mtgcoach.core.cards import CardInstance
 from mtgcoach.core.carrying import not_carried_out as _not_carried_out
@@ -104,7 +105,12 @@ def game(
     active: str = "me",
     life: int = 20,
 ) -> GameState:
-    """A two-player game, written as the two boards you can see."""
+    """A two-player game, written as the two boards you can see.
+
+    Priority is handed out the way entering the step hands it out (CR 117.3a),
+    because a board with nobody able to act is a board where every card in hand
+    comes back with one reason and it is not the one the test is about.
+    """
     mine = PlayerState(
         library=(),
         hand=tuple(instance(o, str(i)) for i, o in enumerate(hand)),
@@ -120,9 +126,11 @@ def game(
         exile=(),
         life=life,
     )
-    return GameState(
-        turn=1,
-        active_player=ME if active == "me" else YOU,
-        step=step,
-        players={ME: mine, YOU: yours},
+    return priority.begins(
+        GameState(
+            turn=1,
+            active_player=ME if active == "me" else YOU,
+            step=step,
+            players={ME: mine, YOU: yours},
+        )
     )

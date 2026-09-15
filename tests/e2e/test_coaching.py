@@ -23,7 +23,7 @@ from mtgcoach.api.app import create_app
 from mtgcoach.api.context import Claude
 from mtgcoach.coach.advice import Explanation
 from mtgcoach.rules.answer import Answer
-from snapshot import ask, look, no_coach, send, start, verdicts
+from snapshot import ask, look, no_coach, start, stepped, verdicts
 from wire import flag, obj, rows, text, words
 
 if TYPE_CHECKING:
@@ -72,7 +72,7 @@ def _main(client: TestClient) -> tuple[str, dict[str, object]]:
     session_id = start(client)
     body = look(client, session_id)
     for _ in range(STEPS_TO_MAIN):
-        body = send(client, session_id, type="advance_step")
+        body = stepped(client, session_id)
     return session_id, body
 
 

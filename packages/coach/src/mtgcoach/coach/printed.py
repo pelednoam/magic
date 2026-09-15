@@ -94,8 +94,13 @@ def _visible(state: GameState, player_id: PlayerId) -> Iterator[OracleId]:
     mine = state.player(player_id)
     for player in state.players.values():
         yield from (permanent.card.oracle_id for permanent in player.battlefield)
-    for player in state.players.values():
-        yield from _ids(player.stack)
+    # The stack is one shared, ordered zone (CR 405.1) rather than a tuple per
+    # player, and it is read in resolution order -- bottom to top, as it is
+    # stored -- so a question about two spells waiting gets them in the order
+    # they will happen. This read per player, back when each had its own
+    # stack; the two merged cleanly and did not compile, which is the only
+    # reason anybody looked.
+    yield from (one.card.oracle_id for one in state.stack)
     yield from _ids(mine.hand)
 
 

@@ -7,7 +7,7 @@
  * rules engine written in the language chosen for not having one.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { ScrollView, StyleSheet, Text } from "react-native";
 
 import { Attacks } from "../components/Attacks";
@@ -16,6 +16,7 @@ import { Coaching } from "../components/Coaching";
 import { Controls } from "../components/Controls";
 import { Finished } from "../components/Finished";
 import { Hand } from "../components/Hand";
+import { Priority } from "../components/Priority";
 import { Question } from "../components/Question";
 import { Reminders, Unknown } from "../components/Reminders";
 import type { Coach } from "../client";
@@ -24,8 +25,8 @@ import { turnLine } from "../format";
 import { playing } from "../playing";
 import { useCoaching, useQuestions } from "../thinking";
 import { colour, space, text } from "../theme";
+import { useWatching } from "../watching";
 import type { NewGame, Playable, Snapshot } from "../wire";
-import { isSnapshot } from "../wire";
 import { THEM, YOU } from "../wire";
 
 
@@ -56,30 +57,7 @@ export function Game({
     setSnapshot((shown) => (update.version >= shown.version ? update : shown));
   }, []);
 
-  // The socket is the other device's changes arriving. Our own come back from
-  // the request that caused them, so there is one path for each and neither
-  // has to guess.
-  const [watching, setWatching] = useState(true);
-  useEffect(() => {
-    const socket = new WebSocket(coach.watchUrl(game.session_id));
-    socket.onopen = () => { setWatching(true); };
-    socket.onmessage = (message: MessageEvent<string>) => {
-      const update: unknown = parse(message.data);
-      if (isSnapshot(update)) {
-        accept(update);
-        return;
-      }
-      // A frame we cannot read is a broken server, not a broken game. The
-      // board on screen is still the last one the server confirmed, and saying
-      // so beats crashing one render later inside `snapshot.state.players`.
-      setWatching(false);
-    };
-    // A board that has stopped updating must not keep looking live: the other
-    // device's plays would simply stop appearing, with nothing to say so.
-    socket.onclose = () => { setWatching(false); };
-    socket.onerror = () => { setWatching(false); };
-    return () => { socket.close(); };
-  }, [accept, coach, game.session_id]);
+  const watching = useWatching(coach, game.session_id, accept);
 
   const coaching = useCoaching(coach, game.session_id, seat, snapshot.version);
   const questions = useQuestions(coach, game.session_id, seat, snapshot.version);
@@ -88,9 +66,9 @@ export function Game({
     async (...events: readonly Record<string, unknown>[]): Promise<void> => {
       setProblem("");
       try {
-        // In order, and one at a time: casting a spell is three events and the
-        // second depends on the first having been accepted. A refusal stops
-        // the rest, leaving the game where the server last agreed it was.
+        // In order, and one at a time: a later event depends on the earlier
+        // one having been accepted. A refusal stops the rest, leaving the game
+        // where the server last agreed it was.
         for (const event of events) {
           accept(await coach.event(game.session_id, event));
         }
@@ -136,6 +114,26 @@ export function Game({
         // one, so without this the only feedback for tapping a card would be
         // the engine's refusal text appearing for no reason a player can see.
         onPlay={playable ? (card: Playable) => { void act(...playing(card, seat)); } : undefined}
+      />
+      <Priority
+        state={snapshot.state}
+        seat={seat}
+        // What the rules engine does not model at this moment, in its own
+        // words. Beside the stack because that is what it is about: a stack
+        // holding only spells looks complete, and a child who learned from it
+        // that a trigger cannot be answered would have learned a wrong rule.
+        gaps={advice.not_modelled}
+        onPass={playable ? () => { void act({ type: "pass_priority", player: seat }); } : undefined}
+        onResolve={
+          playable
+            ? (instanceId: string, to: string) => {
+                // Where it resolves to is the server's answer, sent back
+                // unchanged: it read the type line (CR 608.3, CR 608.2m) and
+                // this app does not know how and must not guess.
+                void act({ type: "resolve_spell", player: seat, instance_id: instanceId, to });
+              }
+            : undefined
+        }
       />
       <Attacks attacks={advice.attacks} />
       <Coaching
@@ -187,12 +185,3 @@ const styles = StyleSheet.create({
   problem: { color: colour.no, fontSize: text.body, marginBottom: space.medium },
   stale: { color: colour.warn, fontSize: text.small, marginBottom: space.medium },
 });
-
-/** JSON, or undefined. A frame that is not JSON is not an exception here. */
-function parse(text: string): unknown {
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return undefined;
-  }
-}

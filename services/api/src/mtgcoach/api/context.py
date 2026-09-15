@@ -134,7 +134,7 @@ def snapshot(server: Server, game: Session) -> dict[str, Json]:
         # box, let somebody type a question, and only then say the feature was
         # off. A flag costs one boolean and moves that sentence to the top.
         "rules_available": server.rules is not None,
-        "state": boardview.state(game.state, server.catalogue.name),
+        "state": boardview.state(game.state, server.catalogue),
         "advice": {
             str(player): views.report(advise(game.state, player, server.catalogue))
             for player in game.state.players

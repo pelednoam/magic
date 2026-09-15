@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from helpers import ME, YOU, deck
+from helpers import ME, YOU, all_pass, deck
 from mtgcoach.core.movement import add_card
 from mtgcoach.core.state import GameState, start_game
 from mtgcoach.core.steps import TURN_ORDER, Step
@@ -12,9 +12,23 @@ from mtgcoach.core.turn import advance, draw_card
 from mtgcoach.core.zones import ZoneName
 
 
+def _ended(state: GameState) -> GameState:
+    """End the current step the way CR 500.2 ends it, and enter the next.
+
+    Everybody passes first. Every walk in this file used to be a bare
+    ``advance``, and the engine used to accept one -- which is the half of
+    CR 500.2 the rule itself warns about: a step does not end because the stack
+    happens to be empty, it ends because each player has had the chance to add
+    to it and declined. The untap and cleanup steps hand out no priority
+    (CR 500.3), so ``all_pass`` has nobody to pass and this is a bare advance
+    there, which is exactly right.
+    """
+    return advance(all_pass(state))
+
+
 def _advance_to(state: GameState, step: Step) -> GameState:
     for _ in range(len(TURN_ORDER) * 2):
-        state = advance(state)
+        state = _ended(state)
         if state.step is step:
             return state
     msg = f"never reached {step}"
@@ -28,7 +42,7 @@ def test_advance_moves_one_step(game: GameState) -> None:
 def test_a_full_turn_passes_to_the_other_player(game: GameState) -> None:
     state = game
     for _ in range(len(TURN_ORDER)):
-        state = advance(state)
+        state = _ended(state)
     assert state.step is Step.UNTAP
     assert state.turn == 2
     assert state.active_player == YOU
@@ -44,7 +58,7 @@ def test_the_starting_player_skips_their_first_draw(game: GameState) -> None:
 def test_the_second_player_does_draw_on_turn_two(game: GameState) -> None:
     state = game
     for _ in range(len(TURN_ORDER)):
-        state = advance(state)
+        state = _ended(state)
     before = len(state.player(YOU).hand)
     state = _advance_to(state, Step.DRAW)
     assert len(state.player(YOU).hand) == before + 1
@@ -60,7 +74,7 @@ def test_the_untap_step_untaps_only_the_active_player(game: GameState) -> None:
         )
 
     for _ in range(len(TURN_ORDER)):
-        state = advance(state)
+        state = _ended(state)
 
     assert state.active_player == YOU
     assert not state.player(YOU).battlefield[0].tapped
@@ -71,14 +85,14 @@ def test_the_untap_step_clears_summoning_sickness(game: GameState) -> None:
     state = game.with_player(YOU, add_card(game.player(YOU), deck("y")[0], ZoneName.BATTLEFIELD))
     assert state.player(YOU).battlefield[0].summoning_sick
     for _ in range(len(TURN_ORDER)):
-        state = advance(state)
+        state = _ended(state)
     assert not state.player(YOU).battlefield[0].summoning_sick
 
 
 def test_the_untap_step_resets_the_land_drop(game: GameState) -> None:
     state = game.with_player(YOU, replace(game.player(YOU), lands_played_this_turn=1))
     for _ in range(len(TURN_ORDER)):
-        state = advance(state)
+        state = _ended(state)
     assert state.player(YOU).lands_played_this_turn == 0
 
 
@@ -107,7 +121,12 @@ def test_drawing_from_an_empty_library_loses_rather_than_failing() -> None:
 
 
 def test_the_attempted_draw_loses_the_game_at_the_next_priority() -> None:
-    """CR 704.5b. One step later, not one event later."""
+    """CR 704.5b. One step later, not one event later.
+
+    A bare ``advance`` from the untap step, and legitimately: no player
+    receives priority there (CR 502.4), so there is nobody to pass and
+    CR 500.3 ends the step on its own.
+    """
     state = start_game({ME: deck("m", 7), YOU: deck("y")}, ME)
     finished = advance(draw_card(state, ME))
     assert finished.over is not None

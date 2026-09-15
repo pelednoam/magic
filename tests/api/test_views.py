@@ -3,20 +3,20 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from dataclasses import replace
 
 from helpers import ME, YOU, deck, facts
 from helpers_coach import Book, game, land
 from mtgcoach.api import boardview, views
 from mtgcoach.coach.report import advise
 from mtgcoach.core.abilities import Trigger, TriggeredAbility
-from mtgcoach.core.state import start_game
+from mtgcoach.core.cards import CardInstance
+from mtgcoach.core.ids import InstanceId, OracleId
+from mtgcoach.core.stack import StackObject
+from mtgcoach.core.state import GameState, start_game
 from mtgcoach.core.steps import Step
 from mtgcoach.core.vocabulary import TriggerEvent
 from wire import at, flag, number, rows, text, words
-
-if TYPE_CHECKING:
-    from mtgcoach.core.ids import OracleId
 
 FOREST, FOREST_RULES = land("Forest", "{G}")
 BEAR = facts("Grizzly Bears", "{1}{G}", power=2, toughness=2, creature=True)
@@ -26,16 +26,11 @@ BOOK = Book(
 )
 
 
-def _names(oracle_id: OracleId) -> str:
-    card = BOOK.facts(oracle_id)
-    return card.name if card is not None else str(oracle_id)
-
-
 def test_everything_it_produces_is_json() -> None:
     """The one property that matters: it has to survive `json.dumps`."""
     state = game(hand=("Bear", "Forest"), battlefield=("Forest", "Forest"))
     payload = {
-        "state": boardview.state(state, _names),
+        "state": boardview.state(state, BOOK),
         "advice": views.report(advise(state, ME, BOOK)),
     }
     assert json.loads(json.dumps(payload)) == json.loads(json.dumps(payload))
@@ -44,14 +39,70 @@ def test_everything_it_produces_is_json() -> None:
 def test_a_library_is_a_count_and_never_a_list() -> None:
     """A tracker that shows you the top of a deck is a cheating tool."""
     state = start_game({ME: deck("m"), YOU: deck("y")}, ME)
-    rendered = boardview.state(state, _names)
+    rendered = boardview.state(state, BOOK)
     for name in ("me", "you"):
         assert isinstance(at(rendered, "players", name, "library"), int)
 
 
+def _waiting(oracle: str) -> GameState:
+    """A board with one spell of ``oracle`` on the shared stack, cast by ME."""
+    card = CardInstance(InstanceId(f"{oracle}-cast"), OracleId(oracle))
+    return replace(game(), stack=(StackObject(card, ME),))
+
+
+def test_a_spell_on_the_stack_says_whose_it_is_and_where_it_is_going() -> None:
+    """Both of the things a shared, ordered stack has to tell a client.
+
+    Its controller (CR 405.4), because a zone two players share has to say
+    whose each object is -- one filed under each player used to answer that by
+    where it sat, and could not answer which resolves first.
+
+    And its destination, which only this side knows: ``core`` cannot read a
+    type line, ``resolve_spell`` has to carry the answer, and the app used to
+    remember it from the hand advice -- holding a fact about a card after the
+    card had left the zone it read it from.
+    """
+    (spell,) = rows(boardview.state(_waiting("Bear"), BOOK), "stack")
+    assert text(spell, "name") == "Grizzly Bears"
+    assert text(spell, "controller") == "me"
+    assert text(spell, "resolves_to") == "battlefield"
+
+
+def test_a_spell_the_coach_cannot_name_gets_no_destination_guessed_for_it() -> None:
+    """Null, not a zone. The one answer that cannot be wrong.
+
+    Nothing about an unknown card says whether it stays on the battlefield, and
+    a guess is how an Opt ends up among the lands for the rest of a game.
+    ``api.guard`` refuses that resolution for the same reason, so a client
+    offering the button would only be offering a refusal.
+    """
+    (spell,) = rows(boardview.state(_waiting("Mystery"), BOOK), "stack")
+    assert spell["resolves_to"] is None
+    assert text(spell, "name") == "Mystery"
+
+
+def test_the_board_says_who_may_act_and_who_has_passed() -> None:
+    """The fields the app had no way to ask for (CR 117.1, CR 117.4).
+
+    Both devices need all three: one to know it is waiting, the other to know
+    it is being waited for, and either to know when nobody may act at all.
+    """
+    rendered = boardview.state(game(), BOOK)
+    assert text(rendered, "priority") == "me"
+    assert words(rendered, "passed") == []
+    assert words(rendered, "yet_to_pass") == ["me", "you"]
+
+
+def test_nobody_holding_priority_is_null_rather_than_missing() -> None:
+    """CR 502.4: the untap step hands it to nobody, which is an answer."""
+    rendered = boardview.state(game(step=Step.UNTAP), BOOK)
+    assert rendered["priority"] is None
+    assert words(rendered, "yet_to_pass") == []
+
+
 def test_a_card_carries_both_of_its_identities_and_its_name() -> None:
     state = game(hand=("Bear",))
-    (card,) = rows(boardview.state(state, _names), "players", "me", "hand")
+    (card,) = rows(boardview.state(state, BOOK), "players", "me", "hand")
     assert text(card, "oracle_id") == "Bear"
     assert text(card, "name") == "Grizzly Bears"
     assert text(card, "instance_id").startswith("Bear")
@@ -59,7 +110,7 @@ def test_a_card_carries_both_of_its_identities_and_its_name() -> None:
 
 def test_a_permanent_carries_the_two_states_a_tracker_has_to_show() -> None:
     state = game(battlefield=("Forest",))
-    (permanent,) = rows(boardview.state(state, _names), "players", "me", "battlefield")
+    (permanent,) = rows(boardview.state(state, BOOK), "players", "me", "battlefield")
     assert flag(permanent, "tapped") is False
     assert flag(permanent, "summoning_sick") is False
 
@@ -67,7 +118,7 @@ def test_a_permanent_carries_the_two_states_a_tracker_has_to_show() -> None:
 def test_an_unnamed_card_falls_back_to_its_identifier() -> None:
     """Better than a blank, which a player would read as a bug."""
     state = game(hand=("Mystery",))
-    (card,) = rows(boardview.state(state, _names), "players", "me", "hand")
+    (card,) = rows(boardview.state(state, BOOK), "players", "me", "hand")
     assert text(card, "name") == "Mystery"
 
 

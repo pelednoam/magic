@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from snapshot import STEPS_IN_TWO_TURNS, advice, send, start, zone
+from snapshot import STEPS_IN_TWO_TURNS, advice, send, start, stepped, zone
 from wire import decoded, number, obj, rows, text, words
 
 if TYPE_CHECKING:
@@ -28,7 +28,7 @@ def test_a_second_device_hears_about_an_event_it_did_not_send(client: TestClient
 def test_the_attack_advisor_over_the_wire(client: TestClient) -> None:
     """Two Savannah Lions against nothing: attack with both, four damage."""
     session_id = start(client)
-    body = send(client, session_id, type="advance_step")
+    body = stepped(client, session_id)
     for lion in [c for c in zone(body, "them", "hand") if text(c, "name") == "Savannah Lions"]:
         body = send(
             client,
@@ -40,7 +40,7 @@ def test_the_attack_advisor_over_the_wire(client: TestClient) -> None:
         )
 
     for _ in range(STEPS_IN_TWO_TURNS):
-        body = send(client, session_id, type="advance_step")
+        body = stepped(client, session_id)
         theirs = text(body, "state", "active_player") == "them"
         if theirs and text(body, "state", "step") == "declare_attackers":
             break

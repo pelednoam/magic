@@ -8,6 +8,7 @@ from helpers import ME, YOU, deck
 from mtgcoach.api.sessions import SessionStore, UnknownSessionError
 from mtgcoach.core.events import AdvanceStep, ChangeLife
 from mtgcoach.core.steps import Step
+from mtgcoach.selfplay.passing import ending
 
 
 def _store() -> tuple[SessionStore, str]:
@@ -40,11 +41,17 @@ def test_an_event_advances_the_game_and_is_kept() -> None:
 
 
 def test_the_log_is_the_game() -> None:
-    """The cached state is a cache; replaying the log has to give the same."""
+    """The cached state is a cache; replaying the log has to give the same.
+
+    The passes are part of the log, and have to be: a step ends because every
+    player passed in succession (CR 500.2), so a log of bare advances is a log
+    the engine now refuses -- which is the point of it refusing.
+    """
     store, session_id = _store()
     session = store.get(session_id)
     for _ in range(6):
-        session = session.with_event(AdvanceStep())
+        for event in ending(session.state):
+            session = session.with_event(event)
     session = session.with_event(ChangeLife(ME, -3))
     assert session.consistent
     assert session.state.player(ME).life == 17
