@@ -19,17 +19,23 @@ from typing import TYPE_CHECKING
 from fastapi import HTTPException, WebSocket
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_403_FORBIDDEN
 
+from mtgcoach.api.boards import all_boards, boards
 from mtgcoach.api.context import Seated, session, snapshot
 from mtgcoach.api.eventfields import BadEventError
 from mtgcoach.api.eventspec import parse
 from mtgcoach.api.guard import check
+from mtgcoach.api.seats import MAX_SEAT, plays_in
 from mtgcoach.api.sessions import UnknownSessionError
 from mtgcoach.core.errors import IllegalEventError
 from mtgcoach.core.events import AdvanceStep
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
+#: What a socket is closed with, in the 4000-4999 range the application owns.
+#: The two refusals a watching client can act on: the game is not there, or it
+#: is not this seat's.
+NO_SUCH_GAME = 4004
+NOT_YOUR_GAME = 4003
 
+if TYPE_CHECKING:
     from fastapi import FastAPI
 
     from mtgcoach.api.context import Server
@@ -43,10 +49,10 @@ def sent_by(event: Event, seat: str) -> None:
 
     ``AdvanceStep`` is the exception and names nobody, because ending a step is
     not a player's action: it happens when every player has passed in
-    succession on an empty stack (CR 117.4), and ``core.priority`` refuses it
-    until they have. So either device may send it, and neither can use it to
-    get ahead of the other -- the pass it needs first is a seated event and is
-    checked here like any other.
+    succession on an empty stack (CR 500.2), and ``core.turn.advance`` refuses
+    it until both halves of that hold. So either device may send it, and
+    neither can use it to get ahead of the other -- the passes it needs first
+    are seated events, checked here like any other.
 
     Raises:
         HTTPException: 403 if the event names another seat. Not 400: the
@@ -56,8 +62,12 @@ def sent_by(event: Event, seat: str) -> None:
     """
     if isinstance(event, AdvanceStep):
         return
-    if str(event.player) != seat:
-        msg = f"your token is {seat!r}; it cannot send an event for {str(event.player)!r}"
+    named = str(event.player)
+    if named != seat:
+        # Truncated, for the reason `thinking._asking` truncates the same
+        # field: this reaches a client and the CORS policy is `*`, so a
+        # megabyte of posted nonsense must not come back out.
+        msg = f"your token is {seat!r}; it cannot send an event for {named[:MAX_SEAT]!r}"
         raise HTTPException(HTTP_403_FORBIDDEN, msg)
 
 
@@ -83,11 +93,9 @@ def routes(app: FastAPI, server: Server) -> None:
             raise HTTPException(HTTP_400_BAD_REQUEST, str(refused)) from refused
         # Built before it is committed. The other order left an event stored
         # after the client had been told the request failed -- so a retry
-        # applied it twice, and every later read failed the same way. The
-        # sender's own board is built first, so that what it is answered with
-        # exists before anything is broadcast.
-        board = _boards(server, advanced)
-        mine = board(seat)
+        # applied it twice, and every later read failed the same way.
+        board = boards(server, advanced)
+        mine = all_boards(server, session_id, board, seat)
         server.store.record(advanced)
         await server.hub.broadcast(session_id, board)
         return mine
@@ -103,8 +111,8 @@ def routes(app: FastAPI, server: Server) -> None:
         has to reach across for is worse than one either can fix.
         """
         undone = session(server, session_id).undone()
-        board = _boards(server, undone)
-        mine = board(seat)
+        board = boards(server, undone)
+        mine = all_boards(server, session_id, board, seat)
         server.store.record(undone)
         await server.hub.broadcast(session_id, board)
         return mine
@@ -119,10 +127,8 @@ def routes(app: FastAPI, server: Server) -> None:
         game are two different payloads.
         """
         await websocket.accept()
-        try:
-            game = server.store.get(session_id)
-        except UnknownSessionError:
-            await websocket.close(code=4004, reason="no such game")
+        game = await _watchable(server, websocket, session_id, seat)
+        if game is None:
             return
         server.hub.join(session_id, websocket, seat)
         try:
@@ -141,20 +147,25 @@ def routes(app: FastAPI, server: Server) -> None:
             server.hub.leave(session_id, websocket)
 
 
-def _boards(server: Server, game: Session) -> Callable[[str], dict[str, Json]]:
-    """The board for a seat, worked out once per seat and then remembered.
+async def _watchable(
+    server: Server, websocket: WebSocket, session_id: str, seat: str
+) -> Session | None:
+    """The game this socket may follow, or None having closed it with a reason.
 
-    One change produces up to three payloads -- the answer to the device that
-    sent it and one per watching seat -- and they differ only in which hand
-    they carry. Building each from scratch would advise both players twice for
-    every tap; building one and sending it to everybody is what this change
-    exists to stop.
+    Two refusals, and a socket has no status codes to make them with -- so each
+    is a close code in the 4000-4999 range the application owns, plus a
+    sentence. Letting ``snapshot``'s 403 stand instead would raise an
+    ``HTTPException`` inside a socket handler, which is not a status code but
+    an unhandled error.
     """
-    made: dict[str, dict[str, Json]] = {}
-
-    def board(seat: str) -> dict[str, Json]:
-        if seat not in made:
-            made[seat] = snapshot(server, game, seat)
-        return made[seat]
-
-    return board
+    try:
+        game = server.store.get(session_id)
+    except UnknownSessionError:
+        await websocket.close(code=NO_SUCH_GAME, reason="no such game")
+        return None
+    if not plays_in(game.state, seat):
+        # A game adopted from somebody else's journal can be between seats this
+        # server has no token for.
+        await websocket.close(code=NOT_YOUR_GAME, reason="this game is not yours")
+        return None
+    return game

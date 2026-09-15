@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 #: A seating a test can write to a file and expect back unchanged.
-KNOWN = Seating({"you": "hunter2", "them": "hunter3"})
+KNOWN = Seating({SEATS[0]: "hunter2", SEATS[1]: "hunter3"})
 
 
 @pytest.mark.parametrize(

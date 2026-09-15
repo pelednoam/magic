@@ -14,7 +14,7 @@ from __future__ import annotations
 import pytest
 
 from helpers_rules import REVISION
-from mtgcoach.rules.effective import UNKNOWN, effective_from
+from mtgcoach.rules.effective import LONGEST, UNKNOWN, effective_from
 
 #: The real document's opening, as of the copy CI fetches.
 REAL = (
@@ -51,6 +51,16 @@ def test_the_date_format_is_wizards_to_change(when: str) -> None:
     display, neither of which is helped by having thrown the original away.
     """
     assert effective_from(f"These rules are effective as of {when}.") == when
+
+
+def test_a_line_far_longer_than_a_date_is_not_a_date() -> None:
+    """Whatever is captured rides every board, every journal line and stdout.
+
+    So a bound, and `UNKNOWN` past it: a line that long is not a revision, and
+    recording it as one would put it in front of somebody as a fact.
+    """
+    assert effective_from(f"These rules are effective as of {'x' * (LONGEST + 1)}.") == UNKNOWN
+    assert effective_from(f"These rules are effective as of {'x' * LONGEST}.") == "x" * LONGEST
 
 
 def test_the_line_has_to_be_the_line() -> None:

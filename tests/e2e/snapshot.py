@@ -32,8 +32,12 @@ STEPS_IN_TWO_TURNS = 24
 
 
 def start(client: TestClient) -> str:
-    """Begin a game and return its name."""
-    response = client.post("/games", json={"you": "green", "them": "white"})
+    """Begin a game and return its name.
+
+    The decks are named from the posting device's side; the server deals
+    "mine" to the seat its token holds.
+    """
+    response = client.post("/games", json={"mine": "green", "theirs": "white"})
     assert response.status_code == HTTP_OK, response.text
     return text(decoded(response.json()), "session_id")
 

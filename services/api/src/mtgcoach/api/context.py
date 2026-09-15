@@ -5,11 +5,11 @@ snapshot in particular is the single most important thing this service produces
 -- it is what every client renders and what the wire contract test pins -- and
 it deserves to be somewhere you can find it.
 
-``seats`` holds the other thing they all share: reading the seat off a
-connection, and deciding whether that seat plays in this game. Both were here
-and grew this module past the line limit, which was the nudge -- they really
-are a different subject. The ``Seated`` alias the routes declare stays here;
-see ``seats`` for why.
+Two things that were here have moved, both at the line limit and both a
+different subject: ``seats`` reads the seat off a connection and decides
+whether it plays in this game, and ``position`` is the board a *slow* answer is
+about. The ``Seated`` alias the routes declare stays here; see ``seats`` for
+why.
 """
 
 from __future__ import annotations
@@ -26,7 +26,6 @@ from mtgcoach.api.seats import seated, seated_in
 from mtgcoach.api.sessions import SessionStore, UnknownSessionError
 from mtgcoach.api.sources import Sources
 from mtgcoach.coach.report import advise
-from mtgcoach.coach.table import table
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -37,9 +36,6 @@ if TYPE_CHECKING:
     from mtgcoach.api.sessions import Session
     from mtgcoach.api.views import Json
     from mtgcoach.coach.advice import Explainer
-    from mtgcoach.coach.report import TurnReport
-    from mtgcoach.coach.table import Table
-    from mtgcoach.core.ids import PlayerId
     from mtgcoach.rules.answer import Asker
     from mtgcoach.rules.search import RuleIndex
 
@@ -63,9 +59,27 @@ class Claude:
     rules: RuleIndex | None = None
     #: Which revision the document in ``rules`` is -- its own "effective as of"
     #: sentence, read by ``rules.effective``. Here because it belongs to that
-    #: document and travels with it; ``Server.sources`` is where it is used.
-    #: Empty when no rules are installed, which is a supported way to run this.
+    #: document; ``Server.sources`` is where it is used. Empty when no rules
+    #: are installed, which is a supported way to run this.
     rules_revision: str = ""
+
+    def __post_init__(self) -> None:
+        """Refuse a revision with no document under it.
+
+        The pair can express a contradiction: a server with no rules installed
+        reporting which revision it has. That claim would ride every board and
+        be recorded on every game, and ``Sources`` already has a way to say the
+        truth -- empty means "not recorded".
+
+        Raises:
+            ValueError: If there is a revision but no index.
+        """
+        if self.rules_revision and self.rules is None:
+            msg = (
+                f"a rules revision ({self.rules_revision!r}) with no rules index: "
+                "the revision describes the document, so it cannot be known without one"
+            )
+            raise ValueError(msg)
 
 
 @dataclass(slots=True)
@@ -96,32 +110,6 @@ class Server:
     #: servers in one process are two servers, and a module global made one
     #: test's saturated limiter another test's mysterious 503.
     rations: Rationed = field(default_factory=Rationed)
-
-
-@dataclass(frozen=True, slots=True)
-class Position:
-    """The board a slow answer is about, and which revision that was.
-
-    Both slow routes need all of it and one of them needed six arguments to
-    say so. Carrying the revision alongside the report is also the point of the
-    thing: an answer that takes a minute has to come back saying which board it
-    was about, or the client is left guessing.
-    """
-
-    report: TurnReport
-    revision: int
-    #: Only the rules route needs the battlefield; the turn coach's report
-    #: already names every creature that matters.
-    board: Table | None = None
-
-
-def position(server: Server, game: Session, player: PlayerId, *, board: bool = False) -> Position:
-    """Work out the board, once, for one of the slow routes."""
-    return Position(
-        report=advise(game.state, player, server.catalogue),
-        revision=game.revision,
-        board=table(game.state, player, server.catalogue) if board else None,
-    )
 
 
 #: A route's way of asking who is talking to it: ``seat: Seated`` in the
@@ -164,7 +152,7 @@ def snapshot(server: Server, game: Session, seat: str) -> dict[str, Json]:
         HTTPException: 403 if this seat is not a player in this game; see
             ``seated_in``.
     """
-    player = seated_in(game, seat)
+    player = seated_in(game.state, seat)
     return {
         # How many times this game has changed. The client uses it to ignore a
         # stale reply: an HTTP response and a broadcast race, and without an
@@ -182,11 +170,7 @@ def snapshot(server: Server, game: Session, seat: str) -> dict[str, Json]:
         # the wire because a client showing a position should be able to say
         # what produced it -- and because a recorded game carries the same
         # three, so the two can be compared at all.
-        "sources": {
-            "engine": server.sources.engine,
-            "cards": server.sources.cards,
-            "rules": server.sources.rules,
-        },
+        "sources": server.sources.as_json(),
         # Which seat this payload is for, so the app does not have to be told
         # and cannot be told wrong. It used to be chosen on the device -- start
         # a game and you were "you", join one and you were "them" -- and a

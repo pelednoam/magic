@@ -66,6 +66,11 @@ class Replay:
     #: Empty for a journal written before that was recorded, which is most of
     #: the ones on disk -- and is exactly the case this exists to make legible.
     sources: Sources = field(default_factory=Sources)
+    #: Why this game cannot be shown, when it cannot. Empty when it rebuilt.
+    #: A game with a problem has no moments and is still listed, because the
+    #: listing is where somebody finds out *why* -- and what it was played
+    #: under is beside it.
+    problem: str = ""
 
 
 def _decoded(text: str) -> list[object]:
@@ -109,11 +114,11 @@ def games_in(data_root: Path, name: str) -> tuple[Replay, ...]:
     """Every game a journal holds, in the order it played them.
 
     Raises:
-        UnknownReplayError: If there is no such journal, or it holds no game
-            that can be rebuilt. A journal of decisions with no recording is
-            the shape a killed run leaves; it can still be replayed *inside*
-            the harness, and cannot be shown, and saying which is better than
-            an empty screen.
+        UnknownReplayError: If there is no such journal, or it holds no
+            recording at all -- the shape a killed run leaves. Such a journal
+            can still be replayed *inside* the harness and cannot be shown, and
+            saying which is better than an empty screen. A game that is there
+            and will not rebuild is a listed game with a reason, not an error.
     """
     path = data_root / FOLDER / f"{name}{SUFFIX}"
     try:
@@ -122,34 +127,45 @@ def games_in(data_root: Path, name: str) -> tuple[Replay, ...]:
         msg = f"{name}: {type(unreadable).__name__}"
         raise UnknownReplayError(msg) from unreadable
     lines = _decoded(text)
-    played = tuple(
-        game
-        for at, written in enumerate(games(lines))
-        if (game := _replay(at, written)) is not None
-    )
+    played = tuple(_replay(at, written) for at, written in enumerate(games(lines)))
     if not played:
-        msg = f"{name} has no game in it that can be rebuilt; it may be from an interrupted run"
+        # No *recording* at all, which is the shape a killed run leaves: a
+        # journal of decisions can still be replayed inside the harness and
+        # cannot be shown. A game that merely will not rebuild is listed with
+        # its reason instead -- see ``_replay``.
+        msg = f"{name} has no game recorded in it; it may be from an interrupted run"
         raise UnknownReplayError(msg)
     return played
 
 
-def _replay(index: int, written: Written) -> Replay | None:
-    """One game, rebuilt, with its decisions attached.
+def _replay(index: int, written: Written) -> Replay:
+    """One game, rebuilt, with its decisions attached -- or the reason it is not.
 
-    None when the recording will not rebuild. Two ways that happens and both
-    are real: a deal that is not a game (``ValueError`` out of ``start_game``
-    -- a library too short for an opening hand, a seat missing), and an event
-    the engine now refuses (``IllegalEventError`` out of ``apply``). The second
-    is not hypothetical: ``docs/SELFPLAY.md`` says in as many words that a
-    replay against a stricter engine diverges, and a game recorded before a
-    rule was tightened is exactly that. Neither is a reason to refuse the rest
-    of a season, and neither may be a 500.
+    Two ways a recording will not rebuild and both are real: a deal that is not
+    a game (``ValueError`` out of ``start_game`` -- a library too short for an
+    opening hand, a seat missing), and an event the engine now refuses
+    (``IllegalEventError`` out of ``apply``). The second is not hypothetical:
+    ``docs/SELFPLAY.md`` says in as many words that a replay against a stricter
+    engine diverges, and a game recorded before a rule was tightened is exactly
+    that. Neither is a reason to refuse the rest of a season, and neither may
+    be a 500.
+
+    It used to drop such a game from the list, which threw away the one thing
+    that explains it: the recording *says* which engine played it. It is listed
+    with no moments, the reason, and the revisions -- so "this will not open"
+    arrives with "played under a different engine" rather than a guess.
     """
+    said = decisions(written.decisions, written.recording.game, written.recording.seed)
     try:
         boards = _boards(written.recording)
-    except (ValueError, IllegalEventError):
-        return None
-    said = decisions(written.decisions, written.recording.game, written.recording.seed)
+    except (ValueError, IllegalEventError) as unplayable:
+        return Replay(
+            index=index,
+            seed=written.recording.seed,
+            decks=written.recording.decks,
+            sources=written.recording.sources,
+            problem=f"{type(unplayable).__name__}: {unplayable}",
+        )
     moments = tuple(
         moment(turn, step, boards[turn, step], entry)
         for (turn, step, _), entry in sorted(said.items(), key=lambda one: order(one[0]))

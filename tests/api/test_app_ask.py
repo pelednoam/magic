@@ -36,7 +36,7 @@ GOOD = Answer(
 
 
 def new_game(client: TestClient) -> str:
-    body = client.post("/games", json={"you": "green", "them": "other"}).json()
+    body = client.post("/games", json={"mine": "green", "theirs": "other"}).json()
     session_id: str = body["session_id"]
     return session_id
 

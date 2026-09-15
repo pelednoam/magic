@@ -40,7 +40,7 @@ def test_a_journal_that_is_not_json_at_all(tmp_path: Path) -> None:
     path = tmp_path / "selfplay" / "broken.jsonl"
     path.parent.mkdir(parents=True)
     path.write_text('{"kind": "game"', encoding="utf-8")
-    with pytest.raises(UnknownReplayError, match="can be rebuilt"):
+    with pytest.raises(UnknownReplayError, match="no game recorded"):
         games_in(tmp_path, "broken")
 
 

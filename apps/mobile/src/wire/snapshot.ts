@@ -84,7 +84,17 @@ export function isSnapshot(value: unknown): value is Snapshot {
   // later inside `snapshot.state.players[YOU]` -- far from the frame that
   // caused it, which is the worst place for a type error to surface.
   const players = asObject(state["players"]);
-  return players !== null && hasSeats(players) && asObject(advice[body["seat"]]) !== null;
+  // `Object.hasOwn` before the lookup, because `seat` comes off the wire and
+  // `advice["__proto__"]` is `Object.prototype` -- an object, so `asObject`
+  // accepts it, and the crash arrives later inside `turnLine` with an
+  // undefined step. A decoded payload's own keys are the only ones that count.
+  const seat = body["seat"];
+  return (
+    players !== null &&
+    hasSeats(players) &&
+    Object.hasOwn(advice, seat) &&
+    asObject(advice[seat]) !== null
+  );
 }
 
 /**

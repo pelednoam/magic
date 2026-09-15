@@ -26,11 +26,23 @@ from __future__ import annotations
 import re
 from typing import Final
 
+#: How much of the line can be a date. A bound, because whatever is captured
+#: rides every board on the wire, every recorded game and the retrieval
+#: check's output: a line far longer than a date is not a date, and is better
+#: recorded as ``UNKNOWN`` than carried around as one.
+LONGEST: Final = 64
+
 #: The sentence, as the document writes it. Anchored to the line so that a
 #: rule *quoting* the phrase later in the document cannot be mistaken for it,
 #: and tolerant of the exact date format, which is Wizards' to change.
+#:
+#: ``[^\n]`` and ``[ \t]*`` rather than ``.`` and ``\s*``: under
+#: ``MULTILINE`` both of the latter can reach past the end of the line -- and
+#: the lazy capture with ``\s*$`` behind it is the shape that backtracks
+#: quadratically on a long line of whitespace.
 _EFFECTIVE: Final = re.compile(
-    r"^These rules are effective as of (?P<when>.+?)\.?\s*$", re.MULTILINE
+    rf"^These rules are effective as of (?P<when>[^\n]{{1,{LONGEST}}}?)\.?[ \t]*$",
+    re.MULTILINE,
 )
 
 #: What a document with no such line is recorded as. Empty rather than a guess:

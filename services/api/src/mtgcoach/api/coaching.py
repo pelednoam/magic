@@ -14,7 +14,8 @@ from mtgcoach.coach.advice import refusal, verify
 from mtgcoach.coach.briefing import brief
 
 if TYPE_CHECKING:
-    from mtgcoach.api.context import Position
+    from mtgcoach.api.position import Position
+
     from mtgcoach.api.views import Json
     from mtgcoach.coach.advice import Explainer
 

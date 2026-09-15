@@ -37,9 +37,14 @@ HTTP_OK = 200
 HTTP_REFUSED = 400
 
 
-def started(client: TestClient, you: str = "green", them: str = "other") -> str:
-    """Begin a game and hand back what it is called."""
-    created = decoded(client.post("/games", json={"you": you, "them": them}).json())
+def started(client: TestClient, mine: str = "green", theirs: str = "other") -> str:
+    """Begin a game and hand back what it is called.
+
+    Named from the device that posts it, like the route: the deck a client
+    calls "mine" is dealt to the seat its token names, and the server is what
+    resolves that -- so a test does not have to know which seat it is holding.
+    """
+    created = decoded(client.post("/games", json={"mine": mine, "theirs": theirs}).json())
     session = created["session_id"]
     assert isinstance(session, str)
     return session

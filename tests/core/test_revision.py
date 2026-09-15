@@ -62,6 +62,20 @@ def test_a_renamed_module_gives_a_different_digest(tmp_path: Path) -> None:
     assert one != two
 
 
+def test_two_trees_cannot_be_confused_by_moving_a_boundary(tmp_path: Path) -> None:
+    """The framing, which is why the lengths go into the hash.
+
+    Without them the digest is over one unbroken run of bytes: `a.py` of "1"
+    beside `b.py` of "2" hashes `a.py1b.py2`, and so does a single `a.py` of
+    "1b.py2". Both are engine trees, and moving code from one module into
+    another is exactly the edit that produces that shape -- the one a digest
+    over an engine exists to notice.
+    """
+    two = digest_of(_package(tmp_path / "two", {"a.py": "1", "b.py": "2"}))
+    one = digest_of(_package(tmp_path / "one", {"a.py": "1b.py2"}))
+    assert two != one
+
+
 def test_a_module_in_a_subpackage_counts(tmp_path: Path) -> None:
     """`core.combat` is a package of its own, and it is part of the engine."""
     bare = digest_of(_package(tmp_path / "one", {"a.py": "x = 1\n"}))

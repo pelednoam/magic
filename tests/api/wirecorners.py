@@ -64,7 +64,7 @@ def finished() -> set[str]:
     """
     found: set[str] = set()
     with talking(server()) as client:
-        created = decoded(client.post("/games", json={"you": "green", "them": "other"}).json())
+        created = decoded(client.post("/games", json={"mine": "green", "theirs": "other"}).json())
         session = created["session_id"]
         assert isinstance(session, str)
         # Twenty life, gone. Then one step, which is the priority boundary

@@ -17,11 +17,12 @@ considered:
   in step with the code, which is the same failure as the version.
 
 **What it means, exactly.** Two games with the same digest were played by
-byte-identical engine source. Two with different ones were not -- and that is
-all: a comment changed is a different digest, so a difference is a *reason to
-check*, not a verdict. It is diagnostic and nothing gates on it. The gate is
-the engine itself, which refuses an event it no longer considers legal and lets
-``replays`` skip that game rather than show a board the events did not produce.
+byte-identical engine source, file names included. Two with different digests
+were not -- and that is all: a comment changed is a different digest, so a
+difference is a *reason to check*, not a verdict. It is diagnostic and nothing
+gates on it. The gate is the engine itself, which refuses an event it no longer
+considers legal and lets ``replays`` skip that game rather than show a board
+the events did not produce.
 """
 
 from __future__ import annotations
@@ -62,11 +63,21 @@ def digest_of(package: Path) -> str:
     as well as its bytes -- otherwise renaming a module, or moving code between
     two of them, leaves the digest unchanged.
 
+    Each entry is **framed** by its two lengths, which is not decoration.
+    Without them the hash is over one unbroken run of bytes, so ``a.py`` of
+    ``"1"`` beside ``b.py`` of ``"2"`` hashes ``a.py1b.py2`` -- and so does a
+    single ``a.py`` of ``"1b.py2"``. Both are engine trees, and moving code
+    from one module into another is exactly the edit that produces that shape:
+    the one this is meant to notice.
+
     ``package`` is a parameter only so that a test can digest a directory it
     wrote itself rather than asserting things about this one.
     """
     running = hashlib.sha256()
     for path in sorted(package.rglob(f"*{SUFFIX}")):
-        running.update(str(path.relative_to(package)).encode("utf-8"))
-        running.update(path.read_bytes())
+        name = str(path.relative_to(package)).encode("utf-8")
+        body = path.read_bytes()
+        running.update(f"{len(name)}:{len(body)}:".encode())
+        running.update(name)
+        running.update(body)
     return running.hexdigest()[:LENGTH]

@@ -61,15 +61,35 @@ def _sources(loaded: object) -> Sources:
     have made every journal on disk unreadable to fix journals being
     unreadable.
 
-    Only strings are kept. A number or a null where a revision should be is not
-    a revision, and recording it as ``"3"`` would put a claim in front of
-    somebody that nothing supports.
+    Only strings are kept, and only strings that can leave again. A number or
+    a null where a revision should be is not a revision, and recording it as
+    ``"3"`` would put a claim in front of somebody that nothing supports.
     """
     if not isinstance(loaded, dict):
         return Sources()
     found = cast("dict[str, object]", loaded)
-    said = {name: value for name in SOURCE_FIELDS if isinstance(value := found.get(name), str)}
+    said = {
+        name: value
+        for name in SOURCE_FIELDS
+        if isinstance(value := found.get(name), str) and _sendable(value)
+    }
     return Sources(**said)
+
+
+def _sendable(value: str) -> bool:
+    """Whether this revision can go back out on the wire.
+
+    ``json.loads`` accepts an escaped lone surrogate -- ``"\ud800"`` -- as a
+    perfectly good ``str``, and Starlette then raises ``UnicodeEncodeError``
+    encoding the response: one damaged byte in an *optional* field made the
+    whole journal unreadable, which is the opposite of what recording it is
+    for.
+    """
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
 
 
 def _libraries(loaded: Mapping[str, object]) -> dict[str, tuple[tuple[str, str], ...]]:

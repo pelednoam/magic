@@ -16,6 +16,10 @@ A game is addressed by its **position** in the journal. Two runs into the same
 journal repeat a seed, and a seed is then not an address: it would put one
 game's moments under another game's name. The seed still travels, because it is
 what re-runs the game, and it is a label rather than a key.
+
+Four routes and the finding of a game; ``walked`` is how one is rendered. Split
+at the line limit, and the seam is a real one -- these are the refusals (404s, a
+403 for a seat that is not in the game) and that is the JSON.
 """
 
 from __future__ import annotations
@@ -25,9 +29,10 @@ from typing import TYPE_CHECKING
 from fastapi import HTTPException
 from starlette.status import HTTP_404_NOT_FOUND
 
-from mtgcoach.api import boardview, views
 from mtgcoach.api.context import Seated, snapshot
 from mtgcoach.api.replays import UnknownReplayError, games_in, journals
+from mtgcoach.api.seats import seated_in
+from mtgcoach.api.walked import listed, walked
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -78,13 +83,17 @@ def routes(app: FastAPI, server: Server) -> None:
         board all work on a position out of somebody else's game without a
         single route knowing it came from a replay.
 
-        And because it is a game from here on, it is played from a seat: the
-        hand this device is shown is its own, though the moment it stepped in
-        from showed both. That is not an inconsistency. Reading a finished
-        game is not playing one, and the instant somebody can *act* on a
-        position the rules about who may see what apply again.
+        And because it is a game from here on, it is played from a seat: this
+        device is shown its own hand, though the moment it stepped in from
+        showed both. Reading a finished game is not playing one, and the
+        instant somebody can *act* on a position the rules about who may see
+        what apply again.
         """
         stepped = _moment(_game(_found(server, name), game), index)
+        # Before adopting, not after. A moment out of somebody else's journal
+        # can be between seats this server has no token for, and adopting it
+        # first left a game in the store that nobody could ever read.
+        seated_in(stepped.state, seat)
         started = server.store.adopt(stepped.state)
         return {"session_id": started.session_id, **snapshot(server, started, seat)}
 
@@ -134,67 +143,3 @@ def _moment(game: Replay, index: int) -> Moment:
         msg = f"no moment {index} in game {game.index}"
         raise HTTPException(HTTP_404_NOT_FOUND, msg)
     return game.moments[index]
-
-
-def listed(server: Server, game: Replay) -> dict[str, Json]:
-    """One game, as a line to choose from -- and what it was played under.
-
-    ``differs`` is the whole point of recording the revisions: it names which
-    of the three have moved since, so "this journal will not open" becomes
-    "this journal was made by a different engine". A revision the journal never
-    recorded is not a difference -- see ``Sources.differs_from`` -- so an old
-    journal reads as old rather than as three things having changed.
-    """
-    return {
-        "index": game.index,
-        "seed": game.seed,
-        "decks": list(game.decks),
-        "decisions": len(game.moments),
-        "sources": {
-            "engine": game.sources.engine,
-            "cards": game.sources.cards,
-            "rules": game.sources.rules,
-        },
-        "differs": list(game.sources.differs_from(server.sources)),
-    }
-
-
-def walked(server: Server, game: Replay) -> dict[str, Json]:
-    """One game, as something a screen can page through."""
-    return {**listed(server, game), "moments": [moment(server, one) for one in game.moments]}
-
-
-def moment(server: Server, one: Moment) -> dict[str, Json]:
-    """One moment: where in the game, the board, and what was said about it.
-
-    The board goes out as ``boardview.state`` -- the same shape a live game sends
-    -- so the app renders a replayed position with the components it already
-    has, and a position looks the same whether it is happening now or happened
-    last night.
-
-    With ``RECORDED`` for the seat, which is the one way it differs from a live
-    board: **both hands are shown.** A recording is not a game in progress.
-    Nobody can act on what it shows, there is no advantage left to take, and
-    what makes a game worth walking through is seeing why each side did what it
-    did -- which is the cards they were holding. A live board withholds the
-    other hand (CR 400.2) and this one cannot, because there is no player here
-    to withhold it from.
-
-    Named from the server's catalogue, for the same reason. A journal holds
-    oracle ids, which are Scryfall's UUIDs; without the catalogue every card on
-    the walk screen reads ``b2c6aa39-...`` while the *same* position one tap
-    later, under "ask about this", reads "Forest". ``Catalogue.name`` falls
-    back to the id for a card this server never imported -- which a replay of
-    another set really can contain -- and that is the honest answer: this is a
-    card the server cannot name.
-    """
-    return {
-        "turn": one.turn,
-        "step": str(one.step),
-        "player": one.player,
-        "state": boardview.state(one.state, server.catalogue, boardview.RECORDED),
-        "said": views.explanation(one.said) if one.said is not None else None,
-        "trusted": one.trusted,
-        "problems": list(one.problems),
-        "error": one.error,
-    }

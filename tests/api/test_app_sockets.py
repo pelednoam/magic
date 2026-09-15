@@ -35,7 +35,7 @@ WS_NO_SUCH_GAME = 4004
 
 
 def _new_game(client: TestClient) -> str:
-    response = client.post("/games", json={"you": "green", "them": "other"})
+    response = client.post("/games", json={"mine": "green", "theirs": "other"})
     assert response.status_code == HTTP_OK
     session_id: str = response.json()["session_id"]
     return session_id

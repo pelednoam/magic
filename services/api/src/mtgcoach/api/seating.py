@@ -139,7 +139,15 @@ def parsed(text: str) -> Seating | None:
     token would keep exactly the hole the seating closes. It is replaced, both
     devices are told the new tokens, and the old one stops working -- which is
     what rotating a credential looks like from the inside.
+
+    Strict about the end of the file too. A line only counts once the newline
+    ``written`` puts after it is there, so a file caught half-written -- or cut
+    short by a full disk -- is not a seating. Without that, the truncated
+    second line ``them ab`` parses as a perfectly good two-character token, and
+    the server would accept it forever after.
     """
+    if not text.endswith("\n"):
+        return None
     found: dict[str, str] = {}
     for line in text.splitlines():
         if not line.strip():

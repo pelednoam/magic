@@ -32,7 +32,7 @@ HTTP_REFUSED = 400
 
 
 def _game(client: TestClient) -> str:
-    created = decoded(client.post("/games", json={"you": "green", "them": "other"}).json())
+    created = decoded(client.post("/games", json={"mine": "green", "theirs": "other"}).json())
     session = created["session_id"]
     assert isinstance(session, str)
     return session

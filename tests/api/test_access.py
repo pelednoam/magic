@@ -126,7 +126,7 @@ def test_the_socket_accepts_the_token_in_the_query_string() -> None:
     # One app, so the game the socket asks for is the game that was started.
     app = server()
     with talking(app) as client:
-        started = client.post("/games", json={"you": "green", "them": "other"}).json()
+        started = client.post("/games", json={"mine": "green", "theirs": "other"}).json()
     stranger = TestClient(app)
     with stranger.websocket_connect(
         f"/games/{started['session_id']}/watch?token={TOKEN}"

@@ -148,6 +148,7 @@ describe("what a replayed game's line says", () => {
     decisions: 3,
     sources: { engine: "e1", cards: "c1", rules: "August 7, 2026" },
     differs: [] as readonly string[],
+    problem: "",
   };
 
   it("says how much there is to walk through", () => {
@@ -163,5 +164,11 @@ describe("what a replayed game's line says", () => {
   it("names every version that moved", () => {
     const moved = lineNote({ ...line, differs: ["engine", "card data"] });
     expect(moved).toContain("engine, card data");
+  });
+
+  it("says a game cannot be walked rather than counting decisions it has none of", () => {
+    const refused = lineNote({ ...line, decisions: 0, problem: "IllegalEventError: ..." });
+    expect(refused).toContain("cannot be stepped through");
+    expect(refused).not.toContain("0 decisions");
   });
 });

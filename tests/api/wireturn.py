@@ -69,7 +69,7 @@ def a_whole_turn() -> set[str]:
         unsure="not everything",
     )
     with talking(server(explainer=Canned(said), asker=Answering(answer), rules=RULES)) as client:
-        created = decoded(client.post("/games", json={"you": "green", "them": "other"}).json())
+        created = decoded(client.post("/games", json={"mine": "green", "theirs": "other"}).json())
         session_id = created["session_id"]
         assert isinstance(session_id, str)
         found.update(keys(created))

@@ -106,10 +106,34 @@ def test_the_file_is_written_in_seat_order() -> None:
     assert written(KNOWN).splitlines() == [f"{MINE} mine", f"{THEIRS} theirs"]
 
 
+def test_no_proper_prefix_of_a_written_seating_is_read_as_one() -> None:
+    """A file caught half-written is not a seating, at any length.
+
+    Truncation used to be invisible, and it was the worst way for this to fail:
+    cut ``them <token>`` short anywhere and what is left is still a well-formed
+    line holding a shorter token, which the server would then accept as that
+    seat's credential -- a one-character one, if the write stopped that early.
+    A crash mid-write and a full disk both produce exactly that file.
+
+    Every prefix, rather than a couple of hand-picked ones, because the bug was
+    that *some* lengths parse and there is no interesting length to pick.
+    """
+    whole = written(fresh())
+    for cut in range(len(whole)):
+        assert parsed(whole[:cut]) is None, f"{whole[:cut]!r} is not a whole seating"
+
+
+def test_a_seating_that_reads_back_is_one_the_writer_finished() -> None:
+    """The guard on the guard: the whole file is still read, not just refused."""
+    assert parsed(written(KNOWN)) == KNOWN
+
+
 @pytest.mark.parametrize(
     ("text", "why"),
     [
         ("", "an empty file"),
+        ("you mine\nthem theirs", "a file with no newline after its last line"),
+        ("you mine\nthem th", "a second line cut short mid-token"),
         ("   \n\n", "a file of whitespace"),
         ("one-single-token\n", "the single token this file used to hold"),
         ("you mine them theirs\n", "one line with everything on it"),

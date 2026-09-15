@@ -16,8 +16,16 @@ import { isJournals, isPlayedGame, isWalkthrough } from "../src/wire";
 
 const TOKEN = "t";
 
-/** One line of a journal's game list. */
-const LINE = { index: 2, seed: 77, decks: ["inferno", "healing"], decisions: 81 };
+/** One line of a journal's game list, with everything the server sends. */
+const LINE = {
+  index: 2,
+  seed: 77,
+  decks: ["inferno", "healing"],
+  decisions: 81,
+  sources: { engine: "e1", cards: "c1", rules: "August 7, 2026" },
+  differs: [] as readonly string[],
+  problem: "",
+};
 
 /** A board with one card on it, for naming a checked choice. */
 const BOARD = {

@@ -82,17 +82,13 @@ checks it.** A token names one seat (`api/seating`), the gate stamps the
 connection with it (`api/gatekeeper`), and `api/acting.sent_by` refuses an
 event naming anybody else -- 403, because the request is well formed and what
 is wrong is who sent it. `AdvanceStep` is the one exception and names nobody:
-ending a step is a consequence of every player passing (CR 117.4), not a move,
-and the passes it needs are seated events checked like any other.
+a step ends when the stack is empty and every player has passed in succession
+(CR 500.2), which is a consequence rather than a move -- and the passes it
+needs are seated events, checked like any other.
 
 It was demonstrable in four lines before: one device could post
 `{"type": "change_life", "player": "them", "amount": -5}` and take five life
 off the other player. `tests/api/test_seats.py` is that, refused.
-
-Still not decided: retries, cancellation, and commit boundaries for a
-multi-event action that fails part-way. The review asks for "state revision and
-retry semantics" as a Phase B deliverable, and it is the part of Phase B that
-is missing.
 
 Still not decided: retries, cancellation, and commit boundaries for a
 multi-event action that fails part-way. The review asks for "state revision and
@@ -120,11 +116,13 @@ git commit (absent from an installed wheel, and moves when a README does). A
 digest cannot be forgotten, because nothing has to remember it.
 
 **Nothing gates on them.** The engine is the gate: it refuses an event it no
-longer considers legal and `replays` skips that game. What these do is turn
-"this journal will not open" into "played under a different engine", which the
-walk screen now says. A revision nobody recorded is not a difference, so the
-journals already on disk read as *old* rather than as three things having
-changed — that is the whole of the migration.
+longer considers legal, and a game whose events it refuses has no board to
+show. What these do is turn "this journal will not open" into "played under a
+different engine", which the replay list now says beside the reason itself —
+the game is *listed* with no moments rather than dropped, because the list is
+where somebody finds out. A revision nobody recorded is not a difference, so
+the journals already on disk read as *old* rather than as three things having
+changed; that is the whole of the migration.
 
 Per-scenario too, which is where this meets item 8: `tests/rules` records the
 revision its excerpt was cut from, and `check_retrieval` prints the revision of
@@ -218,11 +216,11 @@ wrong one. And the coach and rules routes refuse a request naming the other
 seat: both put a hand in a prompt, so asking about the other player was a way
 to read their cards out of a model's answer.
 
-A replay is the deliberate exception: a recorded game shows both hands, because
-it is not a game in progress, nobody can act on what it shows, and what makes a
-game worth walking through is seeing what each side was holding. Stepping *into*
-a moment makes it a live game again, and the hand withholding comes back with
-it.
+A replay is the deliberate exception: a recorded game shows both hands, and the
+walk screen prints them under each battlefield. It is not a game in progress,
+nobody can act on what it shows, and "why didn't they block?" is answered by
+the cards they were holding. Stepping *into* a moment makes it a live game
+again, and the withholding comes back with it.
 
 Still not decided: what game data is kept for evaluation. Journals hold every
 briefing verbatim, which is what makes a bad answer diagnosable and also means

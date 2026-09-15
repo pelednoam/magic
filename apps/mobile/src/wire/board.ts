@@ -12,7 +12,6 @@
  * and this app prints; it does not know what a land is, and must not learn.
  */
 
-
 /** One card in hand, and the engine's verdict on it. */
 export interface Playable {
   readonly instance_id: string;

@@ -97,6 +97,17 @@ def _routes(app: FastAPI, server: Server) -> None:
     walking.routes(app, server)
 
 
+def _named(seat: str) -> tuple[str, str]:
+    """This seat and the other one, in that order.
+
+    A two-player game, so "the other one" is the other member of ``SEATS``.
+    Here rather than inline so that the route reads as the rule it is applying
+    -- the deck a device calls "mine" is dealt to the seat its token names.
+    """
+    other = next(one for one in SEATS if one != seat)
+    return seat, other
+
+
 def _reading(app: FastAPI, server: Server) -> None:
     """The routes that only look.
 
@@ -114,15 +125,29 @@ def _reading(app: FastAPI, server: Server) -> None:
 
     @app.post("/games", response_model=None)
     def new_game(body: dict[str, str], seat: Seated) -> dict[str, Json]:
-        """Start a game between two decks.
+        """Start a game between two decks, named from the asking device's side.
 
-        Either seat may start one, and the seats it deals are always both of
-        ``SEATS`` -- which is not the same question. Whoever presses the button
-        is not thereby the first player; the deal decides that, and it decides
-        it the same way whichever device asked.
+        ``{"mine": ..., "theirs": ...}``, and **this** decides which seat each
+        deck reaches. The body used to name the seats -- ``{"you": ...,
+        "them": ...}`` -- which worked only while the device that started a
+        game was always seat "you". It is not, now that a seat comes off a
+        token: a phone holding the other one picked its own deck and the server
+        dealt that deck to its opponent, so it played the whole game out of the
+        deck it had chosen *for* them.
+
+        The client cannot fix that for itself without doing the seat
+        arithmetic, and deciding which player gets which deck is a setup rule.
+        §4 has the app render and the server decide, so the names on the wire
+        are relative and this is where they are resolved.
+
+        Either seat may start a game. Whoever presses the button is not thereby
+        the first player: the deal decides that, and decides it the same way
+        whichever device asked.
         """
+        mine, theirs = _named(seat)
         libraries = {
-            PlayerId(name): library(server.decks, name, body.get(name, "")) for name in SEATS
+            PlayerId(mine): library(server.decks, mine, body.get("mine", "")),
+            PlayerId(theirs): library(server.decks, theirs, body.get("theirs", "")),
         }
         try:
             started = server.store.create(libraries, PlayerId(SEATS[0]))

@@ -1456,9 +1456,18 @@ The seat is no longer chosen on the device either. It is read off the token and 
 every board, so a device cannot be set to the wrong one — which it could, and was: starting a
 game made you "you" and joining one made you "them", whichever token you held.
 
-A replay is the deliberate exception: a recorded game shows both hands, because it is not a game
-in progress and what makes one worth walking through is seeing what each side held. Stepping
-*into* a moment makes it live again, and the withholding comes back with it.
+A replay is the deliberate exception: a recorded game shows both hands — the walk screen prints
+them under each battlefield — because it is not a game in progress and "why didn't they block?"
+is answered by the cards they were holding. Stepping *into* a moment makes it live again, and the
+withholding comes back with it.
+
+**What identity does not close.** `MoveCard` is still unchecked — `guard.py` looks at land drops,
+casts and resolutions and nothing else, because that event is the primitive effects will be built
+from rather than a player action. A seat can no longer move the *other* player's cards, which is
+new, but within its own zones it can move any card anywhere: library to hand is a legal request.
+That is a cheating vector at a table where somebody wants to cheat, and this app is for a family
+learning the rules — but it is a separate hole from identity, it is not closed, and Phase C is
+where it goes away, because an effect that moves a card is the only thing that should be able to.
 
 **A game says what it was played under.** `api/sources.py` carries three revisions — a digest
 over `core`'s source, the sealed card fixture's checksum, and the rules document's own
@@ -1466,6 +1475,10 @@ over `core`'s source, the sealed card fixture's checksum, and the rules document
 engine is the gate. What they do is turn "this journal will not open" into "played under a
 different engine", which is the difference between a puzzle and a fact, and which is what a
 directory of journals unreadable after priority arrived could not say.
+
+A game the engine will not rebuild is **listed** with the reason and those three revisions
+rather than dropped from the answer. Dropping it threw away the only thing that explains it, and
+left the list numbering by file position with a hole in it.
 
 **The server may not contradict its own coach.** `guard.py` asks `legality.why_not_play_land`
 rather than re-deciding. It used to check only that the card was a land, and the reducer checks

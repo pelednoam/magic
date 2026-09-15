@@ -21,6 +21,7 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
+from mtgcoach.api.position import position
 from starlette.status import (
     HTTP_400_BAD_REQUEST,
     HTTP_403_FORBIDDEN,
@@ -29,8 +30,8 @@ from starlette.status import (
 
 from mtgcoach.api.asking import answered
 from mtgcoach.api.coaching import coached
-from mtgcoach.api.context import Seated, position, session
-from mtgcoach.api.seats import seated_in
+from mtgcoach.api.context import Seated, session
+from mtgcoach.api.seats import MAX_SEAT, seated_in
 from mtgcoach.coach.advice import ExplainerError
 
 if TYPE_CHECKING:
@@ -48,10 +49,6 @@ if TYPE_CHECKING:
 #: this it is either a mistake or somebody filling the prompt with their own
 #: text, and both are answered better by saying so than by forwarding it.
 MAX_QUESTION = 500
-
-#: The longest seat name worth echoing back. The real ones are "you" and
-#: "them"; anything longer is not a seat and does not need quoting in full.
-MAX_SEAT = 40
 
 
 @contextmanager
@@ -141,7 +138,7 @@ def _asking(
         HTTPException: 404 for a game that is not there, and 403 both for a
             body naming another seat and for a seat that is not a player in
             this game -- which a game adopted from somebody else's journal
-            really can be. See ``context.seated_in``.
+            really can be. See ``seats.seated_in``.
     """
     game = session(server, session_id)
     claimed = body.get("player", seat)[:MAX_SEAT]
@@ -150,4 +147,4 @@ def _asking(
         # posted -- this reaches a client, and the CORS policy is `*`.
         msg = f"your token is {seat!r}; it cannot ask as {claimed!r}"
         raise HTTPException(HTTP_403_FORBIDDEN, msg)
-    return game, seated_in(game, seat)
+    return game, seated_in(game.state, seat)

@@ -3,21 +3,20 @@
 # pyright: reportUnknownArgumentType=false
 #
 # Same reason as test_app: the TestClient's response type is opaque to strict
-# pyright, and what is read here is read for its shape rather than through
-# ``wire``.
+# pyright, and what is read here is read for its shape.
 
 """Which player a token is, and what it may therefore do.
 
 `test_access` covers the door -- whether a request gets in at all. This is who
 came through it, which was not a question while there was one token for the
-whole server. `test_hidden` is the other consequence: what each device is then
+whole server; `test_hidden` is the other consequence, what each device is then
 *sent*.
 
-The hole this closes was demonstrable in four lines. One device, holding the
-only token, could post `{"type": "change_life", "player": "them", "amount": -5}`
-and take five life off the other player. Nothing checked the `player` field
-against anything, because there was nothing to check it against -- and the
-second device is the one the child holds.
+The hole was demonstrable in four lines. One device, holding the only token,
+could post `{"type": "change_life", "player": "them", "amount": -5}` and take
+five life off the other player: nothing checked the `player` field, because
+there was nothing to check it against -- and the second device is the one the
+child holds.
 """
 
 from __future__ import annotations
@@ -31,8 +30,7 @@ from helpers_api import MINE, OTHER_TOKEN, THEIRS, TOKEN, server, talking
 from helpers_coach import game
 from mtgcoach.api.gatekeeper import SEAT, UnseatedError, seat_of
 from mtgcoach.api.seats import seated_in
-from mtgcoach.api.sessions import Session
-from wire import decoded, text
+from wire import decoded, rows, text
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -40,8 +38,8 @@ if TYPE_CHECKING:
 HTTP_OK = 200
 HTTP_FORBIDDEN = 403
 
-#: The decks a test game is dealt, keyed by the seat that gets them.
-DEAL = {"you": "green", "them": "other"}
+#: The decks a game is started with, named from the device that posts it.
+DEAL = {"mine": "green", "theirs": "other"}
 
 
 def _started(app: FastAPI) -> str:
@@ -81,6 +79,24 @@ def test_the_scope_key_is_where_it_is_thought_to_be() -> None:
     than by fifty failures elsewhere.
     """
     assert seat_of({SEAT: "you"}) == "you"
+
+
+# --- the deck a device picks is the deck it plays -----------------------------
+
+
+def test_the_deck_a_device_calls_its_own_is_dealt_to_its_own_seat() -> None:
+    """The body names decks from the poster's side; the server resolves it.
+
+    It used to name the *seats*, which worked only while the device starting a
+    game was always seat "you". It is not, now the seat comes off a token: a
+    phone holding the other one picked its deck, the server dealt that deck to
+    the opponent, and the phone played out of the one it chose *for them*.
+    """
+    app = server(decks={"bears": ("Bear",) * 10, "forests": ("Forest",) * 10})
+    with talking(app, token=OTHER_TOKEN) as client:
+        started = decoded(client.post("/games", json={"mine": "bears", "theirs": "forests"}).json())
+    held = {card["name"] for card in rows(started, "state", "players", THEIRS, "hand")}
+    assert held == {"Grizzly Bears"}, "the deck it asked for, under the seat it holds"
 
 
 # --- an event may only name the seat that sent it ------------------------------
@@ -178,8 +194,7 @@ def test_a_seat_that_is_not_a_player_in_this_game_is_refused() -> None:
     whatever seats that journal used, and advising a player who is not there
     must not be a 500 -- or, worse, an answer about nobody.
     """
-    state = game()
     with pytest.raises(HTTPException) as refused:
-        seated_in(Session("x", initial=state, events=(), state=state), THEIRS)
+        seated_in(game(), THEIRS)
     assert refused.value.status_code == HTTP_FORBIDDEN
     assert "not you" in str(refused.value.detail)

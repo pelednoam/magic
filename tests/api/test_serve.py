@@ -69,7 +69,7 @@ def test_a_deck_is_dealt_from_the_cards_the_store_actually_has(tmp_path: Path) -
     """A partial import gives a short deck, not a refusal or a blank card."""
     serving = assemble(_stocked(tmp_path), _root(tmp_path), FDN)
     with talking(serving.app, token=serving.seating.token(MINE)) as client:
-        response = client.post("/games", json={"you": "elves", "them": "elves"})
+        response = client.post("/games", json={"mine": "elves", "theirs": "elves"})
         assert response.status_code == HTTP_OK, response.text
         hand = rows(decoded(response.json()), "state", "players", "you", "hand")
         assert hand, "a deck built from the store deals a real opening hand"
@@ -116,7 +116,7 @@ def test_the_rules_are_loaded_when_they_are_installed(
     _install_rules(root, _long_enough())
     _copy_sets(root)
     with _dealt(tmp_path, root) as client:
-        body = decoded(client.post("/games", json={"you": "elves", "them": "elves"}).json())
+        body = decoded(client.post("/games", json={"mine": "elves", "theirs": "elves"}).json())
         assert body["rules_available"] is True
     assert "rules questions are off" not in capsys.readouterr().out
 
@@ -128,7 +128,7 @@ def test_a_server_without_the_rules_still_starts(
     root = tmp_path / "data"
     _copy_sets(root)
     with _dealt(tmp_path, root) as client:
-        body = decoded(client.post("/games", json={"you": "elves", "them": "elves"}).json())
+        body = decoded(client.post("/games", json={"mine": "elves", "theirs": "elves"}).json())
         assert body["rules_available"] is False
     # Printed, because a question box that silently answers nothing is worse
     # than one that says it is switched off.
@@ -159,7 +159,7 @@ def test_a_rules_document_that_is_not_the_rules_does_not_stop_the_server(
     _install_rules(root, installed)
     _copy_sets(root)
     with _dealt(tmp_path, root) as client:
-        body = decoded(client.post("/games", json={"you": "elves", "them": "elves"}).json())
+        body = decoded(client.post("/games", json={"mine": "elves", "theirs": "elves"}).json())
         assert body["rules_available"] is False
     assert "rules questions are off" in capsys.readouterr().out
 

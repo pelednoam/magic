@@ -68,6 +68,14 @@ describe("a response is not a snapshot because we said so", () => {
     expect(isSnapshot({ ...good, advice: { them: {} } })).toBe(false);
   });
 
+  it("rejects a seat that is only an inherited property", () => {
+    // `advice["__proto__"]` is `Object.prototype` -- an object, so a plain
+    // lookup accepted it and the crash arrived later in `turnLine` with an
+    // undefined step. A decoded payload's own keys are the only ones that
+    // count, which is what `Object.hasOwn` is there for.
+    expect(isSnapshot({ ...good, seat: "__proto__", advice: {} })).toBe(false);
+  });
+
   it("rejects players that is an array", () => {
     expect(isSnapshot({ ...good, state: { players: [] } })).toBe(false);
   });

@@ -36,7 +36,7 @@ WS_NO_SUCH_GAME = 4004
 
 
 def _new_game(client: TestClient) -> str:
-    response = client.post("/games", json={"you": "green", "them": "other"})
+    response = client.post("/games", json={"mine": "green", "theirs": "other"})
     assert response.status_code == HTTP_OK
     session_id: str = response.json()["session_id"]
     return session_id
@@ -49,7 +49,7 @@ def test_the_decks_it_can_deal() -> None:
 
 def test_starting_a_game_returns_the_board_and_the_advice() -> None:
     with talking(server()) as client:
-        body = client.post("/games", json={"you": "green", "them": "other"}).json()
+        body = client.post("/games", json={"mine": "green", "theirs": "other"}).json()
         assert number(body, "state", "turn") == 1
         assert set(obj(body, "advice")) == {"you"}
 
@@ -64,7 +64,7 @@ def test_the_advice_is_the_asking_seat_s_own() -> None:
 
 def test_an_unknown_deck_is_refused() -> None:
     with talking(server()) as client:
-        response = client.post("/games", json={"you": "mono-blue", "them": "green"})
+        response = client.post("/games", json={"mine": "mono-blue", "theirs": "green"})
         assert response.status_code == HTTP_BAD_REQUEST
         assert "mono-blue" in response.json()["detail"]
 
@@ -137,7 +137,7 @@ def test_a_deck_too_short_to_deal_is_a_bad_request() -> None:
         CATALOGUE, {"tiny": ("Forest",) * 3}, SEATING, Claude(NoCoach(), NoAnswers())
     )
     with talking(short) as client:
-        response = client.post("/games", json={"you": "tiny", "them": "tiny"})
+        response = client.post("/games", json={"mine": "tiny", "theirs": "tiny"})
         assert response.status_code == HTTP_BAD_REQUEST
         assert "opening hand" in response.json()["detail"]
 

@@ -29,7 +29,11 @@ engine", which is the difference between a puzzle and a fact.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from mtgcoach.api.views import Json
 
 #: What an unknown revision is recorded as. Empty rather than "unknown", so
 #: that a reader can tell it from a revision somebody called that -- and so a
@@ -50,13 +54,26 @@ class Sources:
 
     #: A digest over the rules engine's source; see ``core.revision``.
     engine: str = UNRECORDED
-    #: The sha256 of the sealed card-data fixture, as its manifest records it.
+    #: The sha256 of the sealed card-data fixture -- of the bytes actually
+    #: loaded, checksummed by ``cards.build`` rather than read out of the
+    #: manifest beside them. A manifest that disagrees with its file is what
+    #: ``mtgcoach effects check`` exists to catch, and a revision must not
+    #: inherit that disagreement.
     cards: str = UNRECORDED
     #: The date the Comprehensive Rules say they took effect; see
     #: ``rules.effective``. Empty on a server with no rules installed, which is
     #: a supported way to run this -- the tracker and the engine do not need
     #: them, and only the question box goes away.
     rules: str = UNRECORDED
+
+    def as_json(self) -> dict[str, Json]:
+        """The three revisions, as every payload and every journal line sends them.
+
+        One emitter, used by the snapshot, the replay list and the recording.
+        Three hand-written dicts is three spellings of the same keys, and the
+        way one of them silently stops being read is that they drift.
+        """
+        return {one.name: getattr(self, one.name) for one in fields(self)}
 
     def differs_from(self, other: Sources) -> tuple[str, ...]:
         """Which revisions are not the same, named, for a person to read.

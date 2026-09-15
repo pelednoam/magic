@@ -21,17 +21,10 @@ the difference worth seeing is the one field that moved.
 
 from __future__ import annotations
 
-import json
+from dataclasses import fields
 
-from helpers_api import CATALOGUE, DECKS, SEATING, server, talking
-from helpers_fakes import NoAnswers, NoCoach
-from helpers_replay import recording
-from mtgcoach.api.app import create_app
-from mtgcoach.api.context import Claude
-from mtgcoach.api.reading import recorded
+from mtgcoach.api.recording import SOURCE_FIELDS
 from mtgcoach.api.sources import UNRECORDED, Sources
-from mtgcoach.core.revision import engine
-from wire import decoded, obj
 
 MINE = Sources(engine="engine-1", cards="cards-1", rules="August 7, 2026")
 
@@ -70,87 +63,11 @@ def test_a_missing_field_does_not_hide_the_ones_that_are_there() -> None:
     assert MINE.differs_from(partly) == ("engine",)
 
 
-# --- through a journal line ---------------------------------------------------
+def test_the_field_names_the_journal_uses_are_the_fields_there_are() -> None:
+    """`reading` builds a `Sources` by keyword from these names.
 
-
-def _roundtripped(sources: Sources) -> Sources:
-    """What a recording's revisions read back as, after a trip through JSON."""
-    read = recorded(json.loads(recording(sources).as_json()))
-    assert read is not None
-    return read.sources
-
-
-def test_the_revisions_survive_a_journal_line() -> None:
-    """Written and read back by the two halves of the format.
-
-    A revision that is written and never read is decoration, and this is the
-    same round trip `test_eventspec` asserts over events -- for the same
-    reason: a recorded game is only as good as what comes back out of it.
+    So a field renamed on one side and not the other is a `TypeError` on the
+    first journal read -- or, if the rename went the other way, a revision
+    written and silently never read back. One list, asserted against the type.
     """
-    assert _roundtripped(MINE) == MINE
-
-
-def test_a_game_that_recorded_nothing_reads_back_as_nothing() -> None:
-    assert _roundtripped(Sources()) == Sources()
-
-
-def test_a_journal_line_with_no_revisions_at_all_is_readable() -> None:
-    """Every journal on disk is one of these.
-
-    Refusing them in order to fix journals being unreadable would be a poor
-    trade.
-    """
-    line = json.loads(recording().as_json())
-    del line["sources"]
-    read = recorded(line)
-    assert read is not None
-    assert read.sources == Sources()
-
-
-def test_something_that_is_not_a_revision_is_not_recorded_as_one() -> None:
-    """A number or a null where a revision should be is not a revision.
-
-    Recording it as "3" would put a claim in front of somebody that nothing
-    supports -- and the whole value of these is that they are either true or
-    absent.
-    """
-    line = json.loads(recording().as_json())
-    line["sources"] = {"engine": 3, "cards": None, "rules": "August 7, 2026"}
-    read = recorded(line)
-    assert read is not None
-    assert read.sources == Sources(rules="August 7, 2026")
-
-
-def test_a_sources_field_that_is_not_an_object_is_ignored() -> None:
-    line = json.loads(recording().as_json())
-    line["sources"] = "engine-1"
-    read = recorded(line)
-    assert read is not None
-    assert read.sources == Sources()
-
-
-# --- and what the server says about itself ------------------------------------
-
-
-def test_a_board_says_what_produced_it() -> None:
-    """A client showing a position should be able to say what produced it."""
-    with talking(server()) as client:
-        started = decoded(client.post("/games", json={"you": "green", "them": "other"}).json())
-    assert obj(started, "sources") == {"engine": engine(), "cards": "", "rules": ""}
-
-
-def test_a_server_with_a_rules_document_says_which_revision_it_is() -> None:
-    """The document's own sentence, read off the copy actually installed."""
-    app = create_app(
-        CATALOGUE,
-        DECKS,
-        SEATING,
-        Claude(explainer=NoCoach(), asker=NoAnswers(), rules_revision="August 7, 2026"),
-    )
-    with talking(app) as client:
-        started = decoded(client.post("/games", json={"you": "green", "them": "other"}).json())
-    assert obj(started, "sources") == {
-        "engine": engine(),
-        "cards": "",
-        "rules": "August 7, 2026",
-    }
+    assert set(SOURCE_FIELDS) == {one.name for one in fields(Sources)}

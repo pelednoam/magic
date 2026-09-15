@@ -24,14 +24,24 @@ from typing import TYPE_CHECKING
 
 from fastapi.testclient import TestClient
 
-from helpers_api import MINE, OTHER_TOKEN, THEIRS, TOKEN, server, talking
+from helpers_api import CATALOGUE, MINE, OTHER_TOKEN, SEATING, THEIRS, TOKEN, server, talking
+from helpers_fakes import NoAnswers, NoCoach
+from mtgcoach.api import acting
+from mtgcoach.api.context import Server
+from mtgcoach.api.gatekeeper import guarded
+from mtgcoach.api.hub import Hub
+from mtgcoach.api.sessions import SessionStore
+from mtgcoach.core.ids import PlayerId
+from mtgcoach.core.player import PlayerState
+from mtgcoach.core.state import GameState
+from mtgcoach.core.steps import Step
 from wire import decoded, text
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
 
-#: The decks a test game is dealt, keyed by the seat that gets them.
-DEAL = {"you": "green", "them": "other"}
+#: The decks a game is started with, named from the device that posts it.
+DEAL = {"mine": "green", "theirs": "other"}
 
 #: What a fresh hand holds (CR 103.4), which is what both counts should read.
 OPENING_HAND = 7
@@ -142,3 +152,46 @@ def test_a_broadcast_reaches_both_seats_with_their_own_hands() -> None:
     assert first["state"]["players"][THEIRS]["hand"] is None
     assert second["state"]["players"][THEIRS]["hand"] is not None
     assert second["state"]["players"][MINE]["hand"] is None
+
+
+def test_a_socket_asking_for_a_game_this_seat_is_not_in_is_closed() -> None:
+    """A game adopted from somebody else's journal can be between other seats.
+
+    A socket has no status codes, so it is closed with a reason rather than
+    left to `snapshot`'s 403 -- an `HTTPException` raised inside a socket
+    handler is an unhandled error, not a refusal anybody receives.
+
+    Built from the pieces rather than through a route, because the only way to
+    get such a game into the store is to adopt one, and `step_into` now
+    refuses to adopt a moment this seat is not in.
+    """
+    served = guarded(SEATING)
+    store = SessionStore()
+    elsewhere = GameState(
+        turn=1,
+        active_player=PlayerId("alice"),
+        step=Step.PRECOMBAT_MAIN,
+        players={
+            PlayerId("alice"): PlayerState((), (), (), (), ()),
+            PlayerId("bob"): PlayerState((), (), (), (), ()),
+        },
+    )
+    adopted = store.adopt(elsewhere)
+    acting.routes(
+        served,
+        Server(
+            catalogue=CATALOGUE,
+            store=store,
+            hub=Hub(),
+            decks={},
+            explainer=NoCoach(),
+            asker=NoAnswers(),
+            rules=None,
+        ),
+    )
+    with TestClient(served).websocket_connect(
+        f"/games/{adopted.session_id}/watch?token={TOKEN}"
+    ) as socket:
+        message = socket.receive()
+    assert message["type"] == "websocket.close"
+    assert message["code"] == acting.NOT_YOUR_GAME

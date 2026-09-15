@@ -37,7 +37,8 @@ from mtgcoach.rules.question import brief
 from mtgcoach.rules.refusing import UNCHECKED, refusal
 
 if TYPE_CHECKING:
-    from mtgcoach.api.context import Position
+    from mtgcoach.api.position import Position
+
     from mtgcoach.api.views import Json
     from mtgcoach.rules.answer import Asker
     from mtgcoach.rules.search import RuleIndex

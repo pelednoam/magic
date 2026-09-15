@@ -28,7 +28,7 @@ from mtgcoach.api.gatekeeper import seat_of
 from mtgcoach.core.ids import PlayerId
 
 if TYPE_CHECKING:
-    from mtgcoach.api.sessions import Session
+    from mtgcoach.core.state import GameState
 
 
 def seated(connection: HTTPConnection) -> str:
@@ -48,7 +48,24 @@ def seated(connection: HTTPConnection) -> str:
     return seat_of(connection.scope)
 
 
-def seated_in(game: Session, seat: str) -> PlayerId:
+#: The longest seat name worth quoting back to a client. The real ones are
+#: "you" and "them"; anything longer is not a seat and does not need repeating
+#: in full -- a refusal reaches a browser and the CORS policy is ``*``, so a
+#: megabyte of whatever was posted must not come back out.
+MAX_SEAT = 40
+
+
+def plays_in(state: GameState, seat: str) -> bool:
+    """Whether this seat is a player in this game.
+
+    Without raising, for the one caller that cannot use a refusal: a WebSocket
+    has no status codes, so ``acting.watch`` closes the connection itself with
+    a reason rather than letting an ``HTTPException`` escape a socket handler.
+    """
+    return PlayerId(seat) in state.players
+
+
+def seated_in(state: GameState, seat: str) -> PlayerId:
     """This seat, as a player of this game.
 
     Every game *this* server deals has both of ``seating.SEATS`` in it, so in
@@ -57,14 +74,18 @@ def seated_in(game: Session, seat: str) -> PlayerId:
     advice about a player who is not there.
 
     One function, called by everything that pairs a seat with a game -- the
-    snapshot and both slow routes. Two checks of the same condition is one of
-    them being wrong later.
+    snapshot, both slow routes, and the replay route before it adopts a moment
+    as a game. Two checks of the same condition is one of them being wrong
+    later.
+
+    Takes the *state* rather than the session so that the replay route can ask
+    before adopting: it used to adopt the moment, then get a 403 out of the
+    snapshot, and leave a game in the store that nobody could ever read.
 
     Raises:
         HTTPException: 403 if this seat is not a player in this game.
     """
-    player = PlayerId(seat)
-    if player not in game.state.players:
-        seated_here = ", ".join(sorted(str(one) for one in game.state.players))
+    if not plays_in(state, seat):
+        seated_here = ", ".join(sorted(str(one) for one in state.players))
         raise HTTPException(HTTP_403_FORBIDDEN, f"this game is between {seated_here}, not you")
-    return player
+    return PlayerId(seat)

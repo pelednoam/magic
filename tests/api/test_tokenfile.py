@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 #: A seating a test can write to a file and expect back unchanged.
-KNOWN = Seating({"you": "already-yours", "them": "already-theirs"})
+KNOWN = Seating({SEATS[0]: "already-yours", SEATS[1]: "already-theirs"})
 
 
 def test_a_fresh_token_is_not_guessable() -> None:

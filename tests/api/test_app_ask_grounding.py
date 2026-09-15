@@ -20,12 +20,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from mtgcoach.api.position import Position
+
 from helpers import ME
 from helpers_api import CATALOGUE, RULES, server, talking
 from helpers_coach import game
 from helpers_fakes import Answering
 from mtgcoach.api.asking import answered
-from mtgcoach.api.context import Position
 from mtgcoach.coach.report import advise
 from mtgcoach.rules.answer import Answer
 from wire import decoded, flag, obj, rows, text, words
@@ -78,7 +79,7 @@ class Recording:
 
 
 def new_game(client: TestClient) -> str:
-    body = client.post("/games", json={"you": "green", "them": "other"}).json()
+    body = client.post("/games", json={"mine": "green", "theirs": "other"}).json()
     session_id: str = body["session_id"]
     return session_id
 

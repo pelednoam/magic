@@ -21,7 +21,7 @@ Two things follow, and both matter more than the bytes it costs:
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import TYPE_CHECKING
 
 from mtgcoach.api.eventspec import written
@@ -42,10 +42,11 @@ KIND = "game"
 #: What a card is written as: its instance id and its oracle id.
 CARD_FIELDS = 2
 
-#: The three revision fields, in the order a person reads them. One list, so
-#: that the writer above and ``reading`` cannot disagree about the spelling of
-#: a key -- which is the way a recorded revision silently becomes no revision.
-SOURCE_FIELDS = ("engine", "cards", "rules")
+#: The three revision fields. Written by ``Sources.as_json`` and read back by
+#: ``reading._sources``, which builds a ``Sources`` by keyword from these names
+#: -- so this is the list the reader trusts, and ``test_sources`` asserts it is
+#: the fields the type actually has.
+SOURCE_FIELDS = tuple(field.name for field in fields(Sources))
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,13 +105,7 @@ class Recording:
                 # Written even when every field is empty, so that a reader can
                 # tell "this journal predates the idea" from "this key was
                 # dropped by something in between".
-                "sources": dict(
-                    zip(
-                        SOURCE_FIELDS,
-                        (self.sources.engine, self.sources.cards, self.sources.rules),
-                        strict=True,
-                    )
-                ),
+                "sources": self.sources.as_json(),
             },
             ensure_ascii=False,
         )

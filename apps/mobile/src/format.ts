@@ -39,15 +39,17 @@ export function nameOf(board: Player, instanceId: string): string {
 /**
  * What to say under a replayed game's name.
  *
- * The `differs` half is why a game records which engine, card data and rules
- * it was played under. When one of those has moved, "played under a different
- * engine" is the sentence that turns a game the server will not open — it
- * refuses one whose events the engine no longer considers legal — from a
+ * Two halves, read together. A game the engine will not rebuild says so rather
+ * than offering a decision count it does not have; and `differs` names which
+ * version moved under it, which is what turns "this will not open" from a
  * puzzle into a fact. Silent when nothing moved, and silent for a game that
  * recorded nothing, which reads as old rather than as changed.
  */
 export function lineNote(line: GameLine): string {
-  const played = `${line.decisions} decisions · game ${line.seed}`;
+  const played =
+    line.problem === ""
+      ? `${line.decisions} decisions · game ${line.seed}`
+      : `cannot be stepped through · game ${line.seed}`;
   if (line.differs.length === 0) {
     return played;
   }
